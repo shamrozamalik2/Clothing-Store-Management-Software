@@ -9,7 +9,7 @@ import {
   TruckIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon,
   UserGroupIcon, ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { subDays, subMonths, format, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
+import { subDays, subMonths, format, parseISO, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
 
 import { reportsApi } from '@api/reports.api';
 import { formatCurrency, formatNumber } from '@utils/format';
@@ -149,8 +149,8 @@ function OverviewTab({ params }) {
   const topCusts   = tc?.data ?? [];
 
   const chartData = useMemo(() =>
-    dailyData.map(d => ({
-      day:       format(new Date(d.day + 'T00:00:00'), 'dd MMM'),
+    (dailyData ?? []).filter(d => d?.day).map(d => ({
+      day:       format(d.day instanceof Date ? d.day : parseISO(String(d.day).slice(0, 10)), 'dd MMM'),
       Revenue:   parseFloat(d.revenue)   || 0,
       Collected: parseFloat(d.collected) || 0,
     })), [dailyData]);
@@ -554,8 +554,8 @@ function PurchasesTab({ params }) {
   const bySupplier  = d?.bySupplier ?? [];
 
   const chartData = useMemo(() =>
-    (d?.daily ?? []).map(row => ({
-      day:    format(new Date(row.day + 'T00:00:00'), 'dd MMM'),
+    (d?.daily ?? []).filter(row => row?.day).map(row => ({
+      day:    format(row.day instanceof Date ? row.day : parseISO(String(row.day).slice(0, 10)), 'dd MMM'),
       Amount: parseFloat(row.total_amount) || 0,
     })), [d]);
 
