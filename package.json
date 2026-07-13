@@ -10,7 +10,7 @@
     "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
     "build:frontend": "npm --prefix frontend run build",
     "build": "npm run build:frontend && electron-builder install-app-deps && electron-builder",
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "node -e \"if(process.platform!=='linux')require('child_process').execSync('electron-builder install-app-deps',{stdio:'inherit'})\"",
     "dev:server": "cross-env NODE_ENV=development nodemon backend/src/server.js",
     "start:server": "node backend/src/server.js",
     "migrate": "node backend/src/database/migrate.js"
