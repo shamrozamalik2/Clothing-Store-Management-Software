@@ -763,7 +763,7 @@ function ReceiptModal({ receipt, onClose }) {
                   </td>
                   <td className="py-1.5 text-right text-gray-600">{item.quantity}</td>
                   <td className="py-1.5 text-right text-gray-600">₨{Number(item.unit_price).toFixed(0)}</td>
-                  <td className="py-1.5 text-right font-medium">₨{Number(item.subtotal).toFixed(0)}</td>
+                  <td className="py-1.5 text-right font-medium">₨{Number(item.total ?? item.subtotal).toFixed(0)}</td>
                 </tr>
               ))}
             </tbody>
