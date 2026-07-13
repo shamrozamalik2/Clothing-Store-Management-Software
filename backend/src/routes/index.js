@@ -33,7 +33,6 @@ router.use('/settings',          require('./settings.routes'));
 // ── Super-admin portal (separate auth, no company_id scoping) ─────────────────
 router.use('/admin',             require('./admin.routes'));
 
-// Placeholder routes — to be implemented feature by feature
-// router.use('/expenses',    require('./expenses.routes'));
+router.use('/expenses',          require('./expenses.routes'));
 
 module.exports = router;

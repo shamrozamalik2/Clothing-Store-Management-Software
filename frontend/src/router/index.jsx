@@ -7,6 +7,7 @@ import SuperAdminLoginPage from '@pages/superadmin/SuperAdminLoginPage';
 import SuperAdminDashboard from '@pages/superadmin/SuperAdminDashboard';
 import SuperAdminCompanies from '@pages/superadmin/SuperAdminCompanies';
 import DashboardPage from '@pages/dashboard/DashboardPage';
+import ExpensesPage from '@pages/expenses/ExpensesPage';
 import UsersPage from '@pages/users/UsersPage';
 import ProfilePage from '@pages/settings/ProfilePage';
 import CategoriesPage from '@pages/categories/CategoriesPage';
@@ -75,6 +76,7 @@ export const router = createHashRouter([
           { path: '/sales/:id',            element: <SaleDetailPage /> },
           { path: '/reports',              element: <ReportsPage /> },
           { path: '/settings',             element: <SettingsPage /> },
+          { path: '/expenses',             element: <ExpensesPage /> },
           // Future phases:
           // { path: '/expenses',         element: <ExpensesPage /> },
         ],
