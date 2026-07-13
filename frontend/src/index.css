@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-surface-900 text-surface-100 font-sans antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-1.5 h-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-surface-800;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-600 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-500;
+  }
+
+  /* Focus visible */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-surface-900;
+  }
+}
+
+@layer components {
+  /* Skeleton loader */
+  .skeleton {
+    @apply animate-pulse bg-surface-700 rounded;
+  }
+
+  /* Table styles */
+  .table-container {
+    @apply overflow-x-auto rounded-lg border border-surface-700;
+  }
+
+  .data-table {
+    @apply w-full text-sm text-left;
+  }
+
+  .data-table thead {
+    @apply bg-surface-800 text-surface-400 uppercase text-xs tracking-wider;
+  }
+
+  .data-table thead th {
+    @apply px-4 py-3 font-medium;
+  }
+
+  .data-table tbody tr {
+    @apply border-t border-surface-700 hover:bg-surface-800/50 transition-colors;
+  }
+
+  .data-table tbody td {
+    @apply px-4 py-3;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success { @apply bg-green-900/50 text-green-400 border border-green-800; }
+  .badge-danger  { @apply bg-red-900/50 text-red-400 border border-red-800; }
+  .badge-warning { @apply bg-yellow-900/50 text-yellow-400 border border-yellow-800; }
+  .badge-info    { @apply bg-blue-900/50 text-blue-400 border border-blue-800; }
+  .badge-neutral { @apply bg-surface-700 text-surface-300 border border-surface-600; }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+
+  /* Hide scrollbar but keep functionality */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+}

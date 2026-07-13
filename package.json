@@ -1,0 +1,140 @@
+{
+  "name": "sas-garments",
+  "version": "1.0.0",
+  "description": "SAS Garments – Professional Clothing Store Management System",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names \"FRONTEND,ELECTRON\" --prefix-colors \"green,magenta\" \"npm run dev:frontend\" \"npm run dev:electron\"",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm run build:frontend && electron-builder install-app-deps && electron-builder",
+    "postinstall": "electron-builder install-app-deps",
+    "dev:server": "cross-env NODE_ENV=development nodemon backend/src/server.js",
+    "start:server": "node backend/src/server.js",
+    "migrate": "node backend/src/database/migrate.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "electron-updater": "^6.8.9",
+    "express": "^4.18.3",
+    "express-rate-limit": "^7.2.0",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.22.0",
+    "winston": "^3.12.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.2",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^31.1.0",
+    "electron-builder": "^24.13.3",
+    "nodemon": "^3.1.0",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.sasgarments.app",
+    "productName": "SAS Garments",
+    "copyright": "Copyright © 2024 SAS Garments. All rights reserved.",
+    "npmRebuild": false,
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node",
+      "backend/**/*"
+    ],
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "electron/assets"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "backend/src/**/*",
+      "database/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "uploads",
+        "to": "uploads",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "backups",
+        "to": "backups",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "electron/assets/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": false,
+      "allowElevation": true,
+      "installerIcon": "electron/assets/icon.ico",
+      "uninstallerIcon": "electron/assets/icon.ico",
+      "installerHeaderIcon": "electron/assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SAS Garments",
+      "uninstallDisplayName": "SAS Garments",
+      "artifactName": "SAS Garments Setup.exe",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "SAS Garments Portable.exe"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "electron/assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "electron/assets/icon.png"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "shamrozamalik2",
+      "repo": "sas-garments-releases"
+    }
+  },
+  "nodemonConfig": {
+    "watch": [
+      "backend/src"
+    ],
+    "ext": "js,json",
+    "ignore": [
+      "backend/src/database/*.db"
+    ]
+  }
+}
