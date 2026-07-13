@@ -1,7 +1,12 @@
 'use strict';
 
-// Standalone migration runner — runs via: node backend/src/database/migrate.js
-// This file is kept for legacy compatibility but the canonical migration entry
-// point is backend/src/database/migrate.js which handles dotenv loading itself.
+require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
-require('./database/migrate');
+const { initDb, closeDb } = require('./config/database');
+const { runMigrations }   = require('./database/migrate');
+
+initDb();
+runMigrations()
+  .then(() => closeDb())
+  .then(() => process.exit(0))
+  .catch((err) => { console.error(err); process.exit(1); });

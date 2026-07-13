@@ -10,6 +10,7 @@ const path        = require('path');
 
 const { env }                    = require('./config/env');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
+const logger                     = require('./config/logger');
 const routes                     = require('./routes');
 
 const app = express();
@@ -48,8 +49,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser(env.COOKIE_SECRET));
 
-// ── Logging ───────────────────────────────────────────────────────────────────
-app.use(morgan(env.IS_DEV ? 'dev' : 'combined'));
+// ── HTTP request logging ──────────────────────────────────────────────────────
+app.use(morgan(env.IS_DEV ? 'dev' : 'combined', { stream: logger.stream }));
 
 // ── Static uploads ────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.resolve(env.UPLOADS_DIR), {

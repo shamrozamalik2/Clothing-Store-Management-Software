@@ -3,7 +3,7 @@
 module.exports = {
   apps: [
     {
-      name: 'sas-garments-api',
+      name: 'sas-garments-backend',
       script: 'backend/src/server.js',
       cwd: '/var/www/sas-garments',
 

@@ -1,0 +1,78 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'package.json'
+      - 'ecosystem.config.js'
+      - '.github/workflows/backend-deploy.yml'
+
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ── 1. Lint / basic sanity ────────────────────────────────────────────────
+  test:
+    name: Lint & Sanity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        run: npm ci --omit=dev
+
+      - name: Check syntax (node --check)
+        run: |
+          find backend/src -name '*.js' | xargs -I{} node --check {}
+
+  # ── 2. Deploy to Ubuntu VPS ───────────────────────────────────────────────
+  deploy:
+    name: Deploy to VPS
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host:     ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key:      ${{ secrets.VPS_SSH_KEY }}
+          port:     ${{ secrets.VPS_PORT || 22 }}
+          timeout:  120s
+          script: |
+            set -e
+            cd /var/www/sas-garments
+
+            echo "=== Pull latest code ==="
+            git pull origin main
+
+            echo "=== Install production dependencies ==="
+            npm ci --omit=dev --no-audit
+
+            echo "=== Run migrations ==="
+            npm run migrate
+
+            echo "=== Reload PM2 (zero-downtime) ==="
+            pm2 reload sas-garments-backend --update-env || pm2 start ecosystem.config.js
+
+            echo "=== Save PM2 process list ==="
+            pm2 save
+
+            echo "=== Health check ==="
+            sleep 3
+            curl -sf http://localhost:3001/api/health || (echo "Health check FAILED" && exit 1)
+
+            echo "=== Deploy complete ==="

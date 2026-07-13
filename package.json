@@ -47,8 +47,7 @@
     "npmRebuild": false,
     "asar": true,
     "asarUnpack": [
-      "**/*.node",
-      "backend/**/*"
+      "**/*.node"
     ],
     "directories": {
       "output": "dist-electron",
@@ -57,26 +56,8 @@
     "files": [
       "electron/**/*",
       "frontend/dist/**/*",
-      "backend/src/**/*",
-      "database/**/*",
       "node_modules/**/*",
       "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "uploads",
-        "to": "uploads",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "backups",
-        "to": "backups",
-        "filter": [
-          "**/*"
-        ]
-      }
     ],
     "win": {
       "target": [

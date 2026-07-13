@@ -18,7 +18,7 @@ const env = {
   // ── PostgreSQL ─────────────────────────────────────────────
   DATABASE_URL: req('DATABASE_URL'),
   DB_POOL_MAX:  parseInt(opt('DB_POOL_MAX', '20'), 10),
-  DB_SSL:       opt('DB_SSL', 'false') === 'true',
+  DB_SSL:       opt('DB_SSL', 'true') === 'true',
 
   // ── JWT access token (short-lived, 15 minutes) ─────────────
   JWT_SECRET:     req('JWT_SECRET'),

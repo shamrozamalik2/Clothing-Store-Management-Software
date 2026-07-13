@@ -6,7 +6,12 @@ const authRoutes = require('./auth.routes');
 const router = Router();
 
 router.get('/health', (req, res) => {
-  res.json({ success: true, message: 'SAS Garments API is running.', timestamp: new Date().toISOString() });
+  res.json({
+    success: true,
+    message: 'SAS Garments API is running.',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+  });
 });
 
 router.use('/auth',  authRoutes);
@@ -24,6 +29,10 @@ router.use('/customers',         require('./customers.routes'));
 router.use('/sales',             require('./sales.routes'));
 router.use('/reports',           require('./reports.routes'));
 router.use('/settings',          require('./settings.routes'));
+
+// ── Super-admin portal (separate auth, no company_id scoping) ─────────────────
+router.use('/admin',             require('./admin.routes'));
+
 // Placeholder routes — to be implemented feature by feature
 // router.use('/expenses',    require('./expenses.routes'));
 

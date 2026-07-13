@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: sas-garments-backend
+    runtime: node
+    buildCommand: npm ci --omit=dev
+    startCommand: node backend/src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: DB_POOL_MAX
+        value: "5"
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: REFRESH_SECRET
+        sync: false
+      - key: REFRESH_EXPIRES_DAYS
+        value: "7"
+      - key: SUPER_ADMIN_JWT_SECRET
+        sync: false
+      - key: BCRYPT_ROUNDS
+        value: "12"
+      - key: RATE_LIMIT_MAX
+        value: "300"
+      - key: COOKIE_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: UPLOADS_DIR
+        value: /tmp/uploads
