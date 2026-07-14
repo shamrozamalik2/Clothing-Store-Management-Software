@@ -3,29 +3,39 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeftIcon, PrinterIcon, XCircleIcon,
-  UserIcon, CalendarIcon, BanknotesIcon,
+  UserIcon, CalendarIcon, BanknotesIcon, ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Badge from '@components/common/Badge';
 import Button from '@components/ui/Button';
 import ConfirmDialog from '@components/common/ConfirmDialog';
+import ReturnExchangeModal from './ReturnExchangeModal';
+import { printReceipt } from '@utils/printReceipt';
 import { salesApi } from '@api/sales.api';
+import { settingsApi } from '@api/settings.api';
 import { formatCurrency, formatDate } from '@utils/format';
 import { usePermission } from '@hooks/usePermission';
 
-const STATUS_VARIANTS = { completed: 'success', cancelled: 'danger', refunded: 'warning' };
+const STATUS_VARIANTS = { completed: 'success', cancelled: 'danger', refunded: 'warning', exchanged: 'info' };
 
 export default function SaleDetailPage() {
   const { id }    = useParams();
   const navigate  = useNavigate();
   const qc        = useQueryClient();
   const { can }   = usePermission();
-  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidOpen,   setVoidOpen]   = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['sale', id],
     queryFn:  () => salesApi.getOne(id),
+  });
+
+  const { data: settingsRes } = useQuery({
+    queryKey: ['settings'],
+    queryFn:  settingsApi.getAll,
+    staleTime: 5 * 60 * 1000,
   });
 
   const sale  = data?.data;
@@ -62,7 +72,8 @@ export default function SaleDetailPage() {
     );
   }
 
-  const canVoid = sale.status === 'completed' && can('sales', 'delete');
+  const canVoid      = sale.status === 'completed' && can('sales', 'delete');
+  const canReturn    = ['completed', 'refunded', 'exchanged'].includes(sale.status) && can('sales', 'delete');
 
   return (
     <div className="flex flex-col gap-6">
@@ -87,9 +98,15 @@ export default function SaleDetailPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="ghost" size="sm" icon={<PrinterIcon className="h-4 w-4" />}
-            onClick={() => window.print()}>
-            Print
+            onClick={() => printReceipt(sale, items, settingsRes?.data)}>
+            Print Receipt
           </Button>
+          {canReturn && (
+            <Button variant="secondary" size="sm" icon={<ArrowPathIcon className="h-4 w-4" />}
+              onClick={() => setReturnOpen(true)}>
+              Return / Exchange
+            </Button>
+          )}
           {canVoid && (
             <Button variant="danger" size="sm" icon={<XCircleIcon className="h-4 w-4" />}
               onClick={() => setVoidOpen(true)}>
@@ -125,10 +142,10 @@ export default function SaleDetailPage() {
                       )}
                       {item.sku && <p className="text-xs text-surface-600 font-mono">{item.sku}</p>}
                     </td>
-                    <td className="px-4 py-3 text-center text-surface-300">{item.quantity}</td>
+                    <td className="px-4 py-3 text-center text-surface-300">{parseInt(item.quantity, 10)}</td>
                     <td className="px-4 py-3 text-right text-surface-300">{formatCurrency(item.unit_price)}</td>
                     <td className="px-4 py-3 text-right font-medium text-surface-100">
-                      {formatCurrency(item.subtotal)}
+                      {formatCurrency(item.total ?? item.subtotal)}
                     </td>
                   </tr>
                 ))}
@@ -216,6 +233,21 @@ export default function SaleDetailPage() {
           </div>
         </div>
       </div>
+
+      {returnOpen && (
+        <ReturnExchangeModal
+          sale={sale}
+          onClose={() => setReturnOpen(false)}
+          onSuccess={() => {
+            qc.invalidateQueries({ queryKey: ['sale', id] });
+            qc.invalidateQueries({ queryKey: ['sales'] });
+            qc.invalidateQueries({ queryKey: ['products'] });
+            qc.invalidateQueries({ queryKey: ['notifications-low-stock'] });
+            qc.invalidateQueries({ queryKey: ['dashboard-today'] });
+            qc.invalidateQueries({ queryKey: ['dashboard-overview'] });
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={voidOpen}

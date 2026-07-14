@@ -326,17 +326,31 @@ const voidSale = async (req, res, next) => {
 const todaySummary = async (req, res, next) => {
   try {
     const { rows: [row] } = await query(`
+      WITH sales_today AS (
+        SELECT
+          COUNT(*)::int                   AS sale_count,
+          COALESCE(SUM(total_amount), 0)  AS total_revenue,
+          COALESCE(SUM(paid_amount),  0)  AS total_paid,
+          COALESCE(SUM(due_amount),   0)  AS total_due
+        FROM sales
+        WHERE company_id = $1
+          AND sale_date::date = CURRENT_DATE
+          AND status != 'cancelled'
+      ),
+      returns_today AS (
+        SELECT COALESCE(SUM(CASE WHEN type = 'return' THEN refund_amount ELSE 0 END), 0) AS total_refunded
+        FROM returns
+        WHERE company_id = $1
+          AND return_date::date = CURRENT_DATE
+      )
       SELECT
-        COUNT(*)                        AS sale_count,
-        COALESCE(SUM(total_amount), 0)  AS total_revenue,
-        COALESCE(SUM(paid_amount),  0)  AS total_paid,
-        COALESCE(SUM(due_amount),   0)  AS total_due
-      FROM sales
-      WHERE company_id = $1
-        AND sale_date::date = CURRENT_DATE
-        AND status != 'cancelled'
+        st.sale_count,
+        GREATEST(0, st.total_revenue - rt.total_refunded) AS total_revenue,
+        GREATEST(0, st.total_paid    - rt.total_refunded) AS total_paid,
+        st.total_due,
+        rt.total_refunded
+      FROM sales_today st, returns_today rt
     `, [req.companyId]);
-    row.sale_count = parseInt(row.sale_count, 10);
     return success(res, row);
   } catch (err) { next(err); }
 };

@@ -2,7 +2,7 @@
 
 const router = require('express').Router();
 const { list, listCategories, create, update, remove } = require('../controllers/expenses.controller');
-const { requireAuth } = require('../middleware/auth.middleware');
+const { authenticate } = require('../middleware/auth.middleware');
 const { body }        = require('express-validator');
 
 const validateExpense = [
@@ -11,7 +11,7 @@ const validateExpense = [
   body('expense_date').optional().isISO8601().toDate(),
 ];
 
-router.use(requireAuth);
+router.use(authenticate);
 
 router.get('/',            list);
 router.get('/categories',  listCategories);

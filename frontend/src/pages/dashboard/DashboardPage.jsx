@@ -66,7 +66,7 @@ export default function DashboardPage() {
   const t        = todayRes?.data;
   const lowStock = lowStockRes?.data ?? [];
   const ov       = ovRes?.data;
-  const recent   = recentRes?.data?.sales ?? [];
+  const recent   = recentRes?.data ?? [];
 
   return (
     <div className="space-y-6 animate-fade-in">

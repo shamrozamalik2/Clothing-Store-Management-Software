@@ -15,7 +15,7 @@ import { salesApi } from '@api/sales.api';
 import { formatCurrency, formatDate } from '@utils/format';
 import { usePermission } from '@hooks/usePermission';
 
-const STATUS_VARIANTS = { completed: 'success', cancelled: 'danger', refunded: 'warning' };
+const STATUS_VARIANTS = { completed: 'success', cancelled: 'danger', refunded: 'warning', exchanged: 'info' };
 const METHOD_ICONS    = {
   cash:   <BanknotesIcon className="h-3.5 w-3.5" />,
   card:   <CreditCardIcon className="h-3.5 w-3.5" />,

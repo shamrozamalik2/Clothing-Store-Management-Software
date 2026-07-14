@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { useQuery } from '@tanstack/react-query';
 import {
   HomeIcon,
   ShoppingBagIcon,
@@ -20,6 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { selectSidebarCollapsed, toggleSidebar } from '@store/slices/uiSlice';
 import { selectCurrentUser } from '@store/slices/authSlice';
+import { settingsApi } from '@api/settings.api';
 import { cn } from '@utils/cn';
 
 const NAV_ITEMS = [
@@ -34,6 +36,7 @@ const NAV_ITEMS = [
   { label: 'Sales',        path: '/sales',            icon: ShoppingCartIcon,            permission: 'sales' },
   { label: 'Purchases',    path: '/purchases',        icon: ArrowsRightLeftIcon,         permission: 'purchases' },
   { label: 'Expenses',     path: '/expenses',         icon: ClipboardDocumentListIcon,   permission: 'expenses' },
+  { label: 'Returns',      path: '/returns',           icon: ArrowsRightLeftIcon,          permission: 'sales' },
   { type: 'divider', label: 'Contacts' },
   { label: 'Customers',    path: '/customers',        icon: UserGroupIcon,               permission: 'customers' },
   { label: 'Suppliers',    path: '/suppliers',        icon: TruckIcon,                   permission: 'suppliers' },
@@ -44,11 +47,29 @@ const NAV_ITEMS = [
   { label: 'Settings',     path: '/settings',         icon: Cog6ToothIcon,               permission: 'settings' },
 ];
 
+function getInitials(name) {
+  return (name || 'SAS Garments')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0].toUpperCase())
+    .join('');
+}
+
 export default function Sidebar() {
   const dispatch    = useDispatch();
   const collapsed   = useSelector(selectSidebarCollapsed);
   const currentUser = useSelector(selectCurrentUser);
   const permissions = currentUser?.permissions || {};
+
+  const { data: settingsRes } = useQuery({
+    queryKey: ['settings'],
+    queryFn:  settingsApi.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+  const companyName    = settingsRes?.data?.company?.company_name?.value    || 'SAS Garments';
+  const companyTagline = settingsRes?.data?.company?.company_tagline?.value || 'Management System';
+  const initials       = getInitials(companyName);
 
   function hasAccess(permission) {
     if (currentUser?.role === 'admin') return true;
@@ -69,13 +90,13 @@ export default function Sidebar() {
         'flex items-center h-14 border-b border-surface-700 shrink-0',
         collapsed ? 'justify-center px-0' : 'px-5 gap-3'
       )}>
-        <div className="h-8 w-8 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
-          <span className="text-white font-bold text-sm">SG</span>
+        <div className="h-8 w-8 rounded-lg bg-primary-600 flex items-center justify-center shrink-0 shrink-0">
+          <span className="text-white font-bold text-sm">{initials}</span>
         </div>
         {!collapsed && (
-          <div>
-            <p className="text-sm font-bold text-surface-100 leading-tight">SAS Garments</p>
-            <p className="text-2xs text-surface-500">Management System</p>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-surface-100 leading-tight truncate">{companyName}</p>
+            <p className="text-2xs text-surface-500 truncate">{companyTagline}</p>
           </div>
         )}
       </div>

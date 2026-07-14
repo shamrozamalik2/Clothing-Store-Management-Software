@@ -257,7 +257,7 @@ export default function ExpensesPage() {
                     {exp.expense_date ? new Date(exp.expense_date).toLocaleDateString('en-PK') : '—'}
                   </td>
                   <td className="px-4 py-3 text-surface-300">{exp.category_name || '—'}</td>
-                  <td className="px-4 py-3 text-surface-400 max-w-xs truncate">{exp.description || '—'}</td>
+                  <td className="px-4 py-3 text-surface-400 max-w-xs truncate">{exp.title || exp.description || '—'}</td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-0.5 rounded-full text-xs bg-surface-700 text-surface-300 capitalize">
                       {exp.payment_method?.replace('_', ' ')}

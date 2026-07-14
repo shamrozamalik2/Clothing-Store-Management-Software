@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Surface palette CSS variables — dark mode (default) */
+:root,
+html.dark {
+  --s-50:  248 250 252;
+  --s-100: 241 245 249;
+  --s-200: 226 232 240;
+  --s-300: 203 213 225;
+  --s-400: 148 163 184;
+  --s-500: 100 116 139;
+  --s-600: 71 85 105;
+  --s-700: 51 65 85;
+  --s-800: 30 41 59;
+  --s-900: 15 23 42;
+  --s-950: 2 6 23;
+}
+
+/* Surface palette CSS variables — light mode (scale inverted) */
+html.light {
+  --s-50:  15 23 42;
+  --s-100: 30 41 59;
+  --s-200: 51 65 85;
+  --s-300: 71 85 105;
+  --s-400: 100 116 139;
+  --s-500: 148 163 184;
+  --s-600: 203 213 225;
+  --s-700: 226 232 240;
+  --s-800: 241 245 249;
+  --s-900: 248 250 252;
+  --s-950: 255 255 255;
+}
+
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;

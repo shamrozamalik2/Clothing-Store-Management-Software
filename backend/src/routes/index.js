@@ -34,5 +34,6 @@ router.use('/settings',          require('./settings.routes'));
 router.use('/admin',             require('./admin.routes'));
 
 router.use('/expenses',          require('./expenses.routes'));
+router.use('/returns',           require('./returns.routes'));
 
 module.exports = router;

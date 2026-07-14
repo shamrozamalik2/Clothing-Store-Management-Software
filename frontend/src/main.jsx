@@ -9,6 +9,9 @@ import { store } from '@store/index';
 import App from './App';
 import './index.css';
 
+// Apply saved theme before React renders to avoid flash of wrong theme
+document.documentElement.className = localStorage.getItem('sas_theme') || 'dark';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

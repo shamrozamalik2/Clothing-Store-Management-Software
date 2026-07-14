@@ -1,8 +1,8 @@
 'use strict';
 
 const { query, withTransaction } = require('../config/database');
-const { success, error, paginate } = require('../utils/response');
-const { logAudit, AUDIT_ACTIONS }  = require('../utils/audit');
+const { success, error } = require('../utils/response');
+const { logAudit }       = require('../utils/audit');
 
 async function generateReference(client, companyId) {
   const { rows: [row] } = await client.query(
@@ -52,7 +52,10 @@ async function list(req, res, next) {
       LIMIT $${params.length - 1} OFFSET $${params.length}
     `, params);
 
-    return success(res, { expenses: rows, ...paginate(total, page, limit) });
+    return success(res, {
+      expenses: rows,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    });
   } catch (err) { next(err); }
 }
 
@@ -77,24 +80,24 @@ async function create(req, res, next) {
       const ref = await generateReference(client, cid);
       const { rows: [row] } = await client.query(`
         INSERT INTO expenses
-          (company_id, category_id, reference, amount, payment_method, expense_date, description, notes, created_by)
+          (company_id, category_id, reference, title, amount, payment_method, expense_date, notes, created_by)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
         RETURNING id
       `, [
         cid,
         category_id || null,
         ref,
+        description?.trim() || 'Expense',
         parseFloat(amount),
         payment_method,
         expense_date || new Date().toISOString().slice(0, 10),
-        description?.trim() || null,
-        notes?.trim()       || null,
+        notes?.trim() || null,
         req.user.id,
       ]);
       return row.id;
     });
 
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'expenses', id);
+    await logAudit(cid, req.user.id, 'create', 'expenses', id);
     return success(res, { id }, 'Expense recorded.', 201);
   } catch (err) { next(err); }
 }
@@ -118,7 +121,7 @@ async function update(req, res, next) {
         amount         = COALESCE($2, amount),
         payment_method = COALESCE($3, payment_method),
         expense_date   = COALESCE($4::date, expense_date),
-        description    = COALESCE($5, description),
+        title          = COALESCE($5, title),
         notes          = COALESCE($6, notes),
         updated_at     = NOW()
       WHERE id = $7 AND company_id = $8
@@ -127,12 +130,12 @@ async function update(req, res, next) {
       amount ? parseFloat(amount) : null,
       payment_method || null,
       expense_date   || null,
-      description?.trim() ?? null,
-      notes?.trim()       ?? null,
+      description?.trim() || null,
+      notes?.trim()       || null,
       id, cid,
     ]);
 
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'expenses', id);
+    await logAudit(cid, req.user.id, 'update', 'expenses', id);
     return success(res, null, 'Expense updated.');
   } catch (err) { next(err); }
 }
@@ -149,7 +152,7 @@ async function remove(req, res, next) {
     );
     if (!rowCount) return error(res, 'Expense not found.', 404);
 
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.DELETE, 'expenses', id);
+    await logAudit(cid, req.user.id, 'delete', 'expenses', id);
     return success(res, null, 'Expense deleted.');
   } catch (err) { next(err); }
 }

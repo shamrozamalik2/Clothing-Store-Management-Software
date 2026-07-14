@@ -25,6 +25,7 @@ import SalesPage from '@pages/sales/SalesPage';
 import SaleDetailPage from '@pages/sales/SaleDetailPage';
 import ReportsPage from '@pages/reports/ReportsPage';
 import SettingsPage from '@pages/settings/SettingsPage';
+import ReturnsPage from '@pages/returns/ReturnsPage';
 
 // Protected route wrapper
 function ProtectedRoute({ roles }) {
@@ -77,6 +78,7 @@ export const router = createHashRouter([
           { path: '/reports',              element: <ReportsPage /> },
           { path: '/settings',             element: <SettingsPage /> },
           { path: '/expenses',             element: <ExpensesPage /> },
+          { path: '/returns',              element: <ReturnsPage /> },
           // Future phases:
           // { path: '/expenses',         element: <ExpensesPage /> },
         ],
