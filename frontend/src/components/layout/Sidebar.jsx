@@ -48,7 +48,7 @@ const NAV_ITEMS = [
 ];
 
 function getInitials(name) {
-  return (name || 'SAS Garments')
+  return (name || 'Online Store')
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
@@ -67,7 +67,7 @@ export default function Sidebar() {
     queryFn:  settingsApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
-  const companyName    = settingsRes?.data?.company?.company_name?.value    || 'SAS Garments';
+  const companyName    = settingsRes?.data?.company?.company_name?.value    || 'Online Store';
   const companyTagline = settingsRes?.data?.company?.company_tagline?.value || 'Management System';
   const initials       = getInitials(companyName);
 

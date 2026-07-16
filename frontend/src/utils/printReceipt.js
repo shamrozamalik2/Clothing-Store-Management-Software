@@ -10,7 +10,7 @@ export function printReceipt(sale, items, settings) {
   const co = settings?.company  ?? {};
   const rc = settings?.receipt  ?? {};
 
-  const companyName    = co.company_name?.value    || 'SAS Garments';
+  const companyName    = co.company_name?.value    || 'Online Store';
   const companyTagline = co.company_tagline?.value || '';
   const companyAddress = co.company_address?.value || '';
   const companyCity    = co.company_city?.value    || '';
@@ -194,7 +194,7 @@ export function printReceipt(sale, items, settings) {
   <div class="footer">
     <div>★ ${receiptFooter} ★</div>
     <div>Please visit again</div>
-    <div class="powered">Powered by SAS Garments POS</div>
+    <div class="powered">Powered by Garments POS</div>
   </div>
 
   <script>

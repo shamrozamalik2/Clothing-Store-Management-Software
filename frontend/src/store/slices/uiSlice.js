@@ -34,7 +34,7 @@ const uiSlice = createSlice({
     },
     setPageTitle(state, { payload }) {
       state.pageTitle = payload;
-      document.title = `${payload} – SAS Garments`;
+      document.title = `${payload} – Garments POS`;
     },
   },
 });

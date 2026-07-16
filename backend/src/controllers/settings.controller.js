@@ -5,7 +5,7 @@ const { query } = require('../config/database');
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
 const DEFAULTS = [
-  { key: 'company_name',         value: 'SAS Garments',                     type: 'string',  group_name: 'company', label: 'Company Name' },
+  { key: 'company_name',         value: 'Online Store',                     type: 'string',  group_name: 'company', label: 'Company Name' },
   { key: 'company_tagline',      value: '',                                 type: 'string',  group_name: 'company', label: 'Tagline' },
   { key: 'company_address',      value: '',                                 type: 'string',  group_name: 'company', label: 'Address' },
   { key: 'company_city',         value: '',                                 type: 'string',  group_name: 'company', label: 'City' },

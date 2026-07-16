@@ -45,7 +45,7 @@ export default function LicenseGate({ status, onActivated }) {
           <div className="h-16 w-16 rounded-2xl bg-primary-600 flex items-center justify-center mb-4 shadow-lg shadow-primary-600/30">
             <span className="text-white font-bold text-2xl">SG</span>
           </div>
-          <h1 className="text-2xl font-bold text-surface-100">SAS Garments</h1>
+          <h1 className="text-2xl font-bold text-surface-100">Garments POS</h1>
           <p className="text-sm text-surface-500 mt-1">Professional Store Management System</p>
         </div>
 
@@ -64,7 +64,7 @@ export default function LicenseGate({ status, onActivated }) {
             <p className="text-xs text-surface-400 mt-0.5">
               {isExpiredLicense
                 ? `Your license expired on ${status.license.expiryDate}. Enter a new key to continue.`
-                : 'Your 30-day trial has ended. Enter a license key to continue using SAS Garments.'}
+                : 'Your 30-day trial has ended. Enter a license key to continue.'}
             </p>
           </div>
         </div>

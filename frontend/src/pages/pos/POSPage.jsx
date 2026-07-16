@@ -722,7 +722,7 @@ function ReceiptModal({ receipt, onClose }) {
 
         {/* Header */}
         <div className="text-center p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold">SAS Garments</h2>
+          <h2 className="text-xl font-bold">Online Store</h2>
           <p className="text-xs text-gray-500 mt-1">Point of Sale Receipt</p>
           <p className="text-xs text-gray-500">{date.toLocaleString('en-PK')}</p>
         </div>
