@@ -1,10 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
-import { EyeIcon, EyeSlashIcon, EnvelopeIcon, LockClosedIcon } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { EyeIcon, EyeSlashIcon, EnvelopeIcon, LockClosedIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import { authApi } from '@api/auth.api';
@@ -24,16 +23,19 @@ export default function LoginPage() {
     if (isAuth) navigate('/', { replace: true });
   }, [isAuth]);
 
+  const savedSlug = localStorage.getItem('sas_company_slug') || '';
+
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm({ defaultValues: { email: '', password: '' } });
-
-  const COMPANY_SLUG = import.meta.env.VITE_COMPANY_SLUG || 'sas-garments';
+  } = useForm({ defaultValues: { company_slug: savedSlug, email: '', password: '' } });
 
   const loginMutation = useMutation({
-    mutationFn: (creds) => authApi.login({ ...creds, company_slug: COMPANY_SLUG }),
+    mutationFn: (creds) => {
+      localStorage.setItem('sas_company_slug', creds.company_slug.trim());
+      return authApi.login({ ...creds, company_slug: creds.company_slug.trim() });
+    },
     onSuccess: (data) => {
       dispatch(setCredentials(data.data));
       toast.success(`Welcome back, ${data.data.user.name}!`);
@@ -50,9 +52,9 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex h-16 w-16 rounded-2xl bg-primary-600 items-center justify-center mb-4 shadow-glow">
-            <span className="text-white font-black text-2xl">SG</span>
+            <BuildingStorefrontIcon className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-surface-100">SAS Garments</h1>
+          <h1 className="text-2xl font-bold text-surface-100">Garments POS</h1>
           <p className="text-sm text-surface-500 mt-1">Sign in to your account</p>
         </div>
 
@@ -61,6 +63,17 @@ export default function LoginPage() {
           onSubmit={handleSubmit((data) => loginMutation.mutate(data))}
           className="bg-surface-800 border border-surface-700 rounded-2xl p-6 space-y-4 shadow-card-lg"
         >
+          <Input
+            label="Company Code"
+            type="text"
+            autoComplete="organization"
+            placeholder="e.g. sas-garments"
+            leftIcon={<BuildingStorefrontIcon className="h-4 w-4" />}
+            error={errors.company_slug?.message}
+            required
+            {...register('company_slug', { required: 'Company code is required.' })}
+          />
+
           <Input
             label="Email Address"
             type="email"
@@ -108,7 +121,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-xs text-surface-600 mt-6">
-          SAS Garments v2.0 · Cloud Mode
+          Garments POS v2.0 · Cloud Mode
         </p>
       </div>
     </div>
