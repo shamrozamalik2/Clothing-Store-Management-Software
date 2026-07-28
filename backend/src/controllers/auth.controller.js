@@ -68,14 +68,27 @@ const login = async (req, res, next) => {
 
     // Look up company
     const { rows: [company] } = await query(
-      'SELECT id, is_active, subscription_status FROM companies WHERE slug = $1',
+      'SELECT id, is_active, subscription_status, trial_ends_at FROM companies WHERE slug = $1',
       [company_slug.trim().toLowerCase()]
     );
     if (!company || !company.is_active) {
       return error(res, 'Company not found.', 404);
     }
+
     if (company.subscription_status === 'suspended') {
-      return error(res, 'This account has been suspended. Please contact support.', 403);
+      return error(res, 'This account has been suspended by the administrator. Please contact support.', 403);
+    }
+
+    if (company.subscription_status === 'expired') {
+      return error(res, 'Your subscription has expired. Please renew your plan to continue.', 403);
+    }
+
+    if (company.subscription_status === 'trial' && company.trial_ends_at && new Date(company.trial_ends_at) < new Date()) {
+      await query(
+        `UPDATE companies SET subscription_status = 'expired', updated_at = NOW() WHERE id = $1`,
+        [company.id]
+      );
+      return error(res, 'Your free trial has ended. Please upgrade your plan to continue.', 403);
     }
 
     // Look up user with role info (permissions is JSONB — pg returns it as object automatically)

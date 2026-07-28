@@ -20,15 +20,41 @@ async function authenticate(req, res, next) {
     // Skip company check for impersonation tokens (super admin) or if no companyId
     if (payload.companyId && !payload.impersonated) {
       const { rows: [company] } = await query(
-        'SELECT subscription_status FROM companies WHERE id = $1',
+        'SELECT subscription_status, trial_ends_at FROM companies WHERE id = $1',
         [payload.companyId]
       );
-      if (company?.subscription_status === 'suspended') {
-        return res.status(401).json({
-          success: false,
-          message: 'Your account has been suspended. Please contact support.',
-          code: 'COMPANY_SUSPENDED',
-        });
+
+      if (company) {
+        const status = company.subscription_status;
+
+        if (status === 'suspended') {
+          return res.status(401).json({
+            success: false,
+            message: 'Your account has been suspended by the administrator. Please contact support.',
+            code: 'COMPANY_SUSPENDED',
+          });
+        }
+
+        if (status === 'expired') {
+          return res.status(401).json({
+            success: false,
+            message: 'Your subscription has expired. Please renew your plan to continue.',
+            code: 'COMPANY_EXPIRED',
+          });
+        }
+
+        if (status === 'trial' && company.trial_ends_at && new Date(company.trial_ends_at) < new Date()) {
+          // Auto-mark expired in DB so future checks are faster
+          await query(
+            `UPDATE companies SET subscription_status = 'expired', updated_at = NOW() WHERE id = $1`,
+            [payload.companyId]
+          );
+          return res.status(401).json({
+            success: false,
+            message: 'Your free trial has ended. Please upgrade your plan to continue.',
+            code: 'TRIAL_EXPIRED',
+          });
+        }
       }
     }
 

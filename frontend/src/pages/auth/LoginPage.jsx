@@ -62,7 +62,11 @@ export default function LoginPage() {
         </div>
 
         {suspendedMsg && (
-          <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400 text-center">
+          <div className={`mb-4 rounded-xl px-4 py-3 text-sm text-center border ${
+            suspendedMsg.toLowerCase().includes('suspend')
+              ? 'bg-red-500/10 border-red-500/30 text-red-400'
+              : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+          }`}>
             {suspendedMsg}
           </div>
         )}
