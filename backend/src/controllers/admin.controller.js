@@ -229,6 +229,130 @@ exports.reinstateCompany = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+exports.listUsers = async (req, res, next) => {
+  try {
+    const { search = '', company_id = '', status = '', page = 1, limit = 25 } = req.query;
+    const lim = Math.min(parseInt(limit, 10) || 25, 100);
+    const off = (Math.max(parseInt(page, 10) || 1, 1) - 1) * lim;
+    const params = [];
+    const where  = ['1=1'];
+
+    if (search) {
+      params.push(`%${search}%`);
+      where.push(`(u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`);
+    }
+    if (company_id) {
+      params.push(parseInt(company_id, 10));
+      where.push(`u.company_id = $${params.length}`);
+    }
+    if (status === 'active')   where.push('u.is_active = TRUE');
+    if (status === 'inactive') where.push('u.is_active = FALSE');
+
+    const wStr = where.join(' AND ');
+    const { rows: [{ cnt }] } = await query(`SELECT COUNT(*) AS cnt FROM users u WHERE ${wStr}`, params);
+
+    params.push(lim, off);
+    const { rows } = await query(`
+      SELECT u.id, u.name, u.email, u.is_active, u.last_login, u.created_at,
+             c.id AS company_id, c.name AS company_name, c.slug AS company_slug,
+             r.name AS role_name, r.label AS role_label
+      FROM users u
+      JOIN companies c ON c.id = u.company_id
+      JOIN roles r     ON r.id = u.role_id
+      WHERE ${wStr}
+      ORDER BY u.created_at DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}
+    `, params);
+
+    return res.json({ success: true, data: rows, pagination: { total: parseInt(cnt, 10), page: parseInt(page, 10), limit: lim } });
+  } catch (err) { next(err); }
+};
+
+exports.updateUser = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { name, email } = req.body;
+    const { rows: [u] } = await query('SELECT * FROM users WHERE id=$1', [id]);
+    if (!u) return res.status(404).json({ success: false, message: 'User not found.' });
+    const { rows: [updated] } = await query(
+      'UPDATE users SET name=$2, email=$3, updated_at=NOW() WHERE id=$1 RETURNING id,name,email,is_active',
+      [id, name ?? u.name, email ? email.toLowerCase().trim() : u.email]
+    );
+    return res.json({ success: true, data: updated, message: 'User updated.' });
+  } catch (err) { next(err); }
+};
+
+exports.toggleUser = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { rows: [u] } = await query('SELECT is_active FROM users WHERE id=$1', [id]);
+    if (!u) return res.status(404).json({ success: false, message: 'User not found.' });
+    const { rows: [updated] } = await query(
+      'UPDATE users SET is_active=$2, updated_at=NOW() WHERE id=$1 RETURNING id, is_active',
+      [id, !u.is_active]
+    );
+    return res.json({ success: true, data: updated, message: updated.is_active ? 'User activated.' : 'User deactivated.' });
+  } catch (err) { next(err); }
+};
+
+exports.resetUserPassword = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { password } = req.body;
+    if (!password || password.length < 6)
+      return res.status(422).json({ success: false, message: 'Password must be at least 6 characters.' });
+    const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    await query('UPDATE users SET password=$2, updated_at=NOW() WHERE id=$1', [id, hashed]);
+    return res.json({ success: true, message: 'Password reset.' });
+  } catch (err) { next(err); }
+};
+
+exports.deleteUser = async (req, res, next) => {
+  try {
+    await query('DELETE FROM users WHERE id=$1', [parseInt(req.params.id, 10)]);
+    return res.json({ success: true, message: 'User deleted.' });
+  } catch (err) { next(err); }
+};
+
+exports.deleteCompany = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    await query('DELETE FROM companies WHERE id=$1', [id]);
+    logger.warn(`[SuperAdmin] Company deleted: id=${id}`);
+    return res.json({ success: true, message: 'Company deleted.' });
+  } catch (err) { next(err); }
+};
+
+exports.impersonateCompany = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { rows: [company] } = await query('SELECT * FROM companies WHERE id=$1', [id]);
+    if (!company) return res.status(404).json({ success: false, message: 'Company not found.' });
+
+    const { rows: [user] } = await query(`
+      SELECT u.*, r.name AS role_name, r.permissions
+      FROM users u JOIN roles r ON r.id = u.role_id
+      WHERE u.company_id=$1 AND r.name='admin' AND u.is_active=TRUE
+      LIMIT 1
+    `, [id]);
+    if (!user) return res.status(404).json({ success: false, message: 'No active admin found for this company.' });
+
+    const token = jwt.sign({
+      id:          user.id,
+      companyId:   user.company_id,
+      branchId:    user.branch_id || null,
+      role:        user.role_name,
+      permissions: user.permissions,
+      impersonated: true,
+    }, process.env.JWT_SECRET, { expiresIn: '2h' });
+
+    logger.info(`[SuperAdmin] Impersonating company ${company.slug} as ${user.email}`);
+    return res.json({ success: true, data: { token, user: { id: user.id, name: user.name, email: user.email, role: user.role_name, roleId: user.role_id, companyId: user.company_id, branchId: user.branch_id || null, avatar: user.avatar, permissions: user.permissions } } });
+  } catch (err) { next(err); }
+};
+
 // ── Stats / Health ─────────────────────────────────────────────────────────────
 
 exports.stats = async (req, res, next) => {

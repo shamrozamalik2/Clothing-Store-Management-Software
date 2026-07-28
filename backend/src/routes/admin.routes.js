@@ -32,8 +32,17 @@ router.post('/companies', [
   body('admin_email').isEmail().normalizeEmail(),
   body('admin_password').isLength({ min: 8 }),
 ], ctrl.createCompany);
-router.patch('/companies/:id',          ctrl.updateCompany);
-router.post('/companies/:id/suspend',   ctrl.suspendCompany);
-router.post('/companies/:id/reinstate', ctrl.reinstateCompany);
+router.patch('/companies/:id',               ctrl.updateCompany);
+router.delete('/companies/:id',              ctrl.deleteCompany);
+router.post('/companies/:id/suspend',        ctrl.suspendCompany);
+router.post('/companies/:id/reinstate',      ctrl.reinstateCompany);
+router.post('/companies/:id/impersonate',    ctrl.impersonateCompany);
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+router.get('/users',                   ctrl.listUsers);
+router.patch('/users/:id',             ctrl.updateUser);
+router.post('/users/:id/toggle',       ctrl.toggleUser);
+router.post('/users/:id/reset-password', ctrl.resetUserPassword);
+router.delete('/users/:id',            ctrl.deleteUser);
 
 module.exports = router;
