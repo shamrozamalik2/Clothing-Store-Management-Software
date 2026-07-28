@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   PencilIcon, TrashIcon, NoSymbolIcon, CheckCircleIcon,
   ArrowRightOnRectangleIcon, PlusIcon, MagnifyingGlassIcon,
+  ClipboardDocumentIcon, ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '@store/slices/authSlice';
@@ -45,10 +46,99 @@ const EMPTY = {
   admin_name: '', admin_email: '', admin_password: '',
 };
 
+function CopyRow({ label, value, secret }) {
+  const [copied, setCopied] = useState(false);
+  const [show,   setShow]   = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  const display = secret && !show ? '••••••••' : value;
+  return (
+    <div className="flex items-center justify-between bg-slate-800 rounded-lg px-4 py-2.5 gap-3">
+      <div className="min-w-0">
+        <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+        <p className="text-sm font-mono text-white break-all">{display}</p>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {secret && (
+          <button onClick={() => setShow(s => !s)}
+            className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition-colors">
+            {show ? 'Hide' : 'Show'}
+          </button>
+        )}
+        <button onClick={copy} title="Copy"
+          className="h-7 w-7 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+          {copied
+            ? <ClipboardDocumentCheckIcon className="h-4 w-4 text-green-400" />
+            : <ClipboardDocumentIcon className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CredentialsCard({ creds, onClose }) {
+  const [allCopied, setAllCopied] = useState(false);
+
+  const copyAll = () => {
+    const text = [
+      `Company: ${creds.company_name}`,
+      `Login URL: ${creds.login_url}`,
+      `Company Code: ${creds.slug}`,
+      `Email: ${creds.email}`,
+      `Password: ${creds.password}`,
+    ].join('\n');
+    navigator.clipboard.writeText(text);
+    setAllCopied(true);
+    setTimeout(() => setAllCopied(false), 2000);
+  };
+
+  return (
+    <div className="p-6 space-y-5">
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+          <CheckCircleIcon className="h-5 w-5 text-green-400" />
+        </div>
+        <div>
+          <p className="text-white font-semibold">Company created!</p>
+          <p className="text-sm text-slate-400">Share these login details with your client.</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <CopyRow label="Login URL"     value={creds.login_url} />
+        <CopyRow label="Company Code"  value={creds.slug} />
+        <CopyRow label="Email"         value={creds.email} />
+        <CopyRow label="Password"      value={creds.password} secret />
+      </div>
+
+      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-4 py-3 text-xs text-yellow-400">
+        Save this password now — it cannot be recovered after you close this window.
+      </div>
+
+      <div className="flex justify-end gap-3">
+        <button onClick={copyAll}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors">
+          {allCopied
+            ? <><ClipboardDocumentCheckIcon className="h-4 w-4 text-green-400" /> Copied!</>
+            : <><ClipboardDocumentIcon className="h-4 w-4" /> Copy All</>}
+        </button>
+        <button onClick={onClose}
+          className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors">
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CreateModal({ onClose, onCreated }) {
-  const [form, setForm] = useState(EMPTY);
+  const [form,  setForm]  = useState(EMPTY);
   const [error, setError] = useState('');
   const [busy,  setBusy]  = useState(false);
+  const [creds, setCreds] = useState(null); // set after success
   const set = f => e => setForm(v => ({ ...v, [f]: e.target.value }));
 
   const autoSlug = (name) =>
@@ -64,6 +154,14 @@ function CreateModal({ onClose, onCreated }) {
     setBusy(true); setError('');
     try {
       await saCreateCompany(form);
+      const loginUrl = window.location.origin + window.location.pathname;
+      setCreds({
+        company_name: form.name,
+        slug:         form.slug || autoSlug(form.name),
+        email:        form.admin_email,
+        password:     form.admin_password,
+        login_url:    loginUrl,
+      });
       onCreated();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create company.');
@@ -74,73 +172,77 @@ function CreateModal({ onClose, onCreated }) {
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 shrink-0">
-          <h3 className="text-white font-semibold">New Company</h3>
+          <h3 className="text-white font-semibold">{creds ? 'Client Login Info' : 'New Company'}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
         </div>
 
-        <form onSubmit={submit} className="p-6 space-y-4 overflow-y-auto flex-1">
-          {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-2 text-sm">{error}</div>}
+        {creds ? (
+          <CredentialsCard creds={creds} onClose={onClose} />
+        ) : (
+          <form onSubmit={submit} className="p-6 space-y-4 overflow-y-auto flex-1">
+            {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-2 text-sm">{error}</div>}
 
-          <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Company Details</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Company Name" required>
-              <input required value={form.name} onChange={handleNameChange} placeholder="Acme Store" className={INPUT} />
+            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Company Details</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Company Name" required>
+                <input required value={form.name} onChange={handleNameChange} placeholder="Acme Store" className={INPUT} />
+              </Field>
+              <Field label="Company Slug">
+                <input value={form.slug} onChange={set('slug')} placeholder="acme-store" className={INPUT} />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Email">
+                <input type="email" value={form.email} onChange={set('email')} placeholder="info@acme.com" className={INPUT} />
+              </Field>
+              <Field label="Phone">
+                <input value={form.phone} onChange={set('phone')} placeholder="+92 300 0000000" className={INPUT} />
+              </Field>
+            </div>
+            <Field label="Address">
+              <input value={form.address} onChange={set('address')} placeholder="City, Country" className={INPUT} />
             </Field>
-            <Field label="Company Slug">
-              <input value={form.slug} onChange={set('slug')} placeholder="acme-store" className={INPUT} />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Plan">
+                <select value={form.plan} onChange={set('plan')} className={INPUT}>
+                  <option value="standard">Standard</option>
+                  <option value="pro">Pro</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </Field>
+              <Field label="Status">
+                <select value={form.subscription_status} onChange={set('subscription_status')} className={INPUT}>
+                  <option value="trial">Trial</option>
+                  <option value="active">Active</option>
+                </select>
+              </Field>
+            </div>
+            <Field label="Max Users">
+              <input type="number" min={1} max={500} value={form.max_users} onChange={set('max_users')} className={INPUT} />
             </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Email">
-              <input type="email" value={form.email} onChange={set('email')} placeholder="info@acme.com" className={INPUT} />
-            </Field>
-            <Field label="Phone">
-              <input value={form.phone} onChange={set('phone')} placeholder="+92 300 0000000" className={INPUT} />
-            </Field>
-          </div>
-          <Field label="Address">
-            <input value={form.address} onChange={set('address')} placeholder="City, Country" className={INPUT} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Plan">
-              <select value={form.plan} onChange={set('plan')} className={INPUT}>
-                <option value="standard">Standard</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-            </Field>
-            <Field label="Status">
-              <select value={form.subscription_status} onChange={set('subscription_status')} className={INPUT}>
-                <option value="trial">Trial</option>
-                <option value="active">Active</option>
-              </select>
-            </Field>
-          </div>
-          <Field label="Max Users">
-            <input type="number" min={1} max={500} value={form.max_users} onChange={set('max_users')} className={INPUT} />
-          </Field>
 
-          <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold pt-2">Admin Account</p>
-          <Field label="Admin Name" required>
-            <input required value={form.admin_name} onChange={set('admin_name')} placeholder="Admin User" className={INPUT} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Admin Email" required>
-              <input required type="email" value={form.admin_email} onChange={set('admin_email')} placeholder="admin@acme.com" className={INPUT} />
+            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold pt-2">Admin Account</p>
+            <Field label="Admin Name" required>
+              <input required value={form.admin_name} onChange={set('admin_name')} placeholder="Admin User" className={INPUT} />
             </Field>
-            <Field label="Password" required>
-              <input required type="password" minLength={8} value={form.admin_password} onChange={set('admin_password')} placeholder="Min 8 chars" className={INPUT} />
-            </Field>
-          </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Admin Email" required>
+                <input required type="email" value={form.admin_email} onChange={set('admin_email')} placeholder="admin@acme.com" className={INPUT} />
+              </Field>
+              <Field label="Password" required>
+                <input required type="password" minLength={8} value={form.admin_password} onChange={set('admin_password')} placeholder="Min 8 chars" className={INPUT} />
+              </Field>
+            </div>
 
-          <div className="flex justify-end gap-3 pt-2 shrink-0">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-            <button type="submit" disabled={busy}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
-              {busy ? 'Creating…' : 'Create Company'}
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-end gap-3 pt-2 shrink-0">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
+              <button type="submit" disabled={busy}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
+                {busy ? 'Creating…' : 'Create Company'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
