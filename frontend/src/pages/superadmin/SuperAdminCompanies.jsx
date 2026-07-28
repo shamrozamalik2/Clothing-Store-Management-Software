@@ -154,7 +154,7 @@ function CreateModal({ onClose, onCreated }) {
     setBusy(true); setError('');
     try {
       await saCreateCompany(form);
-      const loginUrl = window.location.origin + window.location.pathname;
+      const loginUrl = window.location.origin + window.location.pathname + '#/login';
       setCreds({
         company_name: form.name,
         slug:         form.slug || autoSlug(form.name),
@@ -162,7 +162,7 @@ function CreateModal({ onClose, onCreated }) {
         password:     form.admin_password,
         login_url:    loginUrl,
       });
-      onCreated();
+      onCreated(); // refreshes the list in background; does NOT close modal
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create company.');
     } finally { setBusy(false); }
@@ -508,7 +508,7 @@ export default function SuperAdminCompanies() {
           )}
         </div>
 
-        {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load(); }} />}
+        {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={() => load()} />}
         {editing    && <EditModal    company={editing}    onClose={() => setEditing(null)}    onSaved={() => { setEditing(null); load(); }} />}
         {suspending && <SuspendModal company={suspending} onClose={() => setSuspending(null)} onDone={() => { setSuspending(null); load(); }} />}
       </SuperAdminLayout>
