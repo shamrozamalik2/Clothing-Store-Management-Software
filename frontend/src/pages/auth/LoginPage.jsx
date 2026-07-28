@@ -16,11 +16,14 @@ export default function LoginPage() {
   const dispatch       = useDispatch();
   const navigate       = useNavigate();
   const isAuth         = useSelector(selectIsAuth);
-  const [showPwd, setShowPwd] = useState(false);
+  const [showPwd, setShowPwd]         = useState(false);
+  const [suspendedMsg, setSuspendedMsg] = useState('');
 
   useEffect(() => {
     dispatch(setPageTitle('Login'));
     if (isAuth) navigate('/', { replace: true });
+    const msg = sessionStorage.getItem('login_error');
+    if (msg) { setSuspendedMsg(msg); sessionStorage.removeItem('login_error'); }
   }, [isAuth]);
 
   const savedSlug = localStorage.getItem('sas_company_slug') || '';
@@ -57,6 +60,12 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-surface-100">Garments POS</h1>
           <p className="text-sm text-surface-500 mt-1">Sign in to your account</p>
         </div>
+
+        {suspendedMsg && (
+          <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400 text-center">
+            {suspendedMsg}
+          </div>
+        )}
 
         {/* Form */}
         <form

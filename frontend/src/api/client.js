@@ -69,7 +69,11 @@ client.interceptors.response.use(
     }
 
     if (status === 401) {
+      const msg = err.response?.data?.message || '';
       store.dispatch(clearCredentials());
+      if (code === 'COMPANY_SUSPENDED') {
+        sessionStorage.setItem('login_error', msg || 'Your account has been suspended. Please contact support.');
+      }
       window.location.hash = '/login';
     }
 

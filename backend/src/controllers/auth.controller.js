@@ -68,11 +68,14 @@ const login = async (req, res, next) => {
 
     // Look up company
     const { rows: [company] } = await query(
-      'SELECT id, is_active FROM companies WHERE slug = $1',
+      'SELECT id, is_active, subscription_status FROM companies WHERE slug = $1',
       [company_slug.trim().toLowerCase()]
     );
     if (!company || !company.is_active) {
       return error(res, 'Company not found.', 404);
+    }
+    if (company.subscription_status === 'suspended') {
+      return error(res, 'This account has been suspended. Please contact support.', 403);
     }
 
     // Look up user with role info (permissions is JSONB — pg returns it as object automatically)
