@@ -3,10 +3,6 @@ import { useSelector } from 'react-redux';
 import { selectIsAuth, selectUserRole } from '@store/slices/authSlice';
 import AppLayout from '@components/layout/AppLayout';
 import LoginPage from '@pages/auth/LoginPage';
-import SuperAdminLoginPage from '@pages/superadmin/SuperAdminLoginPage';
-import SuperAdminDashboard from '@pages/superadmin/SuperAdminDashboard';
-import SuperAdminCompanies from '@pages/superadmin/SuperAdminCompanies';
-import SuperAdminUsers from '@pages/superadmin/SuperAdminUsers';
 import DashboardPage from '@pages/dashboard/DashboardPage';
 import ExpensesPage from '@pages/expenses/ExpensesPage';
 import UsersPage from '@pages/users/UsersPage';
@@ -86,12 +82,6 @@ export const router = createHashRouter([
       },
     ],
   },
-
-  // Super Admin portal (self-contained auth, no Redux dependency)
-  { path: '/admin/login',     element: <SuperAdminLoginPage /> },
-  { path: '/admin/dashboard', element: <SuperAdminDashboard /> },
-  { path: '/admin/companies', element: <SuperAdminCompanies /> },
-  { path: '/admin/users',     element: <SuperAdminUsers /> },
 
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
