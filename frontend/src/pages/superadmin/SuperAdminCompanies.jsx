@@ -221,7 +221,7 @@ function CreateModal({ onClose, onCreated }) {
               <input type="number" min={1} max={500} value={form.max_users} onChange={set('max_users')} className={INPUT} />
             </Field>
 
-            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold pt-2">Admin Account</p>
+            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold pt-2">User's Crediential of Account</p>
             <Field label="Admin Name" required>
               <input required value={form.admin_name} onChange={set('admin_name')} placeholder="Admin User" className={INPUT} />
             </Field>
