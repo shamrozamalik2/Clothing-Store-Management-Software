@@ -10,7 +10,7 @@ import {
   saReinstateCompany, saUpdateCompany, saDeleteCompany, saImpersonate,
 } from '../api/client';
 
-const MAIN_APP_URL = import.meta.env.VITE_MAIN_APP_URL || window.location.origin;
+const MAIN_APP_URL = import.meta.env.VITE_MAIN_APP_URL || 'https://clothing-store-management-system.onrender.com';
 
 const STATUS = {
   active:    'bg-green-500/10 text-green-400 border-green-500/20',
