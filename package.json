@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.2",
+    "better-sqlite3": "^13.0.2",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
     "electron": "^31.1.0",
