@@ -1,0 +1,9 @@
+const String kKeyAccessToken    = 'access_token';
+const String kKeyRefreshToken   = 'refresh_token';
+const String kKeyUser           = 'user_json';
+const String kKeyCompanySlug    = 'company_slug';
+const String kKeyRememberLogin  = 'remember_login';
+const String kKeyPinCode        = 'pin_code';
+const String kKeyDefaultPrinter = 'default_printer_address';
+const String kKeyThemeMode      = 'theme_mode';
+const String kKeyApiUrl         = 'api_url';
