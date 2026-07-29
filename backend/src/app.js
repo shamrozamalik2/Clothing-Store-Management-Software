@@ -62,11 +62,10 @@ app.use('/uploads', express.static(path.resolve(env.UPLOADS_DIR), {
 app.use('/api', routes);
 
 // ── Admin Panel (standalone React app) ───────────────────────────────────────
-const adminDist = path.resolve(__dirname, '../../admin/dist');
+const adminDist = path.join(process.cwd(), 'admin', 'dist');
 app.use('/admin', express.static(adminDist, { maxAge: '1h' }));
-app.get('/admin/*', (_req, res) => {
-  res.sendFile(path.join(adminDist, 'index.html'));
-});
+app.get('/admin', (_req, res) => res.sendFile(path.join(adminDist, 'index.html')));
+app.get('/admin/*', (_req, res) => res.sendFile(path.join(adminDist, 'index.html')));
 
 // ── 404 & error handlers ──────────────────────────────────────────────────────
 app.use(notFound);
