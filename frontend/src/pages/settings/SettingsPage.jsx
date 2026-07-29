@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import {
@@ -13,6 +13,7 @@ import Button from '@components/ui/Button';
 import Input from '@components/ui/Input';
 import Textarea from '@components/common/Textarea';
 import { settingsApi } from '@api/settings.api';
+import client from '@api/client';
 import { cn } from '@utils/cn';
 
 const TABS = [
@@ -132,6 +133,7 @@ function BackupTab() {
   const [exportError, setExportError] = useState('');
   const [restoreError, setRestoreError] = useState('');
   const [autoInfo, setAutoInfo]       = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     window.electronAPI?.backup?.getAutoInfo?.().then(setAutoInfo);
@@ -154,31 +156,47 @@ function BackupTab() {
     setExportState('running');
     setExportError('');
     try {
-      const result = await window.electronAPI.backup.export();
-      if (result.canceled) { setExportState('idle'); return; }
-      if (!result.success) { setExportError(result.error); setExportState('error'); return; }
-      setLastExport(result.filePath);
+      const data = await client.get('/backup/export');
+      const today = new Date().toISOString().slice(0, 10);
+      const filename = `backup-${today}.json`;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setLastExport(filename);
       setExportState('done');
-      toast.success('Backup exported successfully.');
+      toast.success('Backup downloaded successfully.');
     } catch (err) {
-      setExportError(err.message);
+      setExportError(err.message || 'Export failed.');
       setExportState('error');
     }
   }
 
-  async function handleRestore() {
+  function handleRestoreClick() {
+    fileInputRef.current.value = '';
+    fileInputRef.current.click();
+  }
+
+  async function handleRestoreFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!window.confirm('This will replace ALL current data with the backup. Are you sure?')) return;
     setRestoreState('running');
     setRestoreError('');
     try {
-      const result = await window.electronAPI.backup.restore();
-      if (result.canceled) { setRestoreState('idle'); return; }
-      if (!result.success) { setRestoreError(result.error); setRestoreState('error'); return; }
-      // App relaunches — this code won't execute
-    } catch (err) {
-      setRestoreError(err.message);
-      setRestoreState('error');
-    } finally {
+      const text   = await file.text();
+      const backup = JSON.parse(text);
+      await client.post('/backup/restore', backup);
       setRestoreState('idle');
+      toast.success('Backup restored successfully. Please refresh the page.');
+    } catch (err) {
+      setRestoreError(err.message || 'Restore failed. Make sure the file is a valid backup.');
+      setRestoreState('error');
     }
   }
 
@@ -289,11 +307,18 @@ function BackupTab() {
           <p className="text-xs text-red-400">{restoreError}</p>
         )}
 
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          className="hidden"
+          onChange={handleRestoreFile}
+        />
         <Button
           variant="danger"
           icon={<ArrowUpTrayIcon className="h-4 w-4" />}
           loading={restoreState === 'running'}
-          onClick={handleRestore}>
+          onClick={handleRestoreClick}>
           Restore Backup…
         </Button>
       </div>

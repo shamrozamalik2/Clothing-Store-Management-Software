@@ -35,5 +35,6 @@ router.use('/admin',             require('./admin.routes'));
 
 router.use('/expenses',          require('./expenses.routes'));
 router.use('/returns',           require('./returns.routes'));
+router.use('/backup',            require('./backup.routes'));
 
 module.exports = router;
