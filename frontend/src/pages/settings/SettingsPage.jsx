@@ -129,11 +129,13 @@ function CompanyTab() {
 function BackupTab() {
   const [exportState, setExportState] = useState('idle');   // idle | running | done | error
   const [restoreState, setRestoreState] = useState('idle');
+  const [restoreProgress, setRestoreProgress] = useState(0);
   const [lastExport, setLastExport]   = useState(null);
   const [exportError, setExportError] = useState('');
   const [restoreError, setRestoreError] = useState('');
   const [autoInfo, setAutoInfo]       = useState(null);
   const fileInputRef = useRef(null);
+  const progressRef  = useRef(null);
 
   useEffect(() => {
     window.electronAPI?.backup?.getAutoInfo?.().then(setAutoInfo);
@@ -187,14 +189,27 @@ function BackupTab() {
     if (!file) return;
     if (!window.confirm('This will replace ALL current data with the backup. Are you sure?')) return;
     setRestoreState('running');
+    setRestoreProgress(0);
     setRestoreError('');
+
+    // Animate progress 0→90% while waiting for the server
+    let pct = 0;
+    progressRef.current = setInterval(() => {
+      pct = Math.min(pct + (pct < 50 ? 3 : pct < 80 ? 1 : 0.3), 90);
+      setRestoreProgress(Math.round(pct));
+    }, 500);
+
     try {
       const text   = await file.text();
       const backup = JSON.parse(text);
-      await client.post('/backup/restore', backup);
-      setRestoreState('idle');
+      await client.post('/backup/restore', backup, { timeout: 300_000 });
+      clearInterval(progressRef.current);
+      setRestoreProgress(100);
+      setTimeout(() => { setRestoreState('idle'); setRestoreProgress(0); }, 800);
       toast.success('Backup restored successfully. Please refresh the page.');
     } catch (err) {
+      clearInterval(progressRef.current);
+      setRestoreProgress(0);
       setRestoreError(err.message || 'Restore failed. Make sure the file is a valid backup.');
       setRestoreState('error');
     }
@@ -307,6 +322,21 @@ function BackupTab() {
           <p className="text-xs text-red-400">{restoreError}</p>
         )}
 
+        {restoreState === 'running' && (
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-surface-400">
+              <span>Restoring data…</span>
+              <span>{restoreProgress}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-surface-700 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-red-500 transition-all duration-500"
+                style={{ width: `${restoreProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         <input
           ref={fileInputRef}
           type="file"
@@ -318,6 +348,7 @@ function BackupTab() {
           variant="danger"
           icon={<ArrowUpTrayIcon className="h-4 w-4" />}
           loading={restoreState === 'running'}
+          disabled={restoreState === 'running'}
           onClick={handleRestoreClick}>
           Restore Backup…
         </Button>
