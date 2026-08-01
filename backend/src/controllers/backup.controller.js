@@ -62,14 +62,21 @@ exports.exportBackup = async (req, res, next) => {
 // ── Restore ───────────────────────────────────────────────────────────────────
 
 exports.restoreBackup = async (req, res, next) => {
-  const cid = req.companyId;
-  const backup = req.body;
+  const cid  = req.companyId;
+  const body = req.body;
 
-  if (!backup?.version || !backup?.data) {
+  // Accept two formats:
+  //   Standard:  { version, data: { categories, products, ... } }
+  //   Flat/legacy (old desktop app): { categories, products, sales, ... } at top level
+  let d;
+  if (body?.version && body?.data && typeof body.data === 'object') {
+    d = body.data;
+  } else if (body && typeof body === 'object' && !Array.isArray(body) &&
+             (body.products || body.categories || body.sales || body.customers)) {
+    d = body;
+  } else {
     return error(res, 'Invalid backup file format.', 422);
   }
-
-  const d = backup.data;
 
   const client = await getClient();
   try {
@@ -136,21 +143,27 @@ exports.restoreBackup = async (req, res, next) => {
       );
     }
 
-    // Restore sales
+    // Restore sales (handle both PostgreSQL and SQLite field names)
     for (const r of (d.sales || [])) {
+      const total = r.total_amount ?? r.total ?? r.grand_total ?? 0;
       await client.query(
         `INSERT INTO sales (id,company_id,branch_id,user_id,customer_id,subtotal,discount_amount,
           tax_amount,total_amount,payment_method,status,notes,created_at,updated_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (id) DO NOTHING`,
-        [r.id, cid, r.branch_id, r.user_id, r.customer_id, r.subtotal, r.discount_amount,
-         r.tax_amount, r.total_amount, r.payment_method, r.status, r.notes, r.created_at, r.updated_at]
+        [r.id, cid, r.branch_id ?? null, r.user_id, r.customer_id ?? null,
+         r.subtotal ?? total, r.discount_amount ?? r.discount ?? 0,
+         r.tax_amount ?? r.tax ?? 0, total,
+         r.payment_method ?? r.payment_type ?? 'cash',
+         r.status ?? 'completed', r.notes ?? null, r.created_at, r.updated_at]
       );
     }
     for (const r of (d.sale_items || [])) {
       await client.query(
         `INSERT INTO sale_items (id,sale_id,product_id,quantity,unit_price,discount,total,created_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (id) DO NOTHING`,
-        [r.id, r.sale_id, r.product_id, r.quantity, r.unit_price, r.discount, r.total, r.created_at]
+        [r.id, r.sale_id, r.product_id, r.quantity,
+         r.unit_price ?? r.price ?? 0, r.discount ?? 0,
+         r.total ?? r.subtotal ?? 0, r.created_at]
       );
     }
 
