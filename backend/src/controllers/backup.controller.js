@@ -203,6 +203,19 @@ exports.restoreBackup = async (req, res, next) => {
       );
     }
 
+    // Reset sequences so new records don't clash with restored IDs
+    const seqTables = [
+      'categories', 'brands', 'suppliers', 'products', 'customers',
+      'sales', 'sale_items', 'purchases', 'purchase_items',
+      'expense_categories', 'expenses',
+      'stock_adjustments', 'stock_adjustment_items',
+    ];
+    for (const t of seqTables) {
+      await client.query(
+        `SELECT setval(pg_get_serial_sequence('${t}', 'id'), COALESCE(MAX(id), 1)) FROM ${t}`
+      );
+    }
+
     await client.query('COMMIT');
     logger.info(`[Backup] Restore completed for company ${cid}`);
     return success(res, null, 'Backup restored successfully.');
