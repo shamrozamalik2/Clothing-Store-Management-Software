@@ -47,12 +47,15 @@ exports.dashboard = async (req, res, next) => {
 
       // 10 most recent sales
       query(`
-        SELECT s.id, s.invoice_no, s.total_amount, s.created_at,
-               c.name AS customer_name
+        SELECT s.id,
+               s.reference     AS invoice_no,
+               s.total_amount,
+               s.sale_date     AS created_at,
+               c.name          AS customer_name
         FROM sales s
         LEFT JOIN customers c ON c.id = s.customer_id
         WHERE s.company_id=$1 AND s.status='completed'
-        ORDER BY s.created_at DESC LIMIT 10
+        ORDER BY s.sale_date DESC LIMIT 10
       `, [cid]),
 
       // top 5 products (all time or last 30 days)
