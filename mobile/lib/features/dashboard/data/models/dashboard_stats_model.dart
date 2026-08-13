@@ -52,9 +52,9 @@ class RecentSale {
   final String? customerName;
 
   factory RecentSale.fromJson(Map<String, dynamic> j) => RecentSale(
-    id:           j['id'] as int? ?? 0,
+    id:           DashboardStats._i(j['id']),
     invoiceNo:    j['invoice_no']?.toString() ?? '#${j['id']}',
-    total:        (j['total_amount'] as num?)?.toDouble() ?? 0,
+    total:        DashboardStats._d(j['total_amount']),
     createdAt:    j['created_at']?.toString() ?? '',
     customerName: j['customer_name']?.toString(),
   );
@@ -67,9 +67,9 @@ class TopProduct {
   final double revenue;
 
   factory TopProduct.fromJson(Map<String, dynamic> j) => TopProduct(
-    name:    j['name']?.toString()             ?? '',
-    qty:     (j['total_qty'] as num?)?.toInt() ?? 0,
-    revenue: (j['revenue']   as num?)?.toDouble() ?? 0,
+    name:    j['name']?.toString() ?? '',
+    qty:     DashboardStats._i(j['total_qty'] ?? j['qty']),
+    revenue: DashboardStats._d(j['revenue']),
   );
 }
 

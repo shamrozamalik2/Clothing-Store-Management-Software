@@ -33,9 +33,14 @@ class ApiEndpoints {
   static const String suppliers      = '/suppliers';
 
   // Reports
-  static const String reportSales    = '/reports/sales';
-  static const String reportProducts = '/reports/products';
-  static const String reportProfit   = '/reports/profit';
+  static const String reportOverview        = '/reports/overview';
+  static const String reportDailySales      = '/reports/daily-sales';
+  static const String reportTopProducts     = '/reports/top-products';
+  static const String reportPaymentMethods  = '/reports/payment-methods';
+  // legacy aliases kept for reference
+  static const String reportSales    = '/reports/overview';
+  static const String reportProducts = '/reports/top-products';
+  static const String reportProfit   = '/reports/payment-methods';
   static const String reportStock    = '/reports/stock';
 
   // Settings

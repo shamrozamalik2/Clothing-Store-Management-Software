@@ -35,21 +35,26 @@ class ProductModel {
 
   bool get isLowStock => stockQuantity <= minStockLevel;
 
+  static double _d(dynamic v) =>
+      v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+  static int _i(dynamic v) =>
+      v is num ? v.toInt() : int.tryParse('$v') ?? 0;
+
   factory ProductModel.fromJson(Map<String, dynamic> j) => ProductModel(
-    id:            j['id']             as int,
-    name:          j['name']           as String,
-    sku:           j['sku']            as String? ?? '',
-    sellingPrice:  (j['selling_price'] as num?)?.toDouble() ?? 0,
-    costPrice:     (j['cost_price']    as num?)?.toDouble() ?? 0,
-    stockQuantity: (j['stock_quantity'] as num?)?.toInt() ?? 0,
-    unit:          j['unit']           as String? ?? 'pcs',
-    barcode:       j['barcode']        as String?,
-    categoryId:    j['category_id']    as int?,
-    categoryName:  j['category_name']  as String?,
-    brandId:       j['brand_id']       as int?,
-    brandName:     j['brand_name']     as String?,
-    imageUrl:      j['image_url']      as String?,
-    minStockLevel: (j['min_stock_level'] as num?)?.toInt() ?? 0,
-    isActive:      j['is_active']      as bool? ?? true,
+    id:            _i(j['id']),
+    name:          j['name']?.toString()           ?? '',
+    sku:           j['sku']?.toString()            ?? '',
+    sellingPrice:  _d(j['sale_price']  ?? j['selling_price']),
+    costPrice:     _d(j['cost_price']),
+    stockQuantity: _i(j['stock_quantity']),
+    unit:          j['unit']?.toString()           ?? 'pcs',
+    barcode:       j['barcode']?.toString(),
+    categoryId:    j['category_id'] != null ? _i(j['category_id']) : null,
+    categoryName:  j['category_name']?.toString(),
+    brandId:       j['brand_id'] != null ? _i(j['brand_id']) : null,
+    brandName:     j['brand_name']?.toString(),
+    imageUrl:      (j['image'] ?? j['image_url'])?.toString(),
+    minStockLevel: _i(j['low_stock_alert'] ?? j['min_stock_level'] ?? 0),
+    isActive:      j['is_active'] == true || j['is_active'] == 1,
   );
 }

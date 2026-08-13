@@ -21,11 +21,16 @@ class SalesSummary {
   final double totalProfit;
   final double avgOrderValue;
 
+  static double _d(dynamic v) =>
+      v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+  static int _i(dynamic v) =>
+      v is num ? v.toInt() : int.tryParse('$v') ?? 0;
+
   factory SalesSummary.fromJson(Map<String, dynamic> json) => SalesSummary(
-        totalSales:     (json['total_sales']     as num?)?.toDouble() ?? 0.0,
-        totalOrders:     json['total_orders']    as int?              ?? 0,
-        totalProfit:    (json['total_profit']    as num?)?.toDouble() ?? 0.0,
-        avgOrderValue:  (json['avg_order_value'] as num?)?.toDouble() ?? 0.0,
+        totalSales:    _d(json['total_sales']    ?? json['revenue']),
+        totalOrders:   _i(json['total_orders']   ?? json['sale_count']),
+        totalProfit:   _d(json['total_profit']   ?? json['gross_profit']),
+        avgOrderValue: _d(json['avg_order_value']),
       );
 
   /// Empty / zero-value sentinel used while loading.
@@ -57,11 +62,11 @@ class ProductReport {
   final double profit;
 
   factory ProductReport.fromJson(Map<String, dynamic> json) => ProductReport(
-        productId: json['product_id'] as int?    ?? 0,
-        name:      json['name']       as String? ?? '',
-        qtySold:   json['qty_sold']   as int?    ?? 0,
-        revenue:  (json['revenue']    as num?)?.toDouble() ?? 0.0,
-        profit:   (json['profit']     as num?)?.toDouble() ?? 0.0,
+        productId: SalesSummary._i(json['product_id'] ?? json['id'] ?? 0),
+        name:      json['name']?.toString() ?? '',
+        qtySold:   SalesSummary._i(json['qty_sold']  ?? json['total_qty']),
+        revenue:   SalesSummary._d(json['revenue']   ?? json['total_revenue']),
+        profit:    SalesSummary._d(json['profit']    ?? json['gross_profit']),
       );
 }
 
@@ -82,9 +87,9 @@ class DailySalePoint {
   final int    orders;
 
   factory DailySalePoint.fromJson(Map<String, dynamic> json) => DailySalePoint(
-        date:   json['date']   as String? ?? '',
-        amount:(json['amount'] as num?)?.toDouble() ?? 0.0,
-        orders: json['orders'] as int?    ?? 0,
+        date:   (json['date']   ?? json['day'])?.toString() ?? '',
+        amount: SalesSummary._d(json['amount'] ?? json['revenue']),
+        orders: SalesSummary._i(json['orders'] ?? json['sale_count']),
       );
 }
 
@@ -135,8 +140,8 @@ class ReportFilter {
   String get toParam => _isoDate(dateTo);
 
   Map<String, String> toQueryParams() => {
-        'date_from': fromParam,
-        'date_to':   toParam,
+        'from': fromParam,
+        'to':   toParam,
       };
 
   static String _isoDate(DateTime dt) =>

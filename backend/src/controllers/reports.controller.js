@@ -84,17 +84,28 @@ exports.dashboard = async (req, res, next) => {
     const t    = todayRow.rows[0];
     const cogs = parseFloat(cogsRow.rows[0].cogs) || 0;
 
+    const todaySales = parseFloat(t.today_sales) || 0;
+
     res.json({
       success: true,
       data: {
-        today_sales:      parseFloat(t.today_sales)      || 0,
-        today_orders:     t.today_orders                  || 0,
-        today_profit:     (parseFloat(t.today_sales) || 0) - cogs,
+        today_sales:      todaySales,
+        today_orders:     t.today_orders || 0,
+        today_profit:     todaySales - cogs,
         low_stock_count:  stockRow.rows[0].low_stock_count || 0,
         pending_payments: parseFloat(t.pending_payments)  || 0,
-        recent_sales:     recentRows.rows,
-        top_products:     topRows.rows,
-        weekly_sales:     weekRows.rows,
+        recent_sales:     recentRows.rows.map(r => ({
+          ...r,
+          total_amount: parseFloat(r.total_amount) || 0,
+        })),
+        top_products: topRows.rows.map(r => ({
+          ...r,
+          revenue: parseFloat(r.revenue) || 0,
+        })),
+        weekly_sales: weekRows.rows.map(r => ({
+          ...r,
+          amount: parseFloat(r.amount) || 0,
+        })),
       },
     });
   } catch (err) { next(err); }
