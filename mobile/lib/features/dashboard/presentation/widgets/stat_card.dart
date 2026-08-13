@@ -20,14 +20,14 @@ class StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs   = Theme.of(context).colorScheme;
     final tt   = Theme.of(context).textTheme;
-    final bg   = color.withOpacity(0.12);
+    final bg   = color.withValues(alpha: 0.12);
 
     return Card(
       elevation:   0,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),

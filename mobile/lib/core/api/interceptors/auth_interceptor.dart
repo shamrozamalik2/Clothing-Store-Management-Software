@@ -28,13 +28,8 @@ class AuthInterceptor extends Interceptor {
 
       if (code == 'TOKEN_EXPIRED') {
         try {
-          final refreshToken = await _storage.getRefreshToken();
-          if (refreshToken == null) return handler.next(err);
-
-          final res = await _dio.post(
-            '/auth/refresh',
-            options: Options(headers: {'Cookie': 'refreshToken=$refreshToken'}),
-          );
+          // Refresh token is an HttpOnly cookie — sent automatically by the OS/browser
+          final res = await _dio.post('/auth/refresh');
           final newToken = res.data['data']?['token'] as String?;
           if (newToken == null) return handler.next(err);
 

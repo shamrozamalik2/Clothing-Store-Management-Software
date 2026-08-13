@@ -127,7 +127,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
             // ── Sales list ────────────────────────────────────────────────
             salesAsync.when(
-              loading: () => SliverToBoxAdapter(child: _SalesShimmer()),
+              loading: () => const SliverToBoxAdapter(child: _SalesShimmer()),
               error: (e, _) => SliverToBoxAdapter(
                 child: _ErrorState(
                   message: e.toString(),
@@ -198,7 +198,7 @@ class _SummaryBanner extends StatelessWidget {
     return Container(
       padding:    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color:        cs.primaryContainer.withOpacity(0.5),
+        color:        cs.primaryContainer.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -261,7 +261,7 @@ class _SaleCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: InkWell(
         onTap:        onTap,
@@ -337,9 +337,9 @@ class _Chip extends StatelessWidget {
     return Container(
       padding:    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color:        color.withOpacity(0.12),
+        color:        color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
-        border:       Border.all(color: color.withOpacity(0.3)),
+        border:       Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,

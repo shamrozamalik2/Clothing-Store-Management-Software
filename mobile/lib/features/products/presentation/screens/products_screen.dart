@@ -146,7 +146,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 
             // ── Product list ─────────────────────────────────────────────
             productsAsync.when(
-              loading: () => SliverToBoxAdapter(child: _ProductShimmer()),
+              loading: () => const SliverToBoxAdapter(child: _ProductShimmer()),
               error: (e, _) => SliverToBoxAdapter(
                 child: _ErrorState(
                   message: e.toString(),
@@ -154,7 +154,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 ),
               ),
               data: (response) => response.items.isEmpty
-                  ? SliverToBoxAdapter(
+                  ? const SliverToBoxAdapter(
                       child: _EmptyState(),
                     )
                   : SliverPadding(
@@ -209,7 +209,7 @@ class _ProductCard extends StatelessWidget {
       margin:      const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: InkWell(
         onTap:        onTap,
@@ -274,7 +274,7 @@ class _ProductCard extends StatelessWidget {
                   Container(
                     padding:    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color:        stockColor.withOpacity(0.12),
+                      color:        stockColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -422,9 +422,9 @@ class _ProductDetailSheet extends StatelessWidget {
               Container(
                 padding:    const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color:        const Color(0xFFEF4444).withOpacity(0.1),
+                  color:        const Color(0xFFEF4444).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border:       Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                  border:       Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [

@@ -19,30 +19,23 @@ class PosRemoteSource {
   Future<Map<String, dynamic>> createSale(
     Map<String, dynamic> payload,
   ) async {
-    final response = await _apiClient.post(
-      ApiEndpoints.sales,
-      body: payload,
-    );
-    final data = response['data'];
+    final res  = await _apiClient.post(ApiEndpoints.sales, data: payload);
+    final body = res.data as Map<String, dynamic>? ?? {};
+    final data = body['data'];
     if (data is Map<String, dynamic>) return data;
-    // Tolerate servers that return the object at the root level.
-    return response;
+    return body;
   }
 
   // --- Customers --------------------------------------------------------
 
   /// Fetches customers, optionally filtered by [search].
   Future<List<Map<String, dynamic>>> getCustomers({String? search}) async {
-    final response = await _apiClient.get(
-      ApiEndpoints.customers,
-      queryParams: {
-        if (search != null && search.isNotEmpty) 'search': search,
-      },
-    );
-    final raw = response['data'];
-    if (raw is List) {
-      return raw.cast<Map<String, dynamic>>();
-    }
+    final res  = await _apiClient.get(ApiEndpoints.customers, queryParameters: {
+      if (search != null && search.isNotEmpty) 'search': search,
+    });
+    final body = res.data as Map<String, dynamic>? ?? {};
+    final raw  = body['data'];
+    if (raw is List) return raw.cast<Map<String, dynamic>>();
     return const [];
   }
 

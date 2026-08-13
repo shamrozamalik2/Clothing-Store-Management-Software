@@ -89,7 +89,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
             // ── Customer list ────────────────────────────────────────────
             customersAsync.when(
-              loading: () => SliverToBoxAdapter(child: _CustomerShimmer()),
+              loading: () => const SliverToBoxAdapter(child: _CustomerShimmer()),
               error: (e, _) => SliverToBoxAdapter(
                 child: _ErrorState(
                   message: e.toString(),
@@ -170,7 +170,7 @@ class _CustomerCard extends StatelessWidget {
       margin:    const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: InkWell(
         onTap:        onTap,
@@ -229,8 +229,8 @@ class _CustomerCard extends StatelessWidget {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.star_rounded,
-                            size: 14, color: const Color(0xFFFFD700)),
+                        const Icon(Icons.star_rounded,
+                            size: 14, color: Color(0xFFFFD700)),
                         const SizedBox(width: 3),
                         Text(
                           '${customer.loyaltyPoints} pts',
@@ -247,7 +247,7 @@ class _CustomerCard extends StatelessWidget {
                     Container(
                       padding:    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color:        const Color(0xFFEF4444).withOpacity(0.1),
+                        color:        const Color(0xFFEF4444).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -383,7 +383,7 @@ class _CustomerDetailSheet extends StatelessWidget {
             Container(
               padding:    const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color:        cs.surfaceContainerHighest.withOpacity(0.5),
+                color:        cs.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -422,9 +422,9 @@ class _StatTile extends StatelessWidget {
       child: Container(
         padding:    const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color:        color.withOpacity(0.08),
+          color:        color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
-          border:       Border.all(color: color.withOpacity(0.2)),
+          border:       Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [

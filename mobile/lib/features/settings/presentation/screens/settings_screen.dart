@@ -45,7 +45,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: ListView(
         children: [
           // ── Profile ────────────────────────────────────────────────────────
-          _SectionLabel('Profile'),
+          const _SectionLabel('Profile'),
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Padding(
@@ -102,7 +102,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           // ── Company ────────────────────────────────────────────────────────
-          _SectionLabel('Company'),
+          const _SectionLabel('Company'),
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Column(
@@ -113,7 +113,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   value: user?.companyName ?? '—',
                 ),
                 Divider(indent: 56, endIndent: 0, height: 1,
-                    color: cs.outlineVariant.withOpacity(0.5)),
+                    color: cs.outlineVariant.withValues(alpha: 0.5)),
                 _InfoTile(
                   icon:  Icons.tag_rounded,
                   label: 'Company Code',
@@ -124,7 +124,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           // ── Appearance ─────────────────────────────────────────────────────
-          _SectionLabel('Appearance'),
+          const _SectionLabel('Appearance'),
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Padding(
@@ -171,7 +171,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           // ── API / Server URL ───────────────────────────────────────────────
-          _SectionLabel('Server'),
+          const _SectionLabel('Server'),
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Padding(
@@ -231,7 +231,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           // ── Preferences ────────────────────────────────────────────────────
-          _SectionLabel('Preferences'),
+          const _SectionLabel('Preferences'),
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Column(
@@ -249,7 +249,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 Divider(
                   indent: 56, endIndent: 0, height: 1,
-                  color: cs.outlineVariant.withOpacity(0.5),
+                  color: cs.outlineVariant.withValues(alpha: 0.5),
                 ),
                 ListTile(
                   leading: Icon(Icons.notifications_outlined, color: cs.primary),
@@ -262,7 +262,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           // ── Security ───────────────────────────────────────────────────────
-          _SectionLabel('Security'),
+          const _SectionLabel('Security'),
           Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Column(
@@ -275,7 +275,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 Divider(
                   indent: 56, endIndent: 0, height: 1,
-                  color: cs.outlineVariant.withOpacity(0.5),
+                  color: cs.outlineVariant.withValues(alpha: 0.5),
                 ),
                 _BiometricTile(),
               ],
@@ -313,7 +313,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               'v1.0.0',
               style: TextStyle(
                 fontSize: 12,
-                color:    cs.onSurfaceVariant.withOpacity(0.6),
+                color:    cs.onSurfaceVariant.withValues(alpha: 0.6),
               ),
             ),
           ),

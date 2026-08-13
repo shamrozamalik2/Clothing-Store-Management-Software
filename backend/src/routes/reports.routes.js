@@ -8,6 +8,7 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/dashboard',         requirePermission('reports', 'view'), ctrl.dashboard);
 router.get('/overview',          requirePermission('reports', 'view'), ctrl.overview);
 router.get('/daily-sales',       requirePermission('reports', 'view'), ctrl.dailySales);
 router.get('/payment-methods',   requirePermission('reports', 'view'), ctrl.paymentMethods);

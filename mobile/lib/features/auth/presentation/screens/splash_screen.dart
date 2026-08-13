@@ -24,7 +24,7 @@ class SplashScreen extends ConsumerWidget {
             Container(
               width: 96, height: 96,
               decoration: BoxDecoration(
-                color:        cs.onPrimary.withOpacity(0.15),
+                color:        cs.onPrimary.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Icon(Icons.storefront_rounded, size: 56, color: cs.onPrimary),
@@ -34,7 +34,7 @@ class SplashScreen extends ConsumerWidget {
               style: TextStyle(color: cs.onPrimary, fontSize: 26, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text('Management System',
-              style: TextStyle(color: cs.onPrimary.withOpacity(0.7), fontSize: 14)),
+              style: TextStyle(color: cs.onPrimary.withValues(alpha: 0.7), fontSize: 14)),
             const SizedBox(height: 48),
             CircularProgressIndicator(color: cs.onPrimary),
           ],

@@ -1,5 +1,5 @@
 const String kAppName = 'SAS Garments';
-const String kDefaultApiUrl = 'https://clothing-store-management-software.onrender.com/api';
+const String kDefaultApiUrl = 'https://api.probusinesscloud.com/api';
 
 // Hive box names
 const String kBoxPendingSales = 'pending_sales';
@@ -9,9 +9,9 @@ const String kBoxProducts     = 'cached_products';
 // Pagination
 const int kDefaultPageSize = 20;
 
-// Timeouts
-const Duration kConnectTimeout = Duration(seconds: 15);
-const Duration kReceiveTimeout = Duration(seconds: 30);
+// Timeouts — receiveTimeout is 90s to survive Render.com free-tier cold starts
+const Duration kConnectTimeout = Duration(seconds: 30);
+const Duration kReceiveTimeout = Duration(seconds: 90);
 
 // Receipt widths
 const int kPrinterWidth58mm = 32;

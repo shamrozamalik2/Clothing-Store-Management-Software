@@ -37,9 +37,6 @@ dependencies:
   # Scanner (QR + barcode)
   mobile_scanner: ^5.1.1
 
-  # Bluetooth printing
-  esc_pos_utils_plus: ^2.0.3
-  flutter_bluetooth_serial: ^0.4.0
 
   # Images
   cached_network_image: ^3.3.1

@@ -45,16 +45,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final SecureStorageService _storage;
 
   Future<void> _tryRestore() async {
-    final token = await _storage.getAccessToken();
-    final json  = await _storage.read(kKeyUser);
-    if (token != null && json != null) {
-      try {
+    try {
+      final token = await _storage.getAccessToken()
+          .timeout(const Duration(seconds: 5));
+      final json  = await _storage.read(kKeyUser)
+          .timeout(const Duration(seconds: 5));
+      if (token != null && json != null) {
         final user = UserModel.fromJson(
           jsonDecode(json) as Map<String, dynamic>,
         );
         state = AuthAuthenticated(user);
         return;
-      } catch (_) {}
+      }
+    } catch (_) {
+      // Storage hung, timed out, or has corrupted data — wipe and re-login
+      try { await _storage.deleteAll().timeout(const Duration(seconds: 3)); } catch (_) {}
     }
     state = AuthUnauthenticated();
   }
@@ -70,10 +75,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final result = await _source.login(
         slug: slug, email: email, password: password,
       );
-      await _storage.saveTokens(
-        accessToken:  result.accessToken,
-        refreshToken: result.refreshToken,
-      );
+      await _storage.write(kKeyAccessToken, result.accessToken);
       await _storage.write(kKeyUser,        jsonEncode(result.user.toJson() as Map));
       await _storage.write(kKeyCompanySlug, slug);
       if (remember) await _storage.write(kKeyRememberLogin, 'true');

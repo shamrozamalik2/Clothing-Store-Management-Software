@@ -304,7 +304,7 @@ class _SummaryCard extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color:        accent.withOpacity(0.12),
+                color:        accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: accent, size: 22),
@@ -372,14 +372,14 @@ class _SalesLineChart extends StatelessWidget {
                 show:             true,
                 drawVerticalLine: false,
                 getDrawingHorizontalLine: (v) => FlLine(
-                  color:       cs.outlineVariant.withOpacity(0.4),
+                  color:       cs.outlineVariant.withValues(alpha: 0.4),
                   strokeWidth: 1,
                 ),
               ),
               borderData: FlBorderData(show: false),
               titlesData: FlTitlesData(
-                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles:   AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles:   true,
@@ -425,10 +425,10 @@ class _SalesLineChart extends StatelessWidget {
                   isCurved: true,
                   color:    cs.primary,
                   barWidth: 2.5,
-                  dotData:  FlDotData(show: false),
+                  dotData:  const FlDotData(show: false),
                   belowBarData: BarAreaData(
                     show:  true,
-                    color: cs.primary.withOpacity(0.12),
+                    color: cs.primary.withValues(alpha: 0.12),
                   ),
                 ),
               ],
@@ -531,7 +531,7 @@ class _ProductListTile extends StatelessWidget {
                   height: 28,
                   decoration: BoxDecoration(
                     color:  rank <= 3
-                        ? cs.primary.withOpacity(0.15)
+                        ? cs.primary.withValues(alpha: 0.15)
                         : cs.surfaceContainerHighest,
                     shape: BoxShape.circle,
                   ),
@@ -877,7 +877,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           children: [
             Icon(Icons.bar_chart_rounded, size: 48,
-                color: cs.onSurfaceVariant.withOpacity(0.4)),
+                color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
             const SizedBox(height: 12),
             Text(message,
                 textAlign: TextAlign.center,

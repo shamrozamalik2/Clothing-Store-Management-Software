@@ -63,7 +63,7 @@ class DashboardScreen extends ConsumerWidget {
 
             // ── Content ─────────────────────────────────────────────────────
             statsAsync.when(
-              loading: () => SliverToBoxAdapter(child: _Shimmer()),
+              loading: () => const SliverToBoxAdapter(child: _Shimmer()),
               error:   (e, _) => SliverToBoxAdapter(child: _ErrorWidget(error: e.toString())),
               data:    (stats) => SliverList(
                 delegate: SliverChildListDelegate([
@@ -72,7 +72,7 @@ class DashboardScreen extends ConsumerWidget {
                   const SizedBox(height: 20),
                   _WeeklyChart(stats: stats),
                   const SizedBox(height: 20),
-                  _QuickActions(),
+                  const _QuickActions(),
                   const SizedBox(height: 20),
                   _RecentSales(stats: stats),
                   const SizedBox(height: 20),
@@ -165,7 +165,7 @@ class _WeeklyChart extends StatelessWidget {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -242,16 +242,16 @@ class _WeeklyChart extends StatelessWidget {
                                 },
                               ),
                             ),
-                            leftTitles:  AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                            topTitles:   AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            leftTitles:  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                           ),
                           gridData:   FlGridData(
                             show: true,
                             drawVerticalLine: false,
                             horizontalInterval: maxY / 4,
                             getDrawingHorizontalLine: (value) => FlLine(
-                              color: cs.outlineVariant.withOpacity(0.4),
+                              color: cs.outlineVariant.withValues(alpha: 0.4),
                               strokeWidth: 1,
                             ),
                           ),
@@ -270,7 +270,7 @@ class _WeeklyChart extends StatelessWidget {
                                   backDrawRodData: BackgroundBarChartRodData(
                                     show:  true,
                                     toY:   maxY,
-                                    color: cs.primaryContainer.withOpacity(0.3),
+                                    color: cs.primaryContainer.withValues(alpha: 0.3),
                                   ),
                                 ),
                               ],
@@ -298,10 +298,10 @@ class _QuickActions extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     final actions = [
-      _Action('New Sale',  Icons.point_of_sale_rounded,  const Color(0xFF6366F1), '/pos'),
-      _Action('Products',  Icons.inventory_2_rounded,    const Color(0xFF0EA5E9), '/products'),
-      _Action('Customers', Icons.people_rounded,         const Color(0xFF10B981), '/customers'),
-      _Action('Reports',   Icons.bar_chart_rounded,      const Color(0xFFF59E0B), '/reports'),
+      const _Action('New Sale',  Icons.point_of_sale_rounded,  Color(0xFF6366F1), '/pos'),
+      const _Action('Products',  Icons.inventory_2_rounded,    Color(0xFF0EA5E9), '/products'),
+      const _Action('Customers', Icons.people_rounded,         Color(0xFF10B981), '/customers'),
+      const _Action('Reports',   Icons.bar_chart_rounded,      Color(0xFFF59E0B), '/reports'),
     ];
 
     return Padding(
@@ -347,9 +347,9 @@ class _ActionButton extends StatelessWidget {
         child: Container(
           padding:    const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color:        action.color.withOpacity(0.1),
+            color:        action.color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border:       Border.all(color: action.color.withOpacity(0.2)),
+            border:       Border.all(color: action.color.withValues(alpha: 0.2)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -419,7 +419,7 @@ class _RecentSales extends StatelessWidget {
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
               ),
               clipBehavior: Clip.antiAlias,
               child: Column(
@@ -466,7 +466,7 @@ class _RecentSales extends StatelessWidget {
                         ),
                       ),
                       if (i < list.length - 1)
-                        Divider(height: 1, color: cs.outlineVariant.withOpacity(0.5)),
+                        Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
                     ],
                   );
                 }).toList(),
@@ -522,7 +522,7 @@ class _TopProducts extends StatelessWidget {
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                      side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
@@ -534,7 +534,7 @@ class _TopProducts extends StatelessWidget {
                               Container(
                                 padding:    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color:        rankColor.withOpacity(0.15),
+                                  color:        rankColor.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(

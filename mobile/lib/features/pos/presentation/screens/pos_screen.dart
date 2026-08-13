@@ -11,6 +11,7 @@ import '../../data/sources/pos_remote_source.dart';
 import '../widgets/product_grid.dart';
 import '../../../products/data/models/product_model.dart';
 import '../../../products/data/sources/products_remote_source.dart';
+import '../../../products/presentation/providers/products_provider.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/utils/currency_formatter.dart';
 
@@ -66,12 +67,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get(
         '/products',
-        queryParams: {
+        queryParameters: {
           if (_searchQuery.isNotEmpty) 'search': _searchQuery,
           'limit': '200',
         },
       );
-      final raw = response['data'];
+      final raw = (response.data as Map<String, dynamic>?)?['data'];
       final products = (raw is List ? raw : [])
           .map((e) => ProductModel.fromJson(e as Map<String, dynamic>))
           .toList()
@@ -141,7 +142,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     // Slow path: fetch from server.
     ref
         .read(cartProvider.notifier)
-        .applyBarcodeResult(barcode, ref.read(productsRemoteSourceProvider))
+        .applyBarcodeResult(barcode, ref.read(productsSourceProvider))
         .then((_) {
       final cart = ref.read(cartProvider);
       if (cart.items.isNotEmpty) {
@@ -451,13 +452,15 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               taxCtrl: _taxCtrl,
               onDiscountChanged: (v) {
                 final val = double.tryParse(v);
-                if (val != null)
+                if (val != null) {
                   ref.read(cartProvider.notifier).setDiscount(val);
+                }
               },
               onTaxChanged: (v) {
                 final val = double.tryParse(v);
-                if (val != null)
+                if (val != null) {
                   ref.read(cartProvider.notifier).setTax(val);
+                }
               },
               onCheckout: () {
                 context.push('/pos/checkout', extra: ref.read(cartProvider));

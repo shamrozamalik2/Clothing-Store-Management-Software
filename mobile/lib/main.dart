@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_core/firebase_core.dart';
+// import 'package:firebase_core/firebase_core.dart';
 
 import 'core/router/app_router.dart';
 import 'core/storage/hive_storage.dart';
 import 'core/theme/app_theme.dart';
-import 'core/services/notification_service.dart';
+// import 'core/services/notification_service.dart';
 import 'features/settings/presentation/providers/settings_provider.dart';
 
 void main() async {
@@ -14,9 +14,9 @@ void main() async {
   // Hive offline storage
   await HiveStorage.init();
 
-  // Firebase (FCM)
-  await Firebase.initializeApp();
-  await NotificationService.init();
+  // Firebase (FCM) — re-enable after adding google-services.json
+  // await Firebase.initializeApp();
+  // await NotificationService.init();
 
   runApp(const ProviderScope(child: SasGarmentsApp()));
 }

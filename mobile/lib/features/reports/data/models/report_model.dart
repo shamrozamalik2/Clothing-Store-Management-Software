@@ -1,6 +1,8 @@
 // ignore_for_file: invalid_annotation_target
 
 /// Models for the Reports feature.
+library;
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SalesSummary

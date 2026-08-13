@@ -26,7 +26,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (loading)             return '/';
       if (!loggedIn && path != '/login') return '/login';
-      if (loggedIn  && path == '/login') return '/dashboard';
+      if (loggedIn  && (path == '/login' || path == '/')) return '/dashboard';
       return null;
     },
     routes: [
@@ -40,7 +40,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/pos/checkout',
             builder: (_, state) => CheckoutScreen(
-              cartJson: state.extra as Map<String, dynamic>?,
+              cartExtra: state.extra,
             ),
           ),
           GoRoute(path: '/products',   builder: (_, __) => const ProductsScreen()),

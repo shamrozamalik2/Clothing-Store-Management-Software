@@ -78,7 +78,7 @@ class _ProductCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.4)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -154,7 +154,7 @@ class _ProductImage extends StatelessWidget {
         errorBuilder: (_, __, ___) => _Placeholder(),
         loadingBuilder: (context, child, progress) {
           if (progress == null) return child;
-          return const _Placeholder();
+          return _Placeholder();
         },
       );
     }
@@ -188,10 +188,10 @@ class _StockBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool low = qty > 0 && qty <= 5;
     final Color bg = qty == 0
-        ? Colors.red.withOpacity(0.85)
+        ? Colors.red.withValues(alpha: 0.85)
         : low
-            ? Colors.orange.withOpacity(0.9)
-            : Colors.green.withOpacity(0.85);
+            ? Colors.orange.withValues(alpha: 0.9)
+            : Colors.green.withValues(alpha: 0.85);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

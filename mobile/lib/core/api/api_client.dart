@@ -24,7 +24,7 @@ class ApiClient {
       LogInterceptor(
         requestBody:  false,
         responseBody: false,
-        logPrint: (obj) => null, // silence in prod
+        logPrint: (obj) {}, // silence in prod
       ),
     ]);
   }

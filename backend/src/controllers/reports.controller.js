@@ -9,6 +9,97 @@ function getDateRange(qry) {
   return { from: qry.from || today, to: qry.to || today };
 }
 
+// ─── mobile dashboard (single-call summary) ──────────────────────────────────
+
+exports.dashboard = async (req, res, next) => {
+  try {
+    const cid   = req.companyId;
+    const today = new Date().toISOString().slice(0, 10);
+
+    // 7-day window
+    const weekAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const [todayRow, cogsRow, stockRow, recentRows, topRows, weekRows] = await Promise.all([
+      // today KPIs
+      query(`
+        SELECT
+          COUNT(*)::int                    AS today_orders,
+          COALESCE(SUM(total_amount), 0)   AS today_sales,
+          COALESCE(SUM(due_amount),   0)   AS pending_payments
+        FROM sales
+        WHERE company_id=$1 AND status='completed' AND sale_date::date = $2
+      `, [cid, today]),
+
+      // today COGS → profit
+      query(`
+        SELECT COALESCE(SUM(si.cost_price * si.quantity), 0) AS cogs
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id
+        WHERE s.company_id=$1 AND s.status='completed' AND s.sale_date::date=$2
+      `, [cid, today]),
+
+      // low stock count
+      query(`
+        SELECT SUM(CASE WHEN track_inventory AND stock_quantity > 0
+                             AND stock_quantity <= low_stock_alert THEN 1 ELSE 0 END)::int AS low_stock_count
+        FROM products WHERE company_id=$1 AND is_active=TRUE
+      `, [cid]),
+
+      // 10 most recent sales
+      query(`
+        SELECT s.id, s.invoice_no, s.total_amount, s.created_at,
+               c.name AS customer_name
+        FROM sales s
+        LEFT JOIN customers c ON c.id = s.customer_id
+        WHERE s.company_id=$1 AND s.status='completed'
+        ORDER BY s.created_at DESC LIMIT 10
+      `, [cid]),
+
+      // top 5 products (all time or last 30 days)
+      query(`
+        SELECT p.name,
+               COALESCE(SUM(si.quantity),0)::int       AS total_qty,
+               COALESCE(SUM(si.total),   0)            AS revenue
+        FROM sale_items si
+        JOIN sales    s ON s.id  = si.sale_id
+        JOIN products p ON p.id  = si.product_id
+        WHERE s.company_id=$1 AND s.status='completed'
+          AND s.sale_date::date >= (CURRENT_DATE - INTERVAL '30 days')
+        GROUP BY p.name
+        ORDER BY revenue DESC LIMIT 5
+      `, [cid]),
+
+      // weekly sales (last 7 days)
+      query(`
+        SELECT TO_CHAR(sale_date::date, 'Dy') AS day,
+               COALESCE(SUM(total_amount), 0) AS amount
+        FROM sales
+        WHERE company_id=$1 AND status='completed'
+          AND sale_date::date BETWEEN $2 AND $3
+        GROUP BY sale_date::date
+        ORDER BY sale_date::date ASC
+      `, [cid, weekAgo, today]),
+    ]);
+
+    const t    = todayRow.rows[0];
+    const cogs = parseFloat(cogsRow.rows[0].cogs) || 0;
+
+    res.json({
+      success: true,
+      data: {
+        today_sales:      parseFloat(t.today_sales)      || 0,
+        today_orders:     t.today_orders                  || 0,
+        today_profit:     (parseFloat(t.today_sales) || 0) - cogs,
+        low_stock_count:  stockRow.rows[0].low_stock_count || 0,
+        pending_payments: parseFloat(t.pending_payments)  || 0,
+        recent_sales:     recentRows.rows,
+        top_products:     topRows.rows,
+        weekly_sales:     weekRows.rows,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
 // ─── overview (KPIs) ─────────────────────────────────────────────────────────
 
 exports.overview = async (req, res, next) => {

@@ -7,24 +7,25 @@ class ErrorInterceptor extends Interceptor {
     final message = _extractMessage(err);
     final code    = _extractCode(err);
 
+    final status = err.response?.statusCode;
     AppException mapped;
-    switch (err.response?.statusCode) {
-      case 401:
-        mapped = UnauthorizedException(message, code: code);
-      case 404:
-        mapped = NotFoundException(message, code: code);
-      case 422:
-        mapped = ValidationException(message, code: code);
-      case >= 500:
-        mapped = ServerException(message, code: code);
-      default:
-        if (err.type == DioExceptionType.connectionTimeout ||
-            err.type == DioExceptionType.receiveTimeout ||
-            err.type == DioExceptionType.connectionError) {
-          mapped = NetworkException('No internet connection or server is unreachable.');
-        } else {
-          mapped = AppException(message, code: code);
-        }
+    if (status == 401) {
+      mapped = UnauthorizedException(message, code: code);
+    } else if (status == 404) {
+      mapped = NotFoundException(message, code: code);
+    } else if (status == 422) {
+      mapped = ValidationException(message, code: code);
+    } else if (status != null && status >= 500) {
+      mapped = ServerException(message, code: code);
+    } else if (err.type == DioExceptionType.receiveTimeout) {
+      mapped = const NetworkException(
+        'Server is taking too long to respond. It may be waking up — please try again in a moment.',
+      );
+    } else if (err.type == DioExceptionType.connectionTimeout ||
+        err.type == DioExceptionType.connectionError) {
+      mapped = const NetworkException('No internet connection or server is unreachable.');
+    } else {
+      mapped = AppException(message, code: code);
     }
 
     handler.next(err.copyWith(error: mapped));

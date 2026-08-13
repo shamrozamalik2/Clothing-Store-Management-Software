@@ -209,8 +209,8 @@ class CartNotifier extends StateNotifier<CartState> {
     ProductsRemoteSource productsSource,
   ) async {
     final results = await productsSource.getProducts(barcode: barcode);
-    if (results.isNotEmpty) {
-      addItem(results.first);
+    if (results.items.isNotEmpty) {
+      addItem(results.items.first);
     }
   }
 }

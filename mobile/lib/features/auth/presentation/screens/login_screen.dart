@@ -59,7 +59,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final cs    = Theme.of(context).colorScheme;
     final auth  = ref.watch(authProvider);
     final loading = auth is AuthLoading;
-    final error   = auth is AuthError ? (auth as AuthError).message : null;
+    final error   = auth is AuthError ? (auth).message : null;
 
     return Scaffold(
       body: SafeArea(
