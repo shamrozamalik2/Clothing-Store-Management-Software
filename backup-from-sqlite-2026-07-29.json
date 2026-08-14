@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "exported_at": "2026-07-29T18:39:56.972Z",
+  "source": "sqlite-migration",
+  "company": {},
+  "data": {
+    "settings": [],
+    "categories": [],
+    "brands": [],
+    "suppliers": [],
+    "products": [],
+    "customers": [],
+    "sales": [],
+    "sale_items": [],
+    "purchases": [],
+    "purchase_items": [],
+    "expenses": [],
+    "users": []
+  }
+}

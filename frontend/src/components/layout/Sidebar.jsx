@@ -191,7 +191,7 @@ export default function Sidebar() {
       <button
         onClick={() => dispatch(toggleSidebar())}
         className={cn(
-          'absolute -right-3 top-[68px] z-20',
+          'absolute -right-2 top-[81px] z-20',
           'h-6 w-6 rounded-full',
           'flex items-center justify-center',
           'transition-all duration-200',
