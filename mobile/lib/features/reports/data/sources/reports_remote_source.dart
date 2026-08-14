@@ -18,7 +18,7 @@ class ReportsRemoteSource {
       ApiEndpoints.reportOverview,
       queryParameters: filter.toQueryParams(),
     );
-    final body   = res.data as Map<String, dynamic>? ?? {};
+    final body   = (res.data as Map?)?.cast<String, dynamic>() ?? {};
     final data   = (body['data'] as Map<String, dynamic>?) ?? {};
     final sales  = (data['sales'] as Map<String, dynamic>?) ?? {};
     return SalesSummary(

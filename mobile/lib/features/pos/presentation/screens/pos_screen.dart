@@ -10,7 +10,6 @@ import '../../data/models/cart_item_model.dart';
 import '../../data/sources/pos_remote_source.dart';
 import '../widgets/product_grid.dart';
 import '../../../products/data/models/product_model.dart';
-import '../../../products/data/sources/products_remote_source.dart';
 import '../../../products/presentation/providers/products_provider.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/utils/currency_formatter.dart';

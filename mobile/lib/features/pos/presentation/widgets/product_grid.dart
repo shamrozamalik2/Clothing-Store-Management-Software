@@ -72,7 +72,6 @@ class _ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final inStock = product.stockQuantity > 0;
 
     return Card(
       elevation: 0,

@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../data/models/sale_model.dart';
-import '../../data/sources/sales_remote_source.dart';
 import '../providers/sales_provider.dart';
 
 // ── Date filter enum ─────────────────────────────────────────────────────────
@@ -73,8 +72,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   @override
   Widget build(BuildContext context) {
     final salesAsync = ref.watch(salesProvider);
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
 
     final filters = [
       (_DateFilter.today,  'Today'),

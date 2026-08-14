@@ -4,7 +4,6 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/models/customer_model.dart';
-import '../../data/sources/customers_remote_source.dart';
 import '../providers/customers_provider.dart';
 
 class CustomersScreen extends ConsumerStatefulWidget {
@@ -37,7 +36,6 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   @override
   Widget build(BuildContext context) {
     final customersAsync = ref.watch(customersProvider);
-    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: RefreshIndicator(
@@ -530,7 +528,6 @@ class _CreateCustomerSheetState extends ConsumerState<_CreateCustomerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final cs  = Theme.of(context).colorScheme;
     final tt  = Theme.of(context).textTheme;
     final mq  = MediaQuery.of(context);
 

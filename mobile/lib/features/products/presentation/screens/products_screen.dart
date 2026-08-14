@@ -5,7 +5,6 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/models/product_model.dart';
-import '../../data/sources/products_remote_source.dart';
 import '../providers/products_provider.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
@@ -61,8 +60,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   Widget build(BuildContext context) {
     final productsAsync  = ref.watch(productsProvider);
     final selectedCatId  = ref.watch(productCategoryProvider);
-    final cs             = Theme.of(context).colorScheme;
-    final tt             = Theme.of(context).textTheme;
 
     return Scaffold(
       body: RefreshIndicator(
