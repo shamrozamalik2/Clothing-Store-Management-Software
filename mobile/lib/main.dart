@@ -30,7 +30,7 @@ class SasGarmentsApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title:           'SAS Garments',
+      title:           'ProBusinessCloud',
       debugShowCheckedModeBanner: false,
       theme:           AppTheme.light(),
       darkTheme:       AppTheme.dark(),

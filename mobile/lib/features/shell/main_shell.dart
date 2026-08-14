@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/widgets/pbc_logo.dart';
+
+// ── PBC brand colours — always dark navy for the sidebar ────────────────────
+const _kNavyBg     = Color(0xFF0C1427);
+const _kNavyBorder = Color(0x1AFFFFFF); // white/10
+const _kNavyDivider= Color(0x1AFFFFFF); // white/10
+const _kNavyText   = Color(0xFF94A3B8); // slate-400
+const _kActiveText = Color(0xFFA5B4FC); // indigo-300
+const _kActiveBg   = Color(0x1A818CF8); // indigo/10
+
 class MainShell extends StatelessWidget {
   const MainShell({super.key, required this.child});
   final Widget child;
 
-  // GlobalKey lets any screen's AppBar open this drawer programmatically
   static final scaffoldKey = GlobalKey<ScaffoldState>();
 
   static const _navItems = [
@@ -33,39 +42,150 @@ class MainShell extends StatelessWidget {
     final currentPath = _currentPath(context);
 
     if (isWide) {
-      // Tablet / landscape — persistent side rail
-      return Scaffold(
-        body: Row(children: [
-          NavigationRail(
-            extended:         MediaQuery.of(context).size.width >= 1024,
-            selectedIndex:    _navItems.indexWhere((t) => t.path == currentPath),
-            onDestinationSelected: (i) => context.go(_navItems[i].path),
-            leading: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Icon(Icons.storefront_rounded, size: 32),
-            ),
-            destinations: _navItems.map((t) => NavigationRailDestination(
-              icon:         Icon(t.inactiveIcon),
-              selectedIcon: Icon(t.activeIcon),
-              label:        Text(t.label),
-            )).toList(),
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(child: child),
-        ]),
-      );
+      return _TabletShell(currentPath: currentPath, child: child);
     }
 
-    // Phone — left drawer
     return Scaffold(
-      key:   scaffoldKey,
-      body:  child,
+      key:    scaffoldKey,
+      body:   child,
       drawer: _AppDrawer(currentPath: currentPath),
     );
   }
 }
 
-// ── Left navigation drawer ────────────────────────────────────────────────────
+// ── Tablet / large-screen: persistent side rail ──────────────────────────────
+
+class _TabletShell extends StatelessWidget {
+  const _TabletShell({required this.currentPath, required this.child});
+  final String currentPath;
+  final Widget child;
+
+  static const _items = MainShell._navItems;
+
+  @override
+  Widget build(BuildContext context) {
+    final extended = MediaQuery.of(context).size.width >= 1024;
+    final selIdx   = _items.indexWhere((t) => currentPath.startsWith(t.path));
+
+    return Scaffold(
+      body: Row(
+        children: [
+          Container(
+            color: _kNavyBg,
+            width: extended ? 220 : 68,
+            child: SafeArea(
+              right: false,
+              child: Column(
+                children: [
+                  // Brand header
+                  SizedBox(
+                    height: 64,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: extended ? 16 : 0,
+                      ),
+                      child: extended
+                          ? const PBCLogoFull(size: 32, onDark: true, showTagline: false)
+                          : const Center(
+                              child: PBCLogoMark(size: 36, onDark: true),
+                            ),
+                    ),
+                  ),
+                  const Divider(color: _kNavyDivider, thickness: 1, height: 1),
+
+                  // Nav items
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                      children: _items.asMap().entries.map((e) {
+                        final selected = selIdx == e.key;
+                        return _RailItem(
+                          item:     e.value,
+                          selected: selected,
+                          extended: extended,
+                          onTap:    () => context.go(e.value.path),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Right border
+          Container(width: 1, color: _kNavyBorder),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+class _RailItem extends StatelessWidget {
+  const _RailItem({
+    required this.item,
+    required this.selected,
+    required this.extended,
+    required this.onTap,
+  });
+
+  final _NavItem item;
+  final bool     selected;
+  final bool     extended;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message:    extended ? '' : item.label,
+      preferBelow: false,
+      child: InkWell(
+        onTap:        onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration:    const Duration(milliseconds: 150),
+          height:      40,
+          margin:      const EdgeInsets.symmetric(vertical: 2),
+          decoration:  BoxDecoration(
+            color:        selected ? _kActiveBg : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border:       selected
+                ? Border.all(color: _kActiveText.withValues(alpha: 0.2))
+                : null,
+          ),
+          padding: EdgeInsets.symmetric(horizontal: extended ? 12 : 0),
+          alignment: extended ? Alignment.centerLeft : Alignment.center,
+          child: Row(
+            mainAxisSize: extended ? MainAxisSize.max : MainAxisSize.min,
+            children: [
+              Icon(
+                selected ? item.activeIcon : item.inactiveIcon,
+                color: selected ? _kActiveText : _kNavyText,
+                size:  20,
+              ),
+              if (extended) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.label,
+                    style: TextStyle(
+                      color:      selected ? _kActiveText : _kNavyText,
+                      fontSize:   13,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Phone drawer ─────────────────────────────────────────────────────────────
 
 class _AppDrawer extends StatelessWidget {
   const _AppDrawer({required this.currentPath});
@@ -81,59 +201,37 @@ class _AppDrawer extends StatelessWidget {
   ];
 
   static const _bottomItem =
-    _NavItem('/settings', Icons.settings_rounded, Icons.settings_outlined, 'Settings');
+      _NavItem('/settings', Icons.settings_rounded, Icons.settings_outlined, 'Settings');
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
     return Drawer(
-      width: 280,
+      width: 272,
+      backgroundColor: _kNavyBg,
       child: SafeArea(
         child: Column(
           children: [
-            // ── Header ──────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-              child: Row(
-                children: [
-                  Container(
-                    width:  48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color:        cs.primary,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(Icons.storefront_rounded,
-                        color: cs.onPrimary, size: 28),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('SAS Garments',
-                          style: tt.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700)),
-                      Text('Management System',
-                          style: tt.labelSmall?.copyWith(
-                              color: cs.onSurfaceVariant)),
-                    ],
-                  ),
-                ],
+            // ── PBC brand header ───────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+              width: double.infinity,
+              child: const PBCLogoFull(
+                size:        40,
+                onDark:      true,
+                showTagline: true,
               ),
             ),
-            Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
-            const SizedBox(height: 8),
+            Container(height: 1, color: _kNavyDivider),
+            const SizedBox(height: 6),
 
-            // ── Main nav items ───────────────────────────────────────────────
+            // ── Main nav ──────────────────────────────────────────────────
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 children: _mainItems
                     .map((item) => _DrawerTile(
-                          item:        item,
-                          selected:    currentPath.startsWith(item.path),
+                          item:     item,
+                          selected: currentPath.startsWith(item.path),
                           onTap: (ctx) {
                             Navigator.of(ctx).pop();
                             ctx.go(item.path);
@@ -143,10 +241,10 @@ class _AppDrawer extends StatelessWidget {
               ),
             ),
 
-            // ── Bottom: Settings ─────────────────────────────────────────────
-            Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
+            // ── Settings pinned at bottom ─────────────────────────────────
+            Container(height: 1, color: _kNavyDivider),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
               child: _DrawerTile(
                 item:     _bottomItem,
                 selected: currentPath.startsWith(_bottomItem.path),
@@ -156,12 +254,27 @@ class _AppDrawer extends StatelessWidget {
                 },
               ),
             ),
+
+            // ── Version tag ───────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'ProBusinessCloud v2.0',
+                style: TextStyle(
+                  color:    Colors.white.withValues(alpha: 0.18),
+                  fontSize: 10,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
+
+// ── Drawer tile ───────────────────────────────────────────────────────────────
 
 class _DrawerTile extends StatelessWidget {
   const _DrawerTile({
@@ -176,31 +289,37 @@ class _DrawerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: ListTile(
-        shape:           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        selected:        selected,
-        selectedColor:   cs.onPrimaryContainer,
-        selectedTileColor: cs.primaryContainer,
-        leading: Icon(
-          selected ? item.activeIcon : item.inactiveIcon,
-          color: selected ? cs.primary : cs.onSurfaceVariant,
-          size: 22,
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        decoration: BoxDecoration(
+          color:        selected ? _kActiveBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border:       selected
+              ? Border.all(color: _kActiveText.withValues(alpha: 0.2))
+              : Border.all(color: Colors.transparent),
         ),
-        title: Text(
-          item.label,
-          style: TextStyle(
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            fontSize:   14,
-            color: selected ? cs.primary : cs.onSurface,
+        child: ListTile(
+          contentPadding:  const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+          minLeadingWidth: 20,
+          dense:           true,
+          leading: Icon(
+            selected ? item.activeIcon : item.inactiveIcon,
+            color: selected ? _kActiveText : _kNavyText,
+            size:  20,
           ),
+          title: Text(
+            item.label,
+            style: TextStyle(
+              color:      selected ? _kActiveText : _kNavyText,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+              fontSize:   13.5,
+            ),
+          ),
+          onTap: () => onTap(context),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        onTap: () => onTap(context),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        minLeadingWidth: 24,
       ),
     );
   }
