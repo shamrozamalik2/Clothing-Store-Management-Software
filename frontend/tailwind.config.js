@@ -5,19 +5,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Primary brand palette
+        // Primary brand — indigo palette (PBC brand color)
         primary: {
-          50:  '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
-          950: '#082f49',
+          50:  '#eef2ff',
+          100: '#e0e7ff',
+          200: '#c7d2fe',
+          300: '#a5b4fc',
+          400: '#818cf8',
+          500: '#6366f1',
+          600: '#4f46e5',
+          700: '#4338ca',
+          800: '#3730a3',
+          900: '#312e81',
+          950: '#1e1b4b',
         },
         // Surface palette — values come from CSS variables so light/dark toggle works at runtime
         surface: {
@@ -33,6 +33,9 @@ export default {
           900: 'rgb(var(--s-900) / <alpha-value>)',
           950: 'rgb(var(--s-950) / <alpha-value>)',
         },
+        // Semantic tokens — theme-aware via CSS variables
+        card:   'rgb(var(--card) / <alpha-value>)',
+        appbg:  'rgb(var(--app-bg) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
@@ -41,22 +44,33 @@ export default {
       fontSize: {
         '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
       },
+      // Non-standard spacing used in icon sizes
+      spacing: {
+        '4.5': '1.125rem',  // 18px — between h-4 (16px) and h-5 (20px)
+      },
       boxShadow: {
-        card: '0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3)',
-        'card-lg': '0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4)',
-        glow: '0 0 20px rgb(14 165 233 / 0.3)',
+        // Tuned for both light and dark themes
+        sm:       '0 1px 2px 0 rgb(0 0 0 / 0.06)',
+        card:     '0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
+        'card-md':'0 4px 8px -2px rgb(0 0 0 / 0.10), 0 2px 4px -2px rgb(0 0 0 / 0.06)',
+        'card-lg':'0 8px 16px -4px rgb(0 0 0 / 0.12), 0 4px 6px -4px rgb(0 0 0 / 0.08)',
+        glow:     '0 0 24px rgb(79 70 229 / 0.25)',
+        'glow-sm':'0 0 12px rgb(79 70 229 / 0.20)',
+        sidebar:  '4px 0 24px rgb(0 0 0 / 0.15)',
       },
       animation: {
-        'fade-in': 'fadeIn 0.2s ease-in-out',
-        'slide-up': 'slideUp 0.2s ease-out',
-        'slide-down': 'slideDown 0.2s ease-out',
-        shimmer: 'shimmer 2s linear infinite',
+        'fade-in':  'fadeIn 0.2s ease-in-out',
+        'slide-up': 'slideUp 0.25s ease-out',
+        'slide-down':'slideDown 0.2s ease-out',
+        'slide-in-left':'slideInLeft 0.25s ease-out',
+        shimmer:    'shimmer 2s linear infinite',
       },
       keyframes: {
-        fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
-        slideUp: { from: { opacity: 0, transform: 'translateY(8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
-        slideDown: { from: { opacity: 0, transform: 'translateY(-8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
-        shimmer: { from: { backgroundPosition: '-200% 0' }, to: { backgroundPosition: '200% 0' } },
+        fadeIn:       { from: { opacity: 0 }, to: { opacity: 1 } },
+        slideUp:      { from: { opacity: 0, transform: 'translateY(10px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+        slideDown:    { from: { opacity: 0, transform: 'translateY(-8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+        slideInLeft:  { from: { opacity: 0, transform: 'translateX(-10px)' }, to: { opacity: 1, transform: 'translateX(0)' } },
+        shimmer:      { from: { backgroundPosition: '-200% 0' }, to: { backgroundPosition: '200% 0' } },
       },
     },
   },

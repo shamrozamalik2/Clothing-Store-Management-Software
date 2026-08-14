@@ -4,7 +4,7 @@ const THEME_KEY = 'sas_theme';
 const SIDEBAR_KEY = 'sas_sidebar';
 
 const initialState = {
-  theme: localStorage.getItem(THEME_KEY) || 'dark',
+  theme: localStorage.getItem(THEME_KEY) || 'light',
   sidebarCollapsed: localStorage.getItem(SIDEBAR_KEY) === 'true',
   pageTitle: 'Dashboard',
 };
@@ -34,7 +34,7 @@ const uiSlice = createSlice({
     },
     setPageTitle(state, { payload }) {
       state.pageTitle = payload;
-      document.title = `${payload} – Garments POS`;
+      document.title = `${payload} – ProBusinessCloud`;
     },
   },
 });

@@ -52,11 +52,12 @@ export default function Modal({
             >
               <Dialog.Panel
                 className={cn(
-                  'w-full rounded-2xl bg-surface-800 border border-surface-700',
-                  'shadow-2xl',
+                  'w-full rounded-2xl border border-surface-700',
+                  'shadow-card-lg',
                   sizes[size],
                   className,
                 )}
+                style={{ backgroundColor: 'rgb(var(--card))' }}
               >
                 {/* Header */}
                 {(title || !hideClose) && (

@@ -2,24 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Surface palette CSS variables — dark mode (default) */
-:root,
-html.dark {
-  --s-50:  248 250 252;
-  --s-100: 241 245 249;
-  --s-200: 226 232 240;
-  --s-300: 203 213 225;
-  --s-400: 148 163 184;
-  --s-500: 100 116 139;
-  --s-600: 71 85 105;
-  --s-700: 51 65 85;
-  --s-800: 30 41 59;
-  --s-900: 15 23 42;
-  --s-950: 2 6 23;
-}
+/* ─────────────────────────────────────────────
+   Surface palette CSS variables
+   In DARK mode  → higher number = darker (900 is the page bg)
+   In LIGHT mode → scale inverted (900 is near-white page bg)
+   ───────────────────────────────────────────── */
 
-/* Surface palette CSS variables — light mode (scale inverted) */
+/* Light mode — default */
+:root,
 html.light {
+  /* Toast */
+  --toast-bg:     255 255 255;
+  --toast-text:   15 23 42;
+  --toast-border: 226 232 240;
+
   --s-50:  15 23 42;
   --s-100: 30 41 59;
   --s-200: 51 65 85;
@@ -31,6 +27,34 @@ html.light {
   --s-800: 241 245 249;
   --s-900: 248 250 252;
   --s-950: 255 255 255;
+
+  /* Semantic tokens for light mode */
+  --card:   255 255 255;   /* pure white cards */
+  --app-bg: 241 245 249;   /* slate-100 page bg */
+}
+
+/* Dark mode */
+html.dark {
+  /* Toast */
+  --toast-bg:     30 41 59;
+  --toast-text:   241 245 249;
+  --toast-border: 51 65 85;
+
+  --s-50:  248 250 252;
+  --s-100: 241 245 249;
+  --s-200: 226 232 240;
+  --s-300: 203 213 225;
+  --s-400: 148 163 184;
+  --s-500: 100 116 139;
+  --s-600: 71 85 105;
+  --s-700: 51 65 85;
+  --s-800: 30 41 59;
+  --s-900: 15 23 42;
+  --s-950: 2 6 23;
+
+  /* Semantic tokens for dark mode */
+  --card:   30 41 59;      /* slate-800 cards */
+  --app-bg: 15 23 42;      /* slate-900 page bg */
 }
 
 @layer base {
@@ -43,7 +67,9 @@ html.light {
   }
 
   body {
-    @apply bg-surface-900 text-surface-100 font-sans antialiased;
+    @apply font-sans antialiased;
+    background-color: rgb(var(--app-bg));
+    color: rgb(var(--s-100));
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
@@ -52,30 +78,42 @@ html.light {
     @apply w-1.5 h-1.5;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-surface-800;
+    background: rgb(var(--s-800));
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-surface-600 rounded-full;
+    background: rgb(var(--s-600));
+    border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-surface-500;
+    background: rgb(var(--s-500));
   }
 
-  /* Focus visible */
+  /* Focus ring */
   :focus-visible {
-    @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-surface-900;
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+    ring-offset-color: rgb(var(--card));
   }
 }
 
 @layer components {
-  /* Skeleton loader */
+
+  /* ── Skeleton loader ── */
   .skeleton {
-    @apply animate-pulse bg-surface-700 rounded;
+    background: rgb(var(--s-700));
+    @apply animate-pulse rounded;
   }
 
-  /* Table styles */
+  /* ── Card ── */
+  .pbc-card {
+    background-color: rgb(var(--card));
+    border: 1px solid rgb(var(--s-700));
+    @apply rounded-xl shadow-card;
+  }
+
+  /* ── Table ── */
   .table-container {
-    @apply overflow-x-auto rounded-lg border border-surface-700;
+    border: 1px solid rgb(var(--s-700));
+    @apply overflow-x-auto rounded-xl;
   }
 
   .data-table {
@@ -83,37 +121,74 @@ html.light {
   }
 
   .data-table thead {
-    @apply bg-surface-800 text-surface-400 uppercase text-xs tracking-wider;
+    background: rgb(var(--s-800));
+    color: rgb(var(--s-400));
+    @apply text-xs uppercase tracking-wider;
   }
 
   .data-table thead th {
-    @apply px-4 py-3 font-medium;
+    @apply px-4 py-3 font-semibold;
   }
 
   .data-table tbody tr {
-    @apply border-t border-surface-700 hover:bg-surface-800/50 transition-colors;
+    border-top: 1px solid rgb(var(--s-700));
+    @apply transition-colors duration-100;
+  }
+
+  .data-table tbody tr:hover {
+    background: rgb(var(--s-800) / 0.5);
   }
 
   .data-table tbody td {
     @apply px-4 py-3;
   }
 
-  /* Badge */
+  /* ── Badges — theme-aware ── */
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border;
   }
 
-  .badge-success { @apply bg-green-900/50 text-green-400 border border-green-800; }
-  .badge-danger  { @apply bg-red-900/50 text-red-400 border border-red-800; }
-  .badge-warning { @apply bg-yellow-900/50 text-yellow-400 border border-yellow-800; }
-  .badge-info    { @apply bg-blue-900/50 text-blue-400 border border-blue-800; }
-  .badge-neutral { @apply bg-surface-700 text-surface-300 border border-surface-600; }
+  /* Light mode badge colours */
+  .badge-success { @apply bg-emerald-50 text-emerald-700 border-emerald-200; }
+  .badge-danger  { @apply bg-red-50 text-red-700 border-red-200; }
+  .badge-warning { @apply bg-amber-50 text-amber-700 border-amber-200; }
+  .badge-info    { @apply bg-blue-50 text-blue-700 border-blue-200; }
+  .badge-purple  { @apply bg-purple-50 text-purple-700 border-purple-200; }
+  .badge-neutral { @apply bg-slate-100 text-slate-600 border-slate-200; }
+
+  /* Dark mode badge overrides */
+  html.dark .badge-success { @apply bg-emerald-900/40 text-emerald-400 border-emerald-800; }
+  html.dark .badge-danger  { @apply bg-red-900/40 text-red-400 border-red-800; }
+  html.dark .badge-warning { @apply bg-amber-900/40 text-amber-400 border-amber-800; }
+  html.dark .badge-info    { @apply bg-blue-900/40 text-blue-400 border-blue-800; }
+  html.dark .badge-purple  { @apply bg-purple-900/40 text-purple-400 border-purple-800; }
+  html.dark .badge-neutral { @apply bg-slate-700 text-slate-300 border-slate-600; }
+
+  /* ── Page header ── */
+  .page-header {
+    @apply mb-6;
+  }
+
+  .page-title {
+    color: rgb(var(--s-50));
+    @apply text-xl font-bold leading-tight;
+  }
+
+  .page-subtitle {
+    color: rgb(var(--s-400));
+    @apply text-sm mt-0.5;
+  }
 }
 
 @layer utilities {
   .text-balance { text-wrap: balance; }
 
-  /* Hide scrollbar but keep functionality */
+  /* Hide scrollbar visually but keep scroll functionality */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-500 to-primary-700 bg-clip-text text-transparent;
+  }
 }

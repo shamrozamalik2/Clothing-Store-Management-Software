@@ -1,6 +1,7 @@
 import client from './client';
 
 export const reportsApi = {
+  dashboard:        ()       => client.get('/reports/dashboard'),
   overview:         (params) => client.get('/reports/overview',          { params }),
   dailySales:       (params) => client.get('/reports/daily-sales',       { params }),
   paymentMethods:   (params) => client.get('/reports/payment-methods',   { params }),

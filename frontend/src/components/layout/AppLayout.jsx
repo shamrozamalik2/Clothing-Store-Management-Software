@@ -29,7 +29,7 @@ export default function AppLayout() {
   const showBanner = !dismissed && (updateState === 'available' || updateState === 'downloaded');
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-900">
+    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'rgb(var(--app-bg))' }}>
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0">
         {/* Update notification banner */}
@@ -66,7 +66,7 @@ export default function AppLayout() {
 
         <Header />
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="p-6 animate-fade-in">
+          <div className="p-6 max-w-[1600px] mx-auto animate-fade-in">
             <Outlet />
           </div>
         </main>

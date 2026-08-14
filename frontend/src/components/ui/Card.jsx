@@ -4,9 +4,10 @@ function Card({ children, className, ...props }) {
   return (
     <div
       className={cn(
-        'bg-surface-800 border border-surface-700 rounded-xl shadow-card',
+        'rounded-xl shadow-card border border-surface-700',
         className
       )}
+      style={{ backgroundColor: 'rgb(var(--card))' }}
       {...props}
     >
       {children}
@@ -24,7 +25,7 @@ function CardHeader({ children, className, ...props }) {
 
 function CardTitle({ children, className, ...props }) {
   return (
-    <h3 className={cn('text-base font-semibold text-surface-100', className)} {...props}>
+    <h3 className={cn('text-sm font-semibold text-surface-100', className)} {...props}>
       {children}
     </h3>
   );
@@ -41,7 +42,8 @@ function CardContent({ children, className, ...props }) {
 function CardFooter({ children, className, ...props }) {
   return (
     <div
-      className={cn('px-5 py-3 border-t border-surface-700 bg-surface-800/50 rounded-b-xl', className)}
+      className={cn('px-5 py-3 border-t border-surface-700 rounded-b-xl', className)}
+      style={{ backgroundColor: 'rgb(var(--s-800))' }}
       {...props}
     >
       {children}
@@ -49,10 +51,10 @@ function CardFooter({ children, className, ...props }) {
   );
 }
 
-Card.Header = CardHeader;
-Card.Title = CardTitle;
+Card.Header  = CardHeader;
+Card.Title   = CardTitle;
 Card.Content = CardContent;
-Card.Footer = CardFooter;
+Card.Footer  = CardFooter;
 
 export { Card, CardHeader, CardTitle, CardContent, CardFooter };
 export default Card;

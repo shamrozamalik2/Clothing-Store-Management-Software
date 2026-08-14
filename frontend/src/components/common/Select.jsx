@@ -14,7 +14,7 @@ const Select = forwardRef(({
 }, ref) => (
   <div className={cn('flex flex-col gap-1', fullWidth && 'w-full', containerClassName)}>
     {label && (
-      <label className="text-sm font-medium text-surface-300">
+      <label className="text-xs font-semibold text-surface-300 uppercase tracking-wide">
         {label}
         {props.required && <span className="text-red-400 ml-1">*</span>}
       </label>
@@ -22,12 +22,13 @@ const Select = forwardRef(({
     <select
       ref={ref}
       className={cn(
-        'h-9 w-full px-3 rounded-lg bg-surface-800 border text-sm transition-colors',
-        'text-surface-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
+        'h-9 w-full px-3 rounded-lg border text-sm transition-all duration-150',
+        'text-surface-100 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         error ? 'border-red-500' : 'border-surface-600 hover:border-surface-500',
         className,
       )}
+      style={{ backgroundColor: 'rgb(var(--card))', color: 'rgb(var(--s-100))' }}
       {...props}
     >
       {placeholder && <option value="">{placeholder}</option>}

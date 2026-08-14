@@ -16,15 +16,15 @@ const Input = forwardRef(({
   const sizes = {
     sm: 'h-8 text-sm px-3',
     md: 'h-9 text-sm px-3',
-    lg: 'h-11 text-base px-4',
+    lg: 'h-10 text-sm px-4',
   };
 
   return (
     <div className={cn('flex flex-col gap-1', fullWidth && 'w-full', containerClassName)}>
       {label && (
-        <label className="text-sm font-medium text-surface-300">
+        <label className="text-xs font-semibold text-surface-300 uppercase tracking-wide">
           {label}
-          {props.required && <span className="text-red-400 ml-1">*</span>}
+          {props.required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       <div className="relative">
@@ -36,18 +36,22 @@ const Input = forwardRef(({
         <input
           ref={ref}
           className={cn(
-            'w-full rounded-lg bg-surface-800 border transition-colors',
-            'text-surface-100 placeholder:text-surface-500',
-            'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
+            'w-full rounded-lg border transition-all duration-150',
+            'placeholder:text-surface-400',
+            'focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             error
-              ? 'border-red-500 focus:ring-red-500'
+              ? 'border-red-500 focus:ring-red-500/30 focus:border-red-500'
               : 'border-surface-600 hover:border-surface-500',
             sizes[size],
             leftIcon && 'pl-9',
             rightIcon && 'pr-9',
             className,
           )}
+          style={{
+            backgroundColor: 'rgb(var(--card))',
+            color: 'rgb(var(--s-100))',
+          }}
           {...props}
         />
         {rightIcon && (
@@ -56,8 +60,8 @@ const Input = forwardRef(({
           </div>
         )}
       </div>
-      {error && <p className="text-xs text-red-400">{error}</p>}
-      {hint && !error && <p className="text-xs text-surface-500">{hint}</p>}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      {hint && !error && <p className="text-xs text-surface-400">{hint}</p>}
     </div>
   );
 });

@@ -10,7 +10,7 @@ import App from './App';
 import './index.css';
 
 // Apply saved theme before React renders to avoid flash of wrong theme
-document.documentElement.className = localStorage.getItem('sas_theme') || 'dark';
+document.documentElement.className = localStorage.getItem('sas_theme') || 'light';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,14 +36,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           toastOptions={{
             duration: 4000,
             style: {
-              background: '#1e293b',
-              color: '#f1f5f9',
-              border: '1px solid #334155',
-              borderRadius: '0.5rem',
+              background: 'rgb(var(--toast-bg, 255 255 255))',
+              color: 'rgb(var(--toast-text, 15 23 42))',
+              border: '1px solid rgb(var(--toast-border, 226 232 240))',
+              borderRadius: '0.75rem',
               fontSize: '0.875rem',
+              fontWeight: '500',
+              boxShadow: '0 8px 16px -4px rgb(0 0 0 / 0.12)',
             },
-            success: { iconTheme: { primary: '#22c55e', secondary: '#1e293b' } },
-            error:   { iconTheme: { primary: '#ef4444', secondary: '#1e293b' } },
+            success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+            error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
           }}
         />
         {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
