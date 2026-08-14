@@ -6,6 +6,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/models/product_model.dart';
 import '../providers/products_provider.dart';
+import '../../../shell/main_shell.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -70,6 +71,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             SliverAppBar(
               floating:  true,
               snap:      true,
+              leading:   IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
+              ),
               title:     const Text('Products'),
               actions:   [
                 IconButton(

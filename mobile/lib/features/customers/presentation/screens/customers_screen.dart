@@ -5,6 +5,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/models/customer_model.dart';
 import '../providers/customers_provider.dart';
+import '../../../shell/main_shell.dart';
 
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
@@ -46,6 +47,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             SliverAppBar(
               floating:  true,
               snap:      true,
+              leading:   IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
+              ),
               title:     const Text('Customers'),
               actions:   [
                 IconButton(

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/settings_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
+import '../../../shell/main_shell.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -41,7 +42,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final themeMode = ref.watch(themeModeProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        title: const Text('Settings'),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
+        ),
+      ),
       body: ListView(
         children: [
           // ── Profile ────────────────────────────────────────────────────────

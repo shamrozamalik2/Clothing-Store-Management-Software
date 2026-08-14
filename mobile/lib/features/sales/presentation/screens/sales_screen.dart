@@ -7,6 +7,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../data/models/sale_model.dart';
 import '../providers/sales_provider.dart';
+import '../../../shell/main_shell.dart';
 
 // ── Date filter enum ─────────────────────────────────────────────────────────
 
@@ -89,6 +90,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             SliverAppBar(
               floating:  true,
               snap:      true,
+              leading:   IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
+              ),
               title:     const Text('Sales'),
               actions:   [
                 IconButton(

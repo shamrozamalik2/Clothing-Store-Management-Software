@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../data/models/report_model.dart';
 import '../providers/reports_provider.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../shell/main_shell.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root screen
@@ -41,6 +42,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reports'),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
+        ),
         bottom: TabBar(
           controller: _tabs,
           tabs: const [

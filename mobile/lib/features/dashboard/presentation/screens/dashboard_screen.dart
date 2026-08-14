@@ -10,6 +10,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/dashboard_stats_model.dart';
 import '../providers/dashboard_provider.dart';
 import '../widgets/stat_card.dart';
+import '../../../shell/main_shell.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -34,6 +35,10 @@ class DashboardScreen extends ConsumerWidget {
             SliverAppBar(
               floating:       true,
               snap:           true,
+              leading: IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
+              ),
               title:          Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

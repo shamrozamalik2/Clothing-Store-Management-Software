@@ -13,6 +13,7 @@ import '../../../products/data/models/product_model.dart';
 import '../../../products/presentation/providers/products_provider.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../shell/main_shell.dart';
 
 // ---------------------------------------------------------------------------
 // PosScreen
@@ -484,6 +485,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       appBar: AppBar(
         title: const Text('Point of Sale'),
         centerTitle: false,
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
+        ),
         actions: [
           IconButton(
             tooltip: 'Scan barcode',
