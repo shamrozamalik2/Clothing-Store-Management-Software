@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/storage/secure_storage.dart';
-import '../../../../core/widgets/pbc_logo.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -64,7 +63,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final auth    = ref.watch(authProvider);
     final loading = auth is AuthLoading;
     final error   = auth is AuthError ? auth.message : null;
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       body: SafeArea(
@@ -78,12 +76,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
-                  // ── PBC Logo ──────────────────────────────────────────────
+                  // ── Logo — PNG only, no text ───────────────────────────
                   Center(
-                    child: PBCLogoFull(
-                      size:        52,
-                      onDark:      isDark,
-                      showTagline: true,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color:        Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color:      const Color(0xFF4F46E5).withValues(alpha: 0.12),
+                            blurRadius: 24,
+                            offset:     const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      child: Image.asset(
+                        'assets/images/softwarelogo.png',
+                        height: 64,
+                        fit:    BoxFit.contain,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 40),

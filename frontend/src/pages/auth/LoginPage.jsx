@@ -107,29 +107,17 @@ export default function LoginPage() {
           }}
         />
 
-        {/* Logo */}
+        {/* Logo — image only, no text */}
         <div className="relative z-10">
           <div
-            className="inline-flex items-center gap-3 rounded-2xl px-4 py-3 select-none"
-            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)' }}
+            className="inline-flex items-center justify-center rounded-2xl select-none overflow-hidden"
+            style={{ background: 'rgba(255,255,255,0.96)', padding: '12px 28px' }}
           >
             <img
               src="/logo.png"
               alt="ProBusinessCloud"
-              style={{
-                height: 36,
-                width: 'auto',
-                objectFit: 'contain',
-                filter: 'brightness(0) invert(1)',
-                opacity: 0.92,
-              }}
+              style={{ height: 70, width: 'auto', objectFit: 'contain', display: 'block' }}
             />
-            <div>
-              <p className="text-sm font-bold text-white tracking-tight leading-tight">ProBusinessCloud</p>
-              <p className="text-[11px] leading-tight" style={{ color: 'rgba(147,196,255,0.65)' }}>
-                Business Management Platform
-              </p>
-            </div>
           </div>
         </div>
 
@@ -175,13 +163,18 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12" style={{ backgroundColor: 'rgb(var(--app-bg))' }}>
         <div className="w-full max-w-[400px] animate-slide-up">
 
-          {/* Mobile logo */}
+          {/* Mobile logo — PNG only */}
           <div className="lg:hidden mb-8 flex justify-center">
-            <img
-              src="/logo.png"
-              alt="ProBusinessCloud"
-              style={{ height: 56, width: 'auto', objectFit: 'contain' }}
-            />
+            <div
+              className="rounded-2xl overflow-hidden inline-flex items-center justify-center"
+              style={{ background: 'rgb(var(--card))', padding: '10px 24px', border: '1px solid rgb(var(--s-700) / 0.3)' }}
+            >
+              <img
+                src="/logo.png"
+                alt="ProBusinessCloud"
+                style={{ height: 52, width: 'auto', objectFit: 'contain', display: 'block' }}
+              />
+            </div>
           </div>
 
           {/* Heading */}

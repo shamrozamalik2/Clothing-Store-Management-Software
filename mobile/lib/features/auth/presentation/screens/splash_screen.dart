@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/widgets/pbc_logo.dart';
 import '../providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerWidget {
@@ -54,50 +53,28 @@ class SplashScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // PBC logo mark — large version
-                    const PBCLogoMark(size: 88, onDark: true),
-                    const SizedBox(height: 24),
-
-                    // Wordmark
-                    RichText(
-                      text: const TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'ProBusiness',
-                            style: TextStyle(
-                              color:      Colors.white,
-                              fontSize:   26,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'Cloud',
-                            style: TextStyle(
-                              color:      Color(0xFF60A5FA),
-                              fontSize:   26,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
-                              fontFamily: 'Inter',
-                            ),
+                    // Logo — PNG only, no text
+                    Container(
+                      decoration: BoxDecoration(
+                        color:        Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color:      const Color(0xFF4F46E5).withValues(alpha: 0.22),
+                            blurRadius: 40,
+                            offset:     const Offset(0, 10),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Business Management Platform',
-                      style: TextStyle(
-                        color:      Color(0xFF93C5FD),
-                        fontSize:   13,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 0.2,
-                        fontFamily: 'Inter',
+                      padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 24),
+                      child: Image.asset(
+                        'assets/images/softwarelogo.png',
+                        width:  220,
+                        fit:    BoxFit.contain,
                       ),
                     ),
 
-                    const SizedBox(height: 64),
+                    const SizedBox(height: 72),
 
                     // Loading indicator
                     SizedBox(

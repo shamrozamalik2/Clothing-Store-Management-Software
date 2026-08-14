@@ -139,25 +139,17 @@ export default function Sidebar() {
         {collapsed ? (
           <PBCMark size={30} />
         ) : (
-          /* Full logo in a white rounded container */
-          <div className="flex items-center gap-2.5 min-w-0 w-full">
+          /* Logo only — no text */
+          <div className="flex items-center justify-center w-full">
             <div
-              className="shrink-0 rounded-lg overflow-hidden flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.95)', padding: '4px 8px', minWidth: 36 }}
+              className="rounded-xl overflow-hidden flex items-center justify-center select-none"
+              style={{ background: 'rgba(255,255,255,0.96)', padding: '5px 14px' }}
             >
               <img
                 src="/logo.png"
                 alt="ProBusinessCloud"
-                style={{ height: 24, width: 'auto', objectFit: 'contain', display: 'block' }}
+                style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }}
               />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-bold text-white leading-tight truncate tracking-tight select-none">
-                {companyName}
-              </p>
-              <p className="text-[10px] truncate leading-tight mt-0.5 select-none" style={{ color: '#6b7faa' }}>
-                {companyTagline}
-              </p>
             </div>
           </div>
         )}
