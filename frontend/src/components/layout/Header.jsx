@@ -22,15 +22,28 @@ import { authApi } from '@api/auth.api';
 import { productsApi } from '@api/products.api';
 import { cn } from '@utils/cn';
 
-function Avatar({ name }) {
+/* ─── Gradient avatar ────────────────────────────────────────────────────── */
+function Avatar({ name, size = 'sm' }) {
   const initials = (name || '?')
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
     .map(w => w[0].toUpperCase())
     .join('');
+
+  const dim = size === 'md' ? { height: 32, width: 32, fontSize: 13 } : { height: 28, width: 28, fontSize: 11 };
+
   return (
-    <span className="h-7 w-7 rounded-full bg-primary-600 flex items-center justify-center text-white text-xs font-bold shrink-0 select-none">
+    <span
+      className="rounded-full flex items-center justify-center text-white font-bold shrink-0 select-none"
+      style={{
+        height:    dim.height,
+        width:     dim.width,
+        fontSize:  dim.fontSize,
+        background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+        boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+      }}
+    >
       {initials}
     </span>
   );
@@ -64,10 +77,13 @@ export default function Header() {
   const alertCount = lowStock.length;
 
   return (
-    <header className={cn(
-      'h-14 flex items-center justify-between px-5 shrink-0',
-      'bg-card border-b border-surface-700',
-    )}>
+    <header
+      className="h-14 flex items-center justify-between px-5 shrink-0"
+      style={{
+        backgroundColor: 'rgb(var(--card))',
+        borderBottom: '1px solid rgb(var(--s-700))',
+      }}
+    >
       {/* Page title */}
       <h1 className="text-sm font-semibold text-surface-100 tracking-tight">{pageTitle}</h1>
 
@@ -95,7 +111,10 @@ export default function Header() {
               >
                 <BellIcon className="h-4.5 w-4.5" />
                 {alertCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] px-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                  <span
+                    className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] px-0.5 rounded-full text-white text-[10px] font-bold flex items-center justify-center leading-none"
+                    style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+                  >
                     {alertCount > 9 ? '9+' : alertCount}
                   </span>
                 )}
@@ -176,7 +195,7 @@ export default function Header() {
                         onClick={() => navigate('/products')}
                         className={cn(
                           'w-full text-xs text-center font-medium transition-colors',
-                          active ? 'text-primary-500' : 'text-primary-600'
+                          active ? 'text-primary-400' : 'text-primary-500'
                         )}
                       >
                         View all products →
@@ -222,7 +241,7 @@ export default function Header() {
               {/* User info */}
               <div className="px-4 py-3 border-b border-surface-700">
                 <div className="flex items-center gap-3">
-                  <Avatar name={currentUser?.name} />
+                  <Avatar name={currentUser?.name} size="md" />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-surface-100 truncate">{currentUser?.name}</p>
                     <p className="text-xs text-surface-400 truncate">{currentUser?.email}</p>

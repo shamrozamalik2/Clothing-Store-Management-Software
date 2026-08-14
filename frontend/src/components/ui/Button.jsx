@@ -2,12 +2,12 @@ import { forwardRef } from 'react';
 import { cn } from '@utils/cn';
 
 const variants = {
-  primary:   'bg-primary-600 hover:bg-primary-500 active:bg-primary-700 text-white shadow-sm',
+  primary:   'btn-gradient text-white',
   secondary: 'bg-surface-700 hover:bg-surface-600 active:bg-surface-700 text-surface-100 shadow-sm border border-surface-600',
   danger:    'bg-red-600 hover:bg-red-500 active:bg-red-700 text-white shadow-sm',
   success:   'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-sm',
   ghost:     'hover:bg-surface-800 active:bg-surface-700 text-surface-300 hover:text-surface-100',
-  outline:   'border border-surface-600 hover:border-primary-500 text-surface-200 hover:text-primary-500 hover:bg-primary-500/5',
+  outline:   'border border-surface-600 hover:border-primary-500 text-surface-200 hover:text-primary-400 hover:bg-primary-500/5 transition-colors',
 };
 
 const sizes = {
@@ -38,9 +38,8 @@ const Button = forwardRef(({
       ref={ref}
       disabled={isDisabled}
       className={cn(
-        'inline-flex items-center justify-center font-medium',
-        'transition-all duration-150 focus-visible:outline-none',
-        'focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
+        'inline-flex items-center justify-center font-semibold',
+        'focus-visible:outline-none',
         'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
         variants[variant],
         sizes[size],

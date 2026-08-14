@@ -44,26 +44,32 @@ export default {
       fontSize: {
         '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
       },
-      // Non-standard spacing used in icon sizes
       spacing: {
-        '4.5': '1.125rem',  // 18px — between h-4 (16px) and h-5 (20px)
+        '4.5': '1.125rem',
       },
       boxShadow: {
-        // Tuned for both light and dark themes
-        sm:       '0 1px 2px 0 rgb(0 0 0 / 0.06)',
-        card:     '0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
-        'card-md':'0 4px 8px -2px rgb(0 0 0 / 0.10), 0 2px 4px -2px rgb(0 0 0 / 0.06)',
-        'card-lg':'0 8px 16px -4px rgb(0 0 0 / 0.12), 0 4px 6px -4px rgb(0 0 0 / 0.08)',
-        glow:     '0 0 24px rgb(79 70 229 / 0.25)',
-        'glow-sm':'0 0 12px rgb(79 70 229 / 0.20)',
-        sidebar:  '4px 0 24px rgb(0 0 0 / 0.15)',
+        sm:          '0 1px 2px 0 rgb(0 0 0 / 0.06)',
+        card:        '0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
+        'card-md':   '0 4px 8px -2px rgb(0 0 0 / 0.10), 0 2px 4px -2px rgb(0 0 0 / 0.06)',
+        'card-lg':   '0 8px 16px -4px rgb(0 0 0 / 0.12), 0 4px 6px -4px rgb(0 0 0 / 0.08)',
+        glow:        '0 0 24px rgb(79 70 229 / 0.25)',
+        'glow-sm':   '0 0 12px rgb(79 70 229 / 0.20)',
+        'glow-blue': '0 0 20px rgb(59 130 246 / 0.30)',
+        'glow-violet':'0 0 20px rgb(139 92 246 / 0.35)',
+        'btn':       '0 4px 14px rgb(79 70 229 / 0.35)',
+        'btn-hover': '0 6px 22px rgb(139 92 246 / 0.45)',
+        sidebar:     '4px 0 24px rgb(0 0 0 / 0.15)',
       },
       animation: {
-        'fade-in':  'fadeIn 0.2s ease-in-out',
-        'slide-up': 'slideUp 0.25s ease-out',
-        'slide-down':'slideDown 0.2s ease-out',
+        'fade-in':     'fadeIn 0.2s ease-in-out',
+        'slide-up':    'slideUp 0.25s ease-out',
+        'slide-down':  'slideDown 0.2s ease-out',
         'slide-in-left':'slideInLeft 0.25s ease-out',
-        shimmer:    'shimmer 2s linear infinite',
+        shimmer:       'shimmer 2s linear infinite',
+        'gradient-x':  'gradientX 8s ease infinite',
+        'glow-pulse':  'glowPulse 6s ease-in-out infinite',
+        'glow-pulse-slow':'glowPulse 10s ease-in-out infinite',
+        'float':       'float 8s ease-in-out infinite',
       },
       keyframes: {
         fadeIn:       { from: { opacity: 0 }, to: { opacity: 1 } },
@@ -71,6 +77,18 @@ export default {
         slideDown:    { from: { opacity: 0, transform: 'translateY(-8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
         slideInLeft:  { from: { opacity: 0, transform: 'translateX(-10px)' }, to: { opacity: 1, transform: 'translateX(0)' } },
         shimmer:      { from: { backgroundPosition: '-200% 0' }, to: { backgroundPosition: '200% 0' } },
+        gradientX: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%':      { backgroundPosition: '100% 50%' },
+        },
+        glowPulse: {
+          '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
+          '50%':      { opacity: '0.9', transform: 'scale(1.15)' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%':      { transform: 'translateY(-8px)' },
+        },
       },
     },
   },

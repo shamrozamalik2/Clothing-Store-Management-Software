@@ -23,23 +23,30 @@ import { cn } from '@utils/cn';
 /* ─── KPI Card ────────────────────────────────────────────────────────────── */
 function KpiCard({ label, value, sub, subVariant = 'neutral', icon: Icon, accent, loading }) {
   const accents = {
-    blue:   { icon: 'bg-blue-500/10 text-blue-600',   border: 'border-l-4 border-l-blue-500' },
-    green:  { icon: 'bg-emerald-500/10 text-emerald-600', border: 'border-l-4 border-l-emerald-500' },
-    violet: { icon: 'bg-violet-500/10 text-violet-600', border: 'border-l-4 border-l-violet-500' },
-    amber:  { icon: 'bg-amber-500/10 text-amber-600', border: 'border-l-4 border-l-amber-500' },
+    blue:   { iconClass: 'icon-grad-blue',   borderStyle: { borderLeftColor: '#3b82f6' } },
+    green:  { iconClass: 'icon-grad-green',  borderStyle: { borderLeftColor: '#10b981' } },
+    violet: { iconClass: 'icon-grad-violet', borderStyle: { borderLeftColor: '#8b5cf6' } },
+    amber:  { iconClass: 'icon-grad-amber',  borderStyle: { borderLeftColor: '#f59e0b' } },
   };
   const a = accents[accent] || accents.blue;
+
   const subColors = {
-    success: 'text-emerald-600',
-    warning: 'text-amber-600',
+    success: 'text-emerald-500',
+    warning: 'text-amber-500',
     danger:  'text-red-500',
     neutral: 'text-surface-400',
   };
 
   return (
-    <Card className={cn('overflow-hidden', a.border)}>
+    <Card
+      className="overflow-hidden border-l-4"
+      style={{ ...a.borderStyle }}
+    >
       <Card.Content className="flex items-start gap-4 py-5">
-        <div className={cn('h-11 w-11 rounded-xl flex items-center justify-center shrink-0', a.icon)}>
+        <div className={cn(
+          'h-11 w-11 rounded-xl flex items-center justify-center shrink-0',
+          a.iconClass
+        )}>
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -60,22 +67,29 @@ function KpiCard({ label, value, sub, subVariant = 'neutral', icon: Icon, accent
   );
 }
 
-/* ─── Trend bar (weekly sparkline) ───────────────────────────────────────── */
+/* ─── Trend bar (weekly sparkline) with gradient ─────────────────────────── */
 function WeeklyBar({ data }) {
   if (!data?.length) return null;
-  const max = Math.max(...data.map(d => d.amount), 1);
+  const max  = Math.max(...data.map(d => d.amount), 1);
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   return (
     <div className="flex items-end gap-1.5 h-12">
       {days.map((day, i) => {
         const found = data.find(d => d.day?.toLowerCase().startsWith(day.toLowerCase()));
-        const h = found ? Math.max(4, Math.round((found.amount / max) * 48)) : 4;
+        const h     = found ? Math.max(4, Math.round((found.amount / max) * 48)) : 4;
+        const isEmpty = !found || found.amount === 0;
         return (
           <div key={day} className="flex flex-col items-center gap-1 flex-1">
             <div
-              className="w-full rounded-t-sm bg-primary-500/60 hover:bg-primary-500 transition-colors cursor-default"
-              style={{ height: h }}
+              className="w-full cursor-default rounded-sm transition-all duration-200"
+              style={{
+                height:     h,
+                background: isEmpty
+                  ? 'rgba(99,102,241,0.12)'
+                  : 'linear-gradient(to top, rgba(59,130,246,0.65), rgba(139,92,246,0.75))',
+                borderRadius: '3px 3px 0 0',
+              }}
               title={found ? formatCurrency(found.amount) : `${day}: no data`}
             />
           </div>
@@ -92,7 +106,7 @@ export default function DashboardPage() {
 
   useEffect(() => { dispatch(setPageTitle('Dashboard')); }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today      = new Date().toISOString().slice(0, 10);
   const todayLabel = new Date().toLocaleDateString('en-PK', {
     weekday: 'long', month: 'long', day: 'numeric',
   });
@@ -126,15 +140,14 @@ export default function DashboardPage() {
   const lowStock = lowStockRes?.data ?? [];
   const recent   = recentRes?.data ?? [];
 
-  /* Use dashboard endpoint when available, fall back to today endpoint */
-  const todaySales   = dash?.today_sales     ?? t?.total_revenue  ?? 0;
-  const todayOrders  = dash?.today_orders    ?? t?.sale_count     ?? 0;
-  const todayProfit  = dash?.today_profit    ?? 0;
-  const pendingPay   = dash?.pending_payments ?? t?.total_due     ?? 0;
-  const lowStockCnt  = dash?.low_stock_count ?? lowStock.length;
-  const weeklySales  = dash?.weekly_sales    ?? [];
-  const topProducts  = dash?.top_products    ?? [];
-  const recentSales  = dash?.recent_sales    ?? recent;
+  const todaySales  = dash?.today_sales     ?? t?.total_revenue  ?? 0;
+  const todayOrders = dash?.today_orders    ?? t?.sale_count     ?? 0;
+  const todayProfit = dash?.today_profit    ?? 0;
+  const pendingPay  = dash?.pending_payments ?? t?.total_due     ?? 0;
+  const lowStockCnt = dash?.low_stock_count ?? lowStock.length;
+  const weeklySales = dash?.weekly_sales    ?? [];
+  const topProducts = dash?.top_products    ?? [];
+  const recentSales = dash?.recent_sales    ?? recent;
 
   const firstName = user?.name?.split(' ')[0] ?? 'there';
   const loading   = loadingToday && loadingDash;
@@ -146,7 +159,8 @@ export default function DashboardPage() {
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-xl font-black text-surface-100 tracking-tight">
-            Good {getGreeting()}, {firstName}
+            Good {getGreeting()},{' '}
+            <span className="gradient-text">{firstName}</span>
           </h2>
           <p className="text-sm text-surface-400 mt-0.5 flex items-center gap-1.5">
             <ClockIcon className="h-3.5 w-3.5" />
@@ -155,7 +169,7 @@ export default function DashboardPage() {
         </div>
         <Link
           to="/pos"
-          className="hidden sm:flex items-center gap-2 h-9 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-sm font-semibold transition-colors shadow-glow-sm"
+          className="hidden sm:flex items-center gap-2 h-9 px-4 rounded-lg btn-gradient text-white text-sm font-semibold"
         >
           <CurrencyDollarIcon className="h-4 w-4" />
           Open POS
@@ -208,7 +222,13 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <Card.Header className="flex items-center justify-between">
             <Card.Title>Recent Sales</Card.Title>
-            <Link to="/sales" className="flex items-center gap-0.5 text-xs font-medium text-primary-600 hover:text-primary-500 transition-colors">
+            <Link
+              to="/sales"
+              className="flex items-center gap-0.5 text-xs font-medium transition-colors"
+              style={{ color: '#818cf8' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#a5b4fc'}
+              onMouseLeave={e => e.currentTarget.style.color = '#818cf8'}
+            >
               View all <ChevronRightIcon className="h-3.5 w-3.5" />
             </Link>
           </Card.Header>
@@ -232,8 +252,11 @@ export default function DashboardPage() {
                     className="flex items-center justify-between px-5 py-3.5 hover:bg-surface-800/30 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-8 w-8 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
-                        <ShoppingCartIcon className="h-3.5 w-3.5 text-primary-600" />
+                      <div
+                        className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.12))' }}
+                      >
+                        <ShoppingCartIcon className="h-3.5 w-3.5" style={{ color: '#93c5fd' }} />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-surface-100 truncate">
@@ -244,7 +267,7 @@ export default function DashboardPage() {
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm font-bold text-emerald-600 shrink-0 ml-4">
+                    <p className="text-sm font-bold shrink-0 ml-4" style={{ color: '#34d399' }}>
                       {formatCurrency(s.total_amount)}
                     </p>
                   </Link>
@@ -283,7 +306,13 @@ export default function DashboardPage() {
           <Card>
             <Card.Header className="flex items-center justify-between">
               <Card.Title>Low Stock</Card.Title>
-              <Link to="/products" className="flex items-center gap-0.5 text-xs font-medium text-primary-600 hover:text-primary-500 transition-colors">
+              <Link
+                to="/products"
+                className="flex items-center gap-0.5 text-xs font-medium transition-colors"
+                style={{ color: '#818cf8' }}
+                onMouseEnter={e => e.currentTarget.style.color = '#a5b4fc'}
+                onMouseLeave={e => e.currentTarget.style.color = '#818cf8'}
+              >
                 View all <ChevronRightIcon className="h-3.5 w-3.5" />
               </Link>
             </Card.Header>
@@ -305,12 +334,13 @@ export default function DashboardPage() {
                         <p className="text-xs font-semibold text-surface-100 truncate">{p.name}</p>
                         <p className="text-[10px] text-surface-400 truncate">{p.sku}</p>
                       </div>
-                      <span className={cn(
-                        'text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-2',
-                        p.stock_quantity <= 0
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-amber-100 text-amber-700'
-                      )}>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-2"
+                        style={p.stock_quantity <= 0
+                          ? { background: 'rgba(239,68,68,0.15)', color: '#f87171' }
+                          : { background: 'rgba(245,158,11,0.15)', color: '#fbbf24' }
+                        }
+                      >
                         {p.stock_quantity <= 0 ? 'Out' : `${p.stock_quantity} left`}
                       </span>
                     </div>
@@ -322,12 +352,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Top products (if data available from dashboard endpoint) ── */}
+      {/* ── Top products ── */}
       {topProducts.length > 0 && (
         <Card>
           <Card.Header className="flex items-center justify-between">
             <Card.Title>Top Products This Month</Card.Title>
-            <Link to="/reports" className="flex items-center gap-0.5 text-xs font-medium text-primary-600 hover:text-primary-500 transition-colors">
+            <Link
+              to="/reports"
+              className="flex items-center gap-0.5 text-xs font-medium transition-colors"
+              style={{ color: '#818cf8' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#a5b4fc'}
+              onMouseLeave={e => e.currentTarget.style.color = '#818cf8'}
+            >
               Full report <ChevronRightIcon className="h-3.5 w-3.5" />
             </Link>
           </Card.Header>
@@ -347,7 +383,7 @@ export default function DashboardPage() {
                     <td className="text-surface-400 font-mono text-xs">{i + 1}</td>
                     <td className="font-medium text-surface-100">{p.name}</td>
                     <td className="text-right text-surface-300">{p.total_qty?.toLocaleString()}</td>
-                    <td className="text-right font-semibold text-emerald-600">{formatCurrency(p.revenue)}</td>
+                    <td className="text-right font-semibold" style={{ color: '#34d399' }}>{formatCurrency(p.revenue)}</td>
                   </tr>
                 ))}
               </tbody>

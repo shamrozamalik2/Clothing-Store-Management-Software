@@ -36,12 +36,12 @@ const Input = forwardRef(({
         <input
           ref={ref}
           className={cn(
-            'w-full rounded-lg border transition-all duration-150',
-            'placeholder:text-surface-400',
-            'focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500',
+            'pbc-input',
+            'w-full rounded-lg border transition-all duration-200',
+            'placeholder:text-surface-500',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             error
-              ? 'border-red-500 focus:ring-red-500/30 focus:border-red-500'
+              ? 'border-red-500 focus:ring-red-500/30 focus:border-red-500 focus:outline-none'
               : 'border-surface-600 hover:border-surface-500',
             sizes[size],
             leftIcon && 'pl-9',

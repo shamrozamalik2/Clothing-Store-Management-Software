@@ -18,50 +18,26 @@ import { setPageTitle } from '@store/slices/uiSlice';
 import Button from '@components/ui/Button';
 import Input from '@components/ui/Input';
 
-/* ─── PBC Brand mark ──────────────────────────────────────────────────────── */
-function PBCLogoFull() {
-  return (
-    <div className="flex items-center gap-3 select-none">
-      <svg width="44" height="44" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M36 20C36 28.837 28.837 36 20 36C11.163 36 4 28.837 4 20C4 11.163 11.163 4 20 4C24.418 4 28.418 5.791 31.314 8.686"
-          stroke="#60a5fa" strokeWidth="2.8" strokeLinecap="round" fill="none"
-        />
-        <path
-          d="M29 20C29 25.523 24.523 30 19 30C13.477 30 9 25.523 9 20C9 14.477 13.477 10 19 10C21.761 10 24.261 11.119 26.071 12.929"
-          stroke="#3b82f6" strokeWidth="2.2" strokeLinecap="round" fill="none"
-        />
-        <rect x="12" y="14" width="1.8" height="12" rx="0.9" fill="#1e3a8a"/>
-        <path d="M13.8 14H17.2C18.746 14 20 15.254 20 16.8V16.8C20 18.346 18.746 19.6 17.2 19.6H13.8V14Z" fill="#1e3a8a"/>
-        <rect x="21.5" y="14" width="1.8" height="12" rx="0.9" fill="#1e3a8a"/>
-        <path d="M23.3 14H26.2C27.526 14 28.6 15.074 28.6 16.4V16.4C28.6 17.726 27.526 18.8 26.2 18.8H23.3V14Z" fill="#1e3a8a"/>
-        <path d="M23.3 18.8H26.5C27.936 18.8 29.1 19.964 29.1 21.4V21.4C29.1 22.836 27.936 24 26.5 24H23.3V18.8Z" fill="#1e3a8a"/>
-      </svg>
-      <div>
-        <p className="text-xl font-black text-slate-900 tracking-tight leading-tight">ProBusiness<span className="text-primary-600">Cloud</span></p>
-        <p className="text-xs text-slate-500 leading-tight">Business Management Platform</p>
-      </div>
-    </div>
-  );
-}
-
 /* ─── Feature bullet ──────────────────────────────────────────────────────── */
 function Feature({ icon, text }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center shrink-0 text-white/80 text-sm">
+      <div
+        className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0 text-base"
+        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)' }}
+      >
         {icon}
       </div>
-      <span className="text-sm text-blue-100/90">{text}</span>
+      <span className="text-sm" style={{ color: 'rgba(187,210,255,0.85)' }}>{text}</span>
     </div>
   );
 }
 
 /* ─── Login Page ─────────────────────────────────────────────────────────── */
 export default function LoginPage() {
-  const dispatch       = useDispatch();
-  const navigate       = useNavigate();
-  const isAuth         = useSelector(selectIsAuth);
+  const dispatch        = useDispatch();
+  const navigate        = useNavigate();
+  const isAuth          = useSelector(selectIsAuth);
   const [showPwd, setShowPwd]           = useState(false);
   const [suspendedMsg, setSuspendedMsg] = useState('');
 
@@ -98,32 +74,61 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
 
-      {/* ── Left panel — brand / marketing ── */}
-      <div className="hidden lg:flex lg:w-[45%] xl:w-[52%] flex-col justify-between p-12 bg-gradient-to-br from-[#0c1427] via-[#0f2147] to-[#1a3a6e] relative overflow-hidden">
-        {/* Background decoration */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-blue-600/10 blur-3xl" />
-          <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-primary-600/10 blur-3xl" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-blue-500/5 blur-3xl" />
-        </div>
+      {/* ── Left panel — animated gradient brand area ── */}
+      <div
+        className="hidden lg:flex lg:w-[45%] xl:w-[52%] flex-col justify-between p-12 relative overflow-hidden login-gradient-bg"
+      >
+        {/* Decorative glow blobs */}
+        <div
+          className="absolute rounded-full pointer-events-none animate-glow-pulse"
+          style={{
+            top: '-80px', right: '-80px',
+            width: 420, height: 420,
+            background: 'radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 65%)',
+          }}
+        />
+        <div
+          className="absolute rounded-full pointer-events-none animate-glow-pulse-slow"
+          style={{
+            bottom: '-100px', left: '-80px',
+            width: 380, height: 380,
+            background: 'radial-gradient(circle, rgba(139,92,246,0.16) 0%, transparent 65%)',
+            animationDelay: '3s',
+          }}
+        />
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            top: '40%', left: '30%',
+            width: 220, height: 220,
+            background: 'radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 65%)',
+            animation: 'glowPulseAnim 14s ease-in-out infinite',
+            animationDelay: '6s',
+          }}
+        />
 
         {/* Logo */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 select-none">
-            <svg width="48" height="48" viewBox="0 0 40 40" fill="none">
-              <path d="M36 20C36 28.837 28.837 36 20 36C11.163 36 4 28.837 4 20C4 11.163 11.163 4 20 4C24.418 4 28.418 5.791 31.314 8.686"
-                stroke="#60a5fa" strokeWidth="2.8" strokeLinecap="round" fill="none"/>
-              <path d="M29 20C29 25.523 24.523 30 19 30C13.477 30 9 25.523 9 20C9 14.477 13.477 10 19 10C21.761 10 24.261 11.119 26.071 12.929"
-                stroke="#3b82f6" strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-              <rect x="12" y="14" width="1.8" height="12" rx="0.9" fill="white"/>
-              <path d="M13.8 14H17.2C18.746 14 20 15.254 20 16.8V16.8C20 18.346 18.746 19.6 17.2 19.6H13.8V14Z" fill="white"/>
-              <rect x="21.5" y="14" width="1.8" height="12" rx="0.9" fill="white"/>
-              <path d="M23.3 14H26.2C27.526 14 28.6 15.074 28.6 16.4V16.4C28.6 17.726 27.526 18.8 26.2 18.8H23.3V14Z" fill="white"/>
-              <path d="M23.3 18.8H26.5C27.936 18.8 29.1 19.964 29.1 21.4V21.4C29.1 22.836 27.936 24 26.5 24H23.3V18.8Z" fill="white"/>
-            </svg>
+          <div
+            className="inline-flex items-center gap-3 rounded-2xl px-4 py-3 select-none"
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)' }}
+          >
+            <img
+              src="/logo.png"
+              alt="ProBusinessCloud"
+              style={{
+                height: 36,
+                width: 'auto',
+                objectFit: 'contain',
+                filter: 'brightness(0) invert(1)',
+                opacity: 0.92,
+              }}
+            />
             <div>
-              <p className="text-lg font-black text-white tracking-tight">ProBusinessCloud</p>
-              <p className="text-xs text-blue-300/70">Business Management Platform</p>
+              <p className="text-sm font-bold text-white tracking-tight leading-tight">ProBusinessCloud</p>
+              <p className="text-[11px] leading-tight" style={{ color: 'rgba(147,196,255,0.65)' }}>
+                Business Management Platform
+              </p>
             </div>
           </div>
         </div>
@@ -133,9 +138,18 @@ export default function LoginPage() {
           <div>
             <h2 className="text-3xl xl:text-4xl font-black text-white leading-tight text-balance">
               Run your business<br />
-              <span className="text-blue-300">smarter, faster.</span>
+              <span
+                style={{
+                  background: 'linear-gradient(135deg, #60a5fa, #c084fc)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
+                smarter, faster.
+              </span>
             </h2>
-            <p className="text-blue-200/70 mt-4 text-sm leading-relaxed max-w-sm">
+            <p className="mt-4 text-sm leading-relaxed max-w-sm" style={{ color: 'rgba(187,210,255,0.70)' }}>
               Complete POS, inventory, sales, purchases, and reports — all in one professional cloud platform.
             </p>
           </div>
@@ -149,25 +163,35 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Bottom */}
         <div className="relative z-10">
-          <p className="text-xs text-blue-300/40">© 2025 ProBusinessCloud. All rights reserved.</p>
+          <p className="text-xs" style={{ color: 'rgba(147,196,255,0.30)' }}>
+            © 2025 ProBusinessCloud. All rights reserved.
+          </p>
         </div>
       </div>
 
       {/* ── Right panel — login form ── */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-slate-50">
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12" style={{ backgroundColor: 'rgb(var(--app-bg))' }}>
         <div className="w-full max-w-[400px] animate-slide-up">
 
           {/* Mobile logo */}
-          <div className="lg:hidden mb-8">
-            <PBCLogoFull />
+          <div className="lg:hidden mb-8 flex justify-center">
+            <img
+              src="/logo.png"
+              alt="ProBusinessCloud"
+              style={{ height: 56, width: 'auto', objectFit: 'contain' }}
+            />
           </div>
 
           {/* Heading */}
           <div className="mb-8">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Welcome back</h1>
-            <p className="text-sm text-slate-500 mt-1.5">Sign in to your ProBusinessCloud account</p>
+            <h1 className="text-2xl font-black tracking-tight" style={{ color: 'rgb(var(--s-50))' }}>
+              Welcome back
+            </h1>
+            <p className="text-sm mt-1.5" style={{ color: 'rgb(var(--s-400))' }}>
+              Sign in to your ProBusinessCloud account
+            </p>
           </div>
 
           {/* Alert banner */}
@@ -222,7 +246,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPwd(v => !v)}
-                  className="pointer-events-auto text-slate-400 hover:text-slate-600 transition-colors"
+                  className="pointer-events-auto text-surface-400 hover:text-surface-200 transition-colors"
                 >
                   {showPwd ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
                 </button>
@@ -237,15 +261,18 @@ export default function LoginPage() {
               fullWidth
               size="xl"
               loading={loginMutation.isPending}
-              className="mt-2 shadow-glow-sm"
+              className="mt-2"
             >
               Sign In to ProBusinessCloud
             </Button>
           </form>
 
-          <p className="text-center text-xs text-slate-400 mt-8">
-            ProBusinessCloud · Secure Business Platform
-          </p>
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <p className="text-xs" style={{ color: 'rgb(var(--s-500))' }}>
+              ProBusinessCloud · Secure Business Platform
+            </p>
+          </div>
         </div>
       </div>
 
