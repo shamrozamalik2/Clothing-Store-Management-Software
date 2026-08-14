@@ -6,6 +6,7 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../../core/widgets/grad_widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/dashboard_stats_model.dart';
 import '../providers/dashboard_provider.dart';
@@ -25,54 +26,24 @@ class DashboardScreen extends ConsumerWidget {
         : hour < 17
             ? 'Good Afternoon'
             : 'Good Evening';
+    final firstName  = user?.name.split(' ').first ?? 'there';
 
     return Scaffold(
       body: RefreshIndicator(
+        color: const Color(0xFF6366F1),
         onRefresh: () async => ref.invalidate(dashboardProvider),
         child: CustomScrollView(
           slivers: [
-            // ── App Bar ─────────────────────────────────────────────────────
-            SliverAppBar(
-              floating:       true,
-              snap:           true,
-              leading: IconButton(
-                icon: const Icon(Icons.menu_rounded),
-                onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
-              ),
-              title:          Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    greeting,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    user?.name ?? 'User',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined),
-                  onPressed: () {},
-                  tooltip: 'Notifications',
-                ),
-                const SizedBox(width: 4),
-              ],
-            ),
+            // ── Gradient App Bar ─────────────────────────────────────────────
+            _GradientAppBar(greeting: greeting, firstName: firstName),
 
             // ── Content ─────────────────────────────────────────────────────
             statsAsync.when(
               loading: () => const SliverToBoxAdapter(child: _Shimmer()),
-              error:   (e, _) => SliverToBoxAdapter(child: _ErrorWidget(error: e.toString())),
+              error:   (e, _) => SliverToBoxAdapter(child: _ErrorCard(error: e.toString())),
               data:    (stats) => SliverList(
                 delegate: SliverChildListDelegate([
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   _StatsRow(stats: stats),
                   const SizedBox(height: 20),
                   _WeeklyChart(stats: stats),
@@ -93,6 +64,87 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
+// ── Gradient App Bar ──────────────────────────────────────────────────────────
+
+class _GradientAppBar extends StatelessWidget {
+  const _GradientAppBar({required this.greeting, required this.firstName});
+  final String greeting;
+  final String firstName;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return SliverAppBar(
+      floating:        true,
+      snap:            true,
+      expandedHeight:  0,
+      backgroundColor: cs.surfaceContainer,
+      surfaceTintColor: Colors.transparent,
+      leading: IconButton(
+        icon: const Icon(Icons.menu_rounded),
+        onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
+      ),
+      title: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                greeting,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              // Gradient name text via ShaderMask
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: kGradElectric,
+                ).createShader(bounds),
+                child: Text(
+                  firstName,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        // Gradient "New Sale" button in app bar
+        Padding(
+          padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+          child: GradSmallButton(
+            label:     'New Sale',
+            icon:      Icons.point_of_sale_rounded,
+            onPressed: () => context.go('/pos'),
+            colors:    kGradPrimary,
+          ),
+        ),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(
+          height: 1,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.transparent,
+                Color(0x334F46E5),
+                Color(0x338B5CF6),
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Stats Row ────────────────────────────────────────────────────────────────
 
 class _StatsRow extends StatelessWidget {
@@ -104,42 +156,46 @@ class _StatsRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GridView.count(
-        crossAxisCount:     2,
-        shrinkWrap:         true,
-        physics:            const NeverScrollableScrollPhysics(),
-        crossAxisSpacing:   12,
-        mainAxisSpacing:    12,
-        childAspectRatio:   1.3,
+        crossAxisCount:    2,
+        shrinkWrap:        true,
+        physics:           const NeverScrollableScrollPhysics(),
+        crossAxisSpacing:  12,
+        mainAxisSpacing:   12,
+        childAspectRatio:  1.28,
         children: [
           StatCard(
-            title:    'Today Sales',
-            value:    formatCompact(stats.todaySales),
-            icon:     Icons.attach_money_rounded,
-            color:    const Color(0xFF6366F1),
-            subtitle: '${stats.todayOrders} orders',
+            title:     'Today Sales',
+            value:     formatCompact(stats.todaySales),
+            icon:      Icons.attach_money_rounded,
+            color:     const Color(0xFF4F46E5),
+            gradColors: kGradPrimary,
+            subtitle:  '${stats.todayOrders} orders',
           ),
           StatCard(
-            title:    'Orders',
-            value:    stats.todayOrders.toString(),
-            icon:     Icons.shopping_bag_outlined,
-            color:    const Color(0xFF0EA5E9),
-            subtitle: 'Today',
+            title:     'Orders',
+            value:     stats.todayOrders.toString(),
+            icon:      Icons.shopping_bag_outlined,
+            color:     const Color(0xFF0EA5E9),
+            gradColors: kGradSky,
+            subtitle:  'Today',
           ),
           StatCard(
-            title:    'Profit',
-            value:    formatCompact(stats.todayProfit),
-            icon:     Icons.trending_up_rounded,
-            color:    const Color(0xFF10B981),
-            subtitle: 'Today',
+            title:     'Profit',
+            value:     formatCompact(stats.todayProfit),
+            icon:      Icons.trending_up_rounded,
+            color:     const Color(0xFF10B981),
+            gradColors: kGradGreen,
+            subtitle:  'Today',
           ),
           StatCard(
-            title:    'Low Stock',
-            value:    stats.lowStockCount.toString(),
-            icon:     Icons.inventory_2_outlined,
-            color:    stats.lowStockCount > 0
+            title:     'Low Stock',
+            value:     stats.lowStockCount.toString(),
+            icon:      Icons.inventory_2_outlined,
+            color:     stats.lowStockCount > 0
                 ? const Color(0xFFF59E0B)
                 : const Color(0xFF10B981),
-            subtitle: stats.lowStockCount > 0 ? 'Needs restock' : 'All good',
+            gradColors: stats.lowStockCount > 0 ? kGradAmber : kGradGreen,
+            subtitle:  stats.lowStockCount > 0 ? 'Needs restock' : 'All good',
           ),
         ],
       ),
@@ -155,21 +211,28 @@ class _WeeklyChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs      = Theme.of(context).colorScheme;
-    final tt      = Theme.of(context).textTheme;
-    final points  = stats.weeklySales;
-    final maxY    = points.isEmpty
+    final cs     = Theme.of(context).colorScheme;
+    final tt     = Theme.of(context).textTheme;
+    final points = stats.weeklySales;
+    final maxY   = points.isEmpty
         ? 100.0
         : (points.map((p) => p.amount).reduce((a, b) => a > b ? a : b) * 1.2)
             .clamp(1.0, double.infinity);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      child: Container(
+        decoration: BoxDecoration(
+          color:        cs.surfaceContainer,
+          borderRadius: BorderRadius.circular(18),
+          border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+          boxShadow: [
+            BoxShadow(
+              color:       const Color(0xFF4F46E5).withValues(alpha: 0.06),
+              blurRadius:  16,
+              offset:      const Offset(0, 4),
+            ),
+          ],
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -178,14 +241,35 @@ class _WeeklyChart extends StatelessWidget {
             children: [
               Row(
                 children: [
+                  // Gradient dot accent
+                  Container(
+                    width: 8, height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(colors: kGradElectric),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Text(
                     'Weekly Sales',
                     style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   const Spacer(),
-                  Text(
-                    '7 days',
-                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0x1A4F46E5), Color(0x1A8B5CF6)],
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '7 days',
+                      style: tt.labelSmall?.copyWith(
+                        color: const Color(0xFF8B5CF6),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -201,8 +285,8 @@ class _WeeklyChart extends StatelessWidget {
                       )
                     : BarChart(
                         BarChartData(
-                          alignment:   BarChartAlignment.spaceAround,
-                          maxY:        maxY,
+                          alignment: BarChartAlignment.spaceAround,
+                          maxY:      maxY,
                           barTouchData: BarTouchData(
                             touchTooltipData: BarTouchTooltipData(
                               getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -211,9 +295,9 @@ class _WeeklyChart extends StatelessWidget {
                                     : '';
                                 return BarTooltipItem(
                                   '$label\n${formatCompact(rod.toY)}',
-                                  TextStyle(
-                                    color: cs.onPrimary,
-                                    fontSize: 11,
+                                  const TextStyle(
+                                    color:      Colors.white,
+                                    fontSize:   11,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 );
@@ -231,14 +315,14 @@ class _WeeklyChart extends StatelessWidget {
                                   if (idx < 0 || idx >= points.length) {
                                     return const SizedBox.shrink();
                                   }
-                                  final day = points[idx].day;
+                                  final day   = points[idx].day;
                                   final label = day.length >= 3 ? day.substring(0, 3) : day;
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 6),
                                     child: Text(
                                       label,
                                       style: tt.labelSmall?.copyWith(
-                                        color: cs.onSurfaceVariant,
+                                        color:    cs.onSurfaceVariant,
                                         fontSize: 10,
                                       ),
                                     ),
@@ -250,31 +334,36 @@ class _WeeklyChart extends StatelessWidget {
                             topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                             rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                           ),
-                          gridData:   FlGridData(
+                          gridData: FlGridData(
                             show: true,
                             drawVerticalLine: false,
                             horizontalInterval: maxY / 4,
                             getDrawingHorizontalLine: (value) => FlLine(
-                              color: cs.outlineVariant.withValues(alpha: 0.4),
+                              color:       cs.outlineVariant.withValues(alpha: 0.35),
                               strokeWidth: 1,
                             ),
                           ),
                           borderData: FlBorderData(show: false),
+                          // Gradient bars: blue → violet
                           barGroups: points.asMap().entries.map((entry) {
                             return BarChartGroupData(
                               x: entry.key,
                               barRods: [
                                 BarChartRodData(
-                                  toY:          entry.value.amount,
-                                  color:        cs.primary,
-                                  width:        22,
+                                  toY: entry.value.amount,
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end:   Alignment.topCenter,
+                                    colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
+                                  ),
+                                  width: 22,
                                   borderRadius: const BorderRadius.vertical(
                                     top: Radius.circular(6),
                                   ),
                                   backDrawRodData: BackgroundBarChartRodData(
                                     show:  true,
                                     toY:   maxY,
-                                    color: cs.primaryContainer.withValues(alpha: 0.3),
+                                    color: const Color(0xFF4F46E5).withValues(alpha: 0.06),
                                   ),
                                 ),
                               ],
@@ -291,35 +380,55 @@ class _WeeklyChart extends StatelessWidget {
   }
 }
 
-// ── Quick Actions ────────────────────────────────────────────────────────────
+// ── Quick Actions ─────────────────────────────────────────────────────────────
 
 class _QuickActions extends StatelessWidget {
   const _QuickActions();
 
+  static const _actions = [
+    _Action('New Sale',  Icons.point_of_sale_rounded,  kGradPrimary, '/pos',       true),
+    _Action('Products',  Icons.inventory_2_rounded,    kGradSky,     '/products',  false),
+    _Action('Customers', Icons.people_rounded,         kGradGreen,   '/customers', false),
+    _Action('Reports',   Icons.bar_chart_rounded,      kGradAmber,   '/reports',   false),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
-
-    final actions = [
-      const _Action('New Sale',  Icons.point_of_sale_rounded,  Color(0xFF6366F1), '/pos'),
-      const _Action('Products',  Icons.inventory_2_rounded,    Color(0xFF0EA5E9), '/products'),
-      const _Action('Customers', Icons.people_rounded,         Color(0xFF10B981), '/customers'),
-      const _Action('Reports',   Icons.bar_chart_rounded,      Color(0xFFF59E0B), '/reports'),
-    ];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Quick Actions',
-            style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          Row(
+            children: [
+              Container(
+                width: 3, height: 16,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end:   Alignment.bottomCenter,
+                    colors: kGradPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'QUICK ACTIONS',
+                style: tt.labelSmall?.copyWith(
+                  fontWeight:   FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: const Color(0xFF6366F1),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
-            children: actions
-                .map((a) => Expanded(child: _ActionButton(action: a)))
+            children: _actions
+                .map((a) => Expanded(child: _ActionTile(action: a)))
                 .toList(),
           ),
         ],
@@ -329,44 +438,78 @@ class _QuickActions extends StatelessWidget {
 }
 
 class _Action {
-  const _Action(this.label, this.icon, this.color, this.route);
-  final String   label;
-  final IconData icon;
-  final Color    color;
-  final String   route;
+  const _Action(this.label, this.icon, this.colors, this.route, this.isPrimary);
+  final String       label;
+  final IconData     icon;
+  final List<Color>  colors;
+  final String       route;
+  final bool         isPrimary;
 }
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({required this.action});
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({required this.action});
   final _Action action;
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: InkWell(
+      child: GestureDetector(
         onTap: () => context.go(action.route),
-        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding:    const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(
-            color:        action.color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border:       Border.all(color: action.color.withValues(alpha: 0.2)),
+            borderRadius: BorderRadius.circular(14),
+            gradient: action.isPrimary
+                ? const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end:   Alignment.bottomRight,
+                    colors: kGradPrimary,
+                  )
+                : LinearGradient(
+                    begin: Alignment.topLeft,
+                    end:   Alignment.bottomRight,
+                    colors: [
+                      action.colors[0].withValues(alpha: 0.14),
+                      action.colors[1].withValues(alpha: 0.08),
+                    ],
+                  ),
+            border: Border.all(
+              color: action.isPrimary
+                  ? Colors.transparent
+                  : action.colors[0].withValues(alpha: 0.22),
+            ),
+            boxShadow: action.isPrimary
+                ? [
+                    BoxShadow(
+                      color:      action.colors[0].withValues(alpha: 0.28),
+                      blurRadius: 12,
+                      offset:     const Offset(0, 4),
+                    ),
+                  ]
+                : [],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(action.icon, color: action.color, size: 24),
+              Icon(
+                action.icon,
+                color: action.isPrimary ? Colors.white : action.colors[0],
+                size:  24,
+              ),
               const SizedBox(height: 6),
               Text(
                 action.label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color:      action.color,
-                  fontWeight: FontWeight.w600,
+                style: tt.labelSmall?.copyWith(
+                  color:      action.isPrimary ? Colors.white : action.colors[0],
+                  fontWeight: FontWeight.w700,
                   fontSize:   10,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -376,7 +519,7 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-// ── Recent Sales ─────────────────────────────────────────────────────────────
+// ── Recent Sales ──────────────────────────────────────────────────────────────
 
 class _RecentSales extends StatelessWidget {
   const _RecentSales({required this.stats});
@@ -395,14 +538,37 @@ class _RecentSales extends StatelessWidget {
         children: [
           Row(
             children: [
+              Container(
+                width: 3, height: 16,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end:   Alignment.bottomCenter,
+                    colors: kGradElectric,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               Text(
-                'Recent Sales',
-                style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                'RECENT SALES',
+                style: tt.labelSmall?.copyWith(
+                  fontWeight:   FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: const Color(0xFF3B82F6),
+                ),
               ),
               const Spacer(),
               TextButton(
                 onPressed: () => context.go('/sales'),
-                child: const Text('See all'),
+                child: Text(
+                  'See all',
+                  style: TextStyle(
+                    color: const Color(0xFF6366F1),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),
@@ -418,11 +584,18 @@ class _RecentSales extends StatelessWidget {
               ),
             )
           else
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+            Container(
+              decoration: BoxDecoration(
+                color:        cs.surfaceContainer,
+                borderRadius: BorderRadius.circular(18),
+                border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+                boxShadow: [
+                  BoxShadow(
+                    color:      const Color(0xFF3B82F6).withValues(alpha: 0.05),
+                    blurRadius: 12,
+                    offset:     const Offset(0, 4),
+                  ),
+                ],
               ),
               clipBehavior: Clip.antiAlias,
               child: Column(
@@ -433,13 +606,28 @@ class _RecentSales extends StatelessWidget {
                     children: [
                       ListTile(
                         dense:   true,
-                        leading: CircleAvatar(
-                          radius:          18,
-                          backgroundColor: cs.primaryContainer,
-                          child: Icon(
+                        leading: Container(
+                          width:  36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape:    BoxShape.circle,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end:   Alignment.bottomRight,
+                              colors: kGradElectric,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color:      const Color(0xFF3B82F6).withValues(alpha: 0.22),
+                                blurRadius: 6,
+                                offset:     const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
                             Icons.receipt_long_rounded,
                             size:  16,
-                            color: cs.onPrimaryContainer,
+                            color: Colors.white,
                           ),
                         ),
                         title: Text(
@@ -454,11 +642,16 @@ class _RecentSales extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text(
-                              formatCurrency(sale.total),
-                              style: tt.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color:      cs.primary,
+                            ShaderMask(
+                              shaderCallback: (bounds) => const LinearGradient(
+                                colors: kGradGreen,
+                              ).createShader(bounds),
+                              child: Text(
+                                formatCurrency(sale.total),
+                                style: tt.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                             Text(
@@ -469,7 +662,7 @@ class _RecentSales extends StatelessWidget {
                         ),
                       ),
                       if (i < list.length - 1)
-                        Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
+                        Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.4)),
                     ],
                   );
                 }).toList(),
@@ -481,7 +674,7 @@ class _RecentSales extends StatelessWidget {
   }
 }
 
-// ── Top Products ─────────────────────────────────────────────────────────────
+// ── Top Products ──────────────────────────────────────────────────────────────
 
 class _TopProducts extends StatelessWidget {
   const _TopProducts({required this.stats});
@@ -500,32 +693,48 @@ class _TopProducts extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Top Products',
-            style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          Row(
+            children: [
+              Container(
+                width: 3, height: 16,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end:   Alignment.bottomCenter,
+                    colors: kGradViolet,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'TOP PRODUCTS',
+                style: tt.labelSmall?.copyWith(
+                  fontWeight:   FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: const Color(0xFF8B5CF6),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 140,
+            height: 148,
             child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount:       list.length,
+              scrollDirection:  Axis.horizontal,
+              itemCount:        list.length,
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, i) {
-                final p       = list[i];
-                final rankColors = [
-                  const Color(0xFFFFD700),
-                  const Color(0xFFC0C0C0),
-                  const Color(0xFFCD7F32),
-                ];
-                final rankColor = i < 3 ? rankColors[i] : cs.outlineVariant;
+                final p = list[i];
+                final rankGrads = [kGradAmber, kGradViolet, kGradSky];
+                final rankGrad  = i < 3 ? rankGrads[i] : kGradBlue;
                 return SizedBox(
                   width: 140,
-                  child: Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color:        cs.surfaceContainer,
                       borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+                      border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
@@ -535,21 +744,26 @@ class _TopProducts extends StatelessWidget {
                           Row(
                             children: [
                               Container(
-                                padding:    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color:        rankColor.withValues(alpha: 0.15),
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      rankGrad[0].withValues(alpha: 0.18),
+                                      rankGrad[1].withValues(alpha: 0.12),
+                                    ],
+                                  ),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   '#${i + 1}',
                                   style: tt.labelSmall?.copyWith(
-                                    color:      rankColor,
+                                    color:      rankGrad[0],
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
                               ),
                               const Spacer(),
-                              Icon(Icons.star_rounded, size: 14, color: rankColor),
+                              Icon(Icons.star_rounded, size: 14, color: rankGrad[0]),
                             ],
                           ),
                           const Spacer(),
@@ -565,11 +779,16 @@ class _TopProducts extends StatelessWidget {
                             style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            formatCompact(p.revenue),
-                            style: tt.labelSmall?.copyWith(
-                              color:      cs.primary,
-                              fontWeight: FontWeight.w700,
+                          ShaderMask(
+                            shaderCallback: (bounds) => const LinearGradient(
+                              colors: kGradPrimary,
+                            ).createShader(bounds),
+                            child: Text(
+                              formatCompact(p.revenue),
+                              style: tt.labelSmall?.copyWith(
+                                color:      Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],
@@ -586,7 +805,7 @@ class _TopProducts extends StatelessWidget {
   }
 }
 
-// ── Shimmer loading ──────────────────────────────────────────────────────────
+// ── Shimmer loading ───────────────────────────────────────────────────────────
 
 class _Shimmer extends StatelessWidget {
   const _Shimmer();
@@ -595,7 +814,7 @@ class _Shimmer extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Shimmer.fromColors(
-      baseColor:     cs.surfaceContainerHighest,
+      baseColor:      cs.surfaceContainerHighest,
       highlightColor: cs.surface,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -608,7 +827,7 @@ class _Shimmer extends StatelessWidget {
               physics:         const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 12,
               mainAxisSpacing:  12,
-              childAspectRatio: 1.55,
+              childAspectRatio: 1.28,
               children: List.generate(
                 4,
                 (_) => Container(
@@ -621,7 +840,15 @@ class _Shimmer extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Container(
-              height:     220,
+              height: 232,
+              decoration: BoxDecoration(
+                color:        cs.surface,
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              height: 90,
               decoration: BoxDecoration(
                 color:        cs.surface,
                 borderRadius: BorderRadius.circular(16),
@@ -629,15 +856,7 @@ class _Shimmer extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Container(
-              height:     80,
-              decoration: BoxDecoration(
-                color:        cs.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              height:     200,
+              height: 200,
               decoration: BoxDecoration(
                 color:        cs.surface,
                 borderRadius: BorderRadius.circular(16),
@@ -650,10 +869,10 @@ class _Shimmer extends StatelessWidget {
   }
 }
 
-// ── Error widget ─────────────────────────────────────────────────────────────
+// ── Error card ────────────────────────────────────────────────────────────────
 
-class _ErrorWidget extends StatelessWidget {
-  const _ErrorWidget({required this.error});
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.error});
   final String error;
 
   @override

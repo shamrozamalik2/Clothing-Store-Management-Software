@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/widgets/grad_widgets.dart';
 import '../providers/settings_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../shell/main_shell.dart';
@@ -48,6 +49,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           icon: const Icon(Icons.menu_rounded),
           onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
         ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            height: 1,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Color(0x334F46E5),
+                  Color(0x338B5CF6),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
       body: ListView(
         children: [
@@ -59,25 +76,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius:          28,
-                    backgroundColor: cs.primaryContainer,
-                    backgroundImage: (user?.avatar != null && user!.avatar!.isNotEmpty)
-                        ? NetworkImage(user.avatar!)
-                        : null,
-                    child: (user?.avatar == null || user!.avatar!.isEmpty)
-                        ? Text(
-                            (user?.name.isNotEmpty == true)
-                                ? user!.name[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              fontSize:   22,
-                              color:      cs.onPrimaryContainer,
-                              fontWeight: FontWeight.w700,
+                  // Gradient avatar — if user has a photo, overlay it; otherwise show initials
+                  (user?.avatar != null && user!.avatar!.isNotEmpty)
+                      ? Container(
+                          width:  56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end:   Alignment.bottomRight,
+                              colors: kGradPrimary,
                             ),
-                          )
-                        : null,
-                  ),
+                            boxShadow: [
+                              BoxShadow(
+                                color:      kGradPrimary[0].withValues(alpha: 0.28),
+                                blurRadius: 12,
+                                offset:     const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: Image.network(user.avatar!, fit: BoxFit.cover),
+                          ),
+                        )
+                      : GradAvatar(
+                          name:   user?.name ?? '?',
+                          radius: 28,
+                          colors: kGradPrimary,
+                        ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -141,7 +168,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.palette_outlined, color: cs.primary, size: 20),
+                      ShaderMask(
+                        shaderCallback: (b) => const LinearGradient(
+                          colors: kGradViolet,
+                        ).createShader(b),
+                        child: const Icon(Icons.palette_outlined, color: Colors.white, size: 20),
+                      ),
                       const SizedBox(width: 12),
                       const Text('Theme', style: TextStyle(fontWeight: FontWeight.w600)),
                     ],
@@ -188,7 +220,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.cloud_outlined, color: cs.primary, size: 20),
+                      ShaderMask(
+                        shaderCallback: (b) => const LinearGradient(
+                          colors: kGradSky,
+                        ).createShader(b),
+                        child: const Icon(Icons.cloud_outlined, color: Colors.white, size: 20),
+                      ),
                       const SizedBox(width: 12),
                       const Text('API URL',
                           style: TextStyle(fontWeight: FontWeight.w600)),
@@ -244,7 +281,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: Icon(Icons.print_rounded, color: cs.primary),
+                  leading: ShaderMask(
+                    shaderCallback: (b) => const LinearGradient(
+                      colors: kGradElectric,
+                    ).createShader(b),
+                    child: const Icon(Icons.print_rounded, color: Colors.white),
+                  ),
                   title:   const Text('Printer Settings'),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () {
@@ -259,7 +301,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   color: cs.outlineVariant.withValues(alpha: 0.5),
                 ),
                 ListTile(
-                  leading: Icon(Icons.notifications_outlined, color: cs.primary),
+                  leading: ShaderMask(
+                    shaderCallback: (b) => const LinearGradient(
+                      colors: kGradAmber,
+                    ).createShader(b),
+                    child: const Icon(Icons.notifications_outlined, color: Colors.white),
+                  ),
                   title:   const Text('Notifications'),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => _showNotificationsSheet(context),
@@ -275,7 +322,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: Icon(Icons.pin_rounded, color: cs.primary),
+                  leading: ShaderMask(
+                    shaderCallback: (b) => const LinearGradient(
+                      colors: kGradGreen,
+                    ).createShader(b),
+                    child: const Icon(Icons.pin_rounded, color: Colors.white),
+                  ),
                   title:   const Text('Set PIN Code'),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => _showPinSetupSheet(context),
@@ -419,9 +471,13 @@ class _BiometricTileState extends ConsumerState<_BiometricTile> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return SwitchListTile.adaptive(
-      secondary: Icon(Icons.fingerprint_rounded, color: cs.primary),
+      secondary: ShaderMask(
+        shaderCallback: (b) => const LinearGradient(
+          colors: kGradViolet,
+        ).createShader(b),
+        child: const Icon(Icons.fingerprint_rounded, color: Colors.white),
+      ),
       title:     const Text('Biometric Login'),
       subtitle:  const Text('Use fingerprint or face ID to unlock',
           style: TextStyle(fontSize: 12)),
@@ -593,17 +649,33 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 16, 6),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          fontSize:      11,
-          fontWeight:    FontWeight.w700,
-          letterSpacing: 0.8,
-          color:         cs.primary,
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
+      child: Row(
+        children: [
+          Container(
+            width:  3,
+            height: 14,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(2),
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end:   Alignment.bottomCenter,
+                colors: kGradPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text.toUpperCase(),
+            style: const TextStyle(
+              fontSize:      11,
+              fontWeight:    FontWeight.w700,
+              letterSpacing: 0.8,
+              color:         Color(0xFF6366F1),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -624,7 +696,12 @@ class _InfoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return ListTile(
-      leading:  Icon(icon, color: cs.primary),
+      leading: ShaderMask(
+        shaderCallback: (bounds) => const LinearGradient(
+          colors: kGradPrimary,
+        ).createShader(bounds),
+        child: Icon(icon, color: Colors.white, size: 22),
+      ),
       title:    Text(label, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
       subtitle: Text(value,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
@@ -638,20 +715,24 @@ class _RoleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     if (role.isEmpty) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color:        cs.primaryContainer,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end:   Alignment.bottomRight,
+          colors: [Color(0x254F46E5), Color(0x257C3AED)],
+        ),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0x404F46E5)),
       ),
       child: Text(
         role[0].toUpperCase() + role.substring(1),
-        style: TextStyle(
-          color:      cs.onPrimaryContainer,
+        style: const TextStyle(
+          color:      Color(0xFF818CF8),
           fontSize:   11,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
