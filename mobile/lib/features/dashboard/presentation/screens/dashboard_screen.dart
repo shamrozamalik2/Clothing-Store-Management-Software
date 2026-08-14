@@ -104,7 +104,7 @@ class _StatsRow extends StatelessWidget {
         physics:            const NeverScrollableScrollPhysics(),
         crossAxisSpacing:   12,
         mainAxisSpacing:    12,
-        childAspectRatio:   1.55,
+        childAspectRatio:   1.8,
         children: [
           StatCard(
             title:    'Today Sales',

@@ -23,49 +23,51 @@ class StatCard extends StatelessWidget {
     final bg   = color.withValues(alpha: 0.12);
 
     return Card(
-      elevation:   0,
+      elevation:    0,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             // Icon badge
             Container(
-              padding:         const EdgeInsets.all(10),
-              decoration:      BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: color, size: 22),
+              padding:    const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: color, size: 18),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             // Value
             Text(
               value,
-              style: tt.titleLarge?.copyWith(
+              style: tt.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
+                letterSpacing: -0.3,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             // Title
             Text(
               title,
-              style: tt.bodySmall?.copyWith(
+              style: tt.labelSmall?.copyWith(
                 color: cs.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             if (subtitle != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 subtitle!,
-                style: tt.labelSmall?.copyWith(color: color),
+                style: tt.labelSmall?.copyWith(color: color, fontSize: 10),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
