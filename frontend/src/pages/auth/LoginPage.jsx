@@ -9,6 +9,11 @@ import {
   EnvelopeIcon,
   LockClosedIcon,
   BuildingOffice2Icon,
+  BoltIcon,
+  CubeIcon,
+  ChartBarIcon,
+  UsersIcon,
+  CloudIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -19,14 +24,14 @@ import Button from '@components/ui/Button';
 import Input from '@components/ui/Input';
 
 /* ─── Feature bullet ──────────────────────────────────────────────────────── */
-function Feature({ icon, text }) {
+function Feature({ icon: Icon, text }) {
   return (
     <div className="flex items-center gap-3">
       <div
-        className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0 text-base"
+        className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0"
         style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)' }}
       >
-        {icon}
+        <Icon className="h-4 w-4" style={{ color: 'rgba(187,210,255,0.90)' }} />
       </div>
       <span className="text-sm" style={{ color: 'rgba(187,210,255,0.85)' }}>{text}</span>
     </div>
@@ -107,18 +112,20 @@ export default function LoginPage() {
           }}
         />
 
-        {/* Logo — image only, no text */}
+        {/* Logo — transparent PNG, rendered white for the dark panel */}
         <div className="relative z-10">
-          <div
-            className="inline-flex items-center justify-center rounded-2xl select-none overflow-hidden"
-            style={{ background: 'rgba(255,255,255,0.96)', padding: '12px 28px' }}
-          >
-            <img
-              src="/logo.png"
-              alt="ProBusinessCloud"
-              style={{ height: 70, width: 'auto', objectFit: 'contain', display: 'block' }}
-            />
-          </div>
+          <img
+            src="/logo.png"
+            alt="ProBusinessCloud"
+            className="select-none"
+            style={{
+              height: 64,
+              width: 'auto',
+              objectFit: 'contain',
+              display: 'block',
+              filter: 'brightness(0) invert(1)',
+            }}
+          />
         </div>
 
         {/* Hero text */}
@@ -143,11 +150,11 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-3">
-            <Feature icon="⚡" text="Fast POS with one-tap checkout" />
-            <Feature icon="📦" text="Real-time inventory tracking" />
-            <Feature icon="📊" text="Insightful business reports" />
-            <Feature icon="👥" text="Multi-user roles & permissions" />
-            <Feature icon="☁️" text="Secure cloud sync & backup" />
+            <Feature icon={BoltIcon}     text="Fast POS with one-tap checkout" />
+            <Feature icon={CubeIcon}     text="Real-time inventory tracking" />
+            <Feature icon={ChartBarIcon} text="Insightful business reports" />
+            <Feature icon={UsersIcon}    text="Multi-user roles & permissions" />
+            <Feature icon={CloudIcon}    text="Secure cloud sync & backup" />
           </div>
         </div>
 
@@ -163,18 +170,14 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12" style={{ backgroundColor: 'rgb(var(--app-bg))' }}>
         <div className="w-full max-w-[400px] animate-slide-up">
 
-          {/* Mobile logo — PNG only */}
+          {/* Mobile logo — transparent, no plate */}
           <div className="lg:hidden mb-8 flex justify-center">
-            <div
-              className="rounded-2xl overflow-hidden inline-flex items-center justify-center"
-              style={{ background: 'rgb(var(--card))', padding: '10px 24px', border: '1px solid rgb(var(--s-700) / 0.3)' }}
-            >
-              <img
-                src="/logo.png"
-                alt="ProBusinessCloud"
-                style={{ height: 52, width: 'auto', objectFit: 'contain', display: 'block' }}
-              />
-            </div>
+            <img
+              src="/logo.png"
+              alt="ProBusinessCloud"
+              className="brand-logo"
+              style={{ height: 48 }}
+            />
           </div>
 
           {/* Heading */}

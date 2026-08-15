@@ -4,3 +4,58 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+
+/* ───────────────────────────────────────────────────────────
+   LOGIN VISUALS — mirrors the main app's login treatment
+   ─────────────────────────────────────────────────────────── */
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+@keyframes glowPulseAnim {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50%      { opacity: 0.80; transform: scale(1.18); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.login-gradient-bg {
+  background: linear-gradient(
+    135deg,
+    #0c1427 0%,
+    #0f2147 20%,
+    #1a1a4e 38%,
+    #1e0e40 55%,
+    #0f1e47 72%,
+    #0c1427 100%
+  );
+  background-size: 400% 400%;
+  animation: gradientShift 12s ease infinite;
+}
+
+.animate-glow-pulse      { animation: glowPulseAnim 8s  ease-in-out infinite; }
+.animate-glow-pulse-slow { animation: glowPulseAnim 14s ease-in-out infinite; }
+.animate-slide-up        { animation: slideUp 0.25s ease-out; }
+
+/* Brand logo — artwork is dark navy; invert to white on dark surfaces */
+.brand-logo {
+  display: block;
+  width: auto;
+  object-fit: contain;
+  user-select: none;
+  filter: brightness(0) invert(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-gradient-bg,
+  .animate-glow-pulse,
+  .animate-glow-pulse-slow,
+  .animate-slide-up {
+    animation: none !important;
+    transform: none !important;
+  }
+}

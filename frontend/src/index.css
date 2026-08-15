@@ -39,6 +39,17 @@ html.light {
   --g-electric-to:  #8b5cf6;
 }
 
+/* Brand logo — transparent PNG is dark navy; invert it to white on dark surfaces */
+.brand-logo {
+  display: block;
+  width: auto;
+  object-fit: contain;
+  user-select: none;
+}
+html.dark .brand-logo {
+  filter: brightness(0) invert(1);
+}
+
 /* Dark mode */
 html.dark {
   /* Toast */
