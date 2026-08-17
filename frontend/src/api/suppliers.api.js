@@ -7,5 +7,5 @@ export const suppliersApi = {
   create:  (data)   => client.post('/suppliers', data),
   update:  (id, data) => client.put(`/suppliers/${id}`, data),
   remove:    (id)     => client.delete(`/suppliers/${id}`),
-  importCsv: (file)  => { const fd = new FormData(); fd.append('file', file); return client.post('/suppliers/import', fd); },
+  importCsv: (file)  => { const fd = new FormData(); fd.append('file', file); return client.post('/suppliers/import', fd, { headers: { 'Content-Type': undefined } }); },
 };

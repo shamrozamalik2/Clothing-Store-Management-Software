@@ -7,5 +7,5 @@ export const categoriesApi = {
   create:  (data)   => client.post('/categories', data),
   update:  (id, data) => client.put(`/categories/${id}`, data),
   remove:    (id)     => client.delete(`/categories/${id}`),
-  importCsv: (file)  => { const fd = new FormData(); fd.append('file', file); return client.post('/categories/import', fd); },
+  importCsv: (file)  => { const fd = new FormData(); fd.append('file', file); return client.post('/categories/import', fd, { headers: { 'Content-Type': undefined } }); },
 };

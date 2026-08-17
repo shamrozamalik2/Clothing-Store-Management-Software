@@ -14,5 +14,5 @@ export const productsApi = {
   addVariant:     (id, data)    => client.post(`/products/${id}/variants`, data),
   updateVariant:  (id, vid, d)  => client.put(`/products/${id}/variants/${vid}`, d),
   deleteVariant:  (id, vid)     => client.delete(`/products/${id}/variants/${vid}`),
-  importCsv: (file) => { const fd = new FormData(); fd.append('file', file); return client.post('/products/import', fd); },
+  importCsv: (file) => { const fd = new FormData(); fd.append('file', file); return client.post('/products/import', fd, { headers: { 'Content-Type': undefined } }); },
 };
