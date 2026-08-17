@@ -13,7 +13,7 @@ function initDb() {
     ssl:                     env.DB_SSL ? { rejectUnauthorized: false } : false,
     max:                     env.DB_POOL_MAX,
     idleTimeoutMillis:       30_000,
-    connectionTimeoutMillis: 5_000,
+    connectionTimeoutMillis: 15_000,
     statement_timeout:       30_000,
   });
 

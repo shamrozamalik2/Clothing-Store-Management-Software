@@ -11,14 +11,24 @@ async function authenticate(req, res, next) {
   }
 
   const token = header.slice(7);
-  try {
-    const payload = jwt.verify(token, env.JWT_SECRET);
-    req.user      = payload;
-    req.companyId = payload.companyId;
-    req.branchId  = payload.branchId || null;
 
-    // Skip company check for impersonation tokens (super admin) or if no companyId
-    if (payload.companyId && !payload.impersonated) {
+  // Step 1: verify JWT — only JWT errors should produce a 401
+  let payload;
+  try {
+    payload = jwt.verify(token, env.JWT_SECRET);
+  } catch (err) {
+    const code    = err.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'INVALID_TOKEN';
+    const message = err.name === 'TokenExpiredError' ? 'Session expired. Please log in again.' : 'Invalid token.';
+    return res.status(401).json({ success: false, message, code });
+  }
+
+  req.user      = payload;
+  req.companyId = payload.companyId;
+  req.branchId  = payload.branchId || null;
+
+  // Step 2: check company status — DB errors here must NOT log the user out
+  if (payload.companyId && !payload.impersonated) {
+    try {
       const { rows: [company] } = await query(
         'SELECT subscription_status, trial_ends_at FROM companies WHERE id = $1',
         [payload.companyId]
@@ -44,7 +54,6 @@ async function authenticate(req, res, next) {
         }
 
         if (status === 'trial' && company.trial_ends_at && new Date(company.trial_ends_at) < new Date()) {
-          // Auto-mark expired in DB so future checks are faster
           await query(
             `UPDATE companies SET subscription_status = 'expired', updated_at = NOW() WHERE id = $1`,
             [payload.companyId]
@@ -56,14 +65,14 @@ async function authenticate(req, res, next) {
           });
         }
       }
+    } catch (dbErr) {
+      // DB unreachable — token is still valid; let the request continue
+      // (the endpoint's own query will also fail and return a proper 500)
+      console.error('[Auth] Company status check failed (DB issue):', dbErr.message);
     }
-
-    next();
-  } catch (err) {
-    const code    = err.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'INVALID_TOKEN';
-    const message = err.name === 'TokenExpiredError' ? 'Session expired. Please log in again.' : 'Invalid token.';
-    return res.status(401).json({ success: false, message, code });
   }
+
+  next();
 }
 
 function authorize(...roles) {
