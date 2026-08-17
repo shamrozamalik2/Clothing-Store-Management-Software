@@ -4,9 +4,10 @@ const { query, getClient } = require('../config/database');
 const { success, error } = require('../utils/response');
 const logger = require('../config/logger');
 
-// Bulk INSERT in chunks of 500 rows to stay under PostgreSQL's 65535-param limit
+// Bulk INSERT in chunks — returns the count of rows actually inserted
 async function bulkInsert(client, table, cols, rows, mapper, conflict = 'ON CONFLICT (id) DO NOTHING') {
-  if (!rows || rows.length === 0) return;
+  if (!rows || rows.length === 0) return 0;
+  let total = 0;
   const CHUNK = 500;
   for (let start = 0; start < rows.length; start += CHUNK) {
     const chunk = rows.slice(start, start + CHUNK);
@@ -14,11 +15,13 @@ async function bulkInsert(client, table, cols, rows, mapper, conflict = 'ON CONF
     const ph = chunk.map((_, i) =>
       `(${cols.map((__, j) => `$${i * n + j + 1}`).join(',')})`
     ).join(',');
-    await client.query(
+    const res = await client.query(
       `INSERT INTO ${table} (${cols.join(',')}) VALUES ${ph} ${conflict}`,
       chunk.flatMap(mapper)
     );
+    total += res.rowCount || 0;
   }
+  return total;
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
@@ -32,40 +35,81 @@ exports.exportBackup = async (req, res, next) => {
       { rows: brands },
       { rows: suppliers },
       { rows: products },
+      { rows: productVariants },
       { rows: customers },
       { rows: sales },
       { rows: saleItems },
       { rows: purchases },
       { rows: purchaseItems },
+      { rows: purchasePayments },
+      { rows: returns },
+      { rows: returnItems },
+      { rows: exchangeItems },
+      { rows: expenseCategories },
       { rows: expenses },
+      { rows: stockAdjustments },
+      { rows: stockAdjustmentItems },
       { rows: users },
       { rows: company },
     ] = await Promise.all([
       query(`SELECT key, value, type, group_name, label FROM settings WHERE company_id=$1`, [cid]),
-      query(`SELECT * FROM categories  WHERE company_id=$1`, [cid]),
-      query(`SELECT * FROM brands      WHERE company_id=$1`, [cid]),
-      query(`SELECT * FROM suppliers   WHERE company_id=$1`, [cid]),
-      query(`SELECT * FROM products    WHERE company_id=$1`, [cid]),
-      query(`SELECT * FROM customers   WHERE company_id=$1`, [cid]),
-      query(`SELECT * FROM sales       WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM categories WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM brands     WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM suppliers  WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM products   WHERE company_id=$1`, [cid]),
+      query(`SELECT pv.* FROM product_variants pv JOIN products p ON p.id=pv.product_id WHERE p.company_id=$1`, [cid]),
+      query(`SELECT * FROM customers  WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM sales      WHERE company_id=$1`, [cid]),
       query(`SELECT si.* FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE s.company_id=$1`, [cid]),
-      query(`SELECT * FROM purchases   WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM purchases  WHERE company_id=$1`, [cid]),
       query(`SELECT pi.* FROM purchase_items pi JOIN purchases p ON p.id=pi.purchase_id WHERE p.company_id=$1`, [cid]),
-      query(`SELECT * FROM expenses    WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM purchase_payments WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM returns    WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM return_items   WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM exchange_items WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM expense_categories WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM expenses   WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM stock_adjustments WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM stock_adjustment_items WHERE company_id=$1`, [cid]),
       query(`SELECT id,name,email,role_id,branch_id,is_active,created_at FROM users WHERE company_id=$1`, [cid]),
       query(`SELECT id,name,slug,email,phone,plan,subscription_status,max_users,created_at FROM companies WHERE id=$1`, [cid]),
     ]);
 
+    const counts = {
+      categories: categories.length,
+      brands: brands.length,
+      suppliers: suppliers.length,
+      products: products.length,
+      product_variants: productVariants.length,
+      customers: customers.length,
+      sales: sales.length,
+      sale_items: saleItems.length,
+      purchases: purchases.length,
+      purchase_items: purchaseItems.length,
+      purchase_payments: purchasePayments.length,
+      returns: returns.length,
+      return_items: returnItems.length,
+      exchange_items: exchangeItems.length,
+      expense_categories: expenseCategories.length,
+      expenses: expenses.length,
+      stock_adjustments: stockAdjustments.length,
+      stock_adjustment_items: stockAdjustmentItems.length,
+    };
+
     const backup = {
-      version:     '1.0',
+      version:     '2.0',
       exported_at: new Date().toISOString(),
       company:     company[0] || {},
+      counts,
       data: {
         settings, categories, brands, suppliers,
-        products, customers,
+        products, product_variants: productVariants, customers,
         sales, sale_items: saleItems,
-        purchases, purchase_items: purchaseItems,
-        expenses, users,
+        purchases, purchase_items: purchaseItems, purchase_payments: purchasePayments,
+        returns, return_items: returnItems, exchange_items: exchangeItems,
+        expense_categories: expenseCategories, expenses,
+        stock_adjustments: stockAdjustments, stock_adjustment_items: stockAdjustmentItems,
+        users,
       },
     };
 
@@ -83,7 +127,7 @@ exports.restoreBackup = async (req, res, next) => {
   const body = req.body;
 
   // Accept two formats:
-  //   Standard:  { version, data: { categories, products, ... } }
+  //   Standard v2.0: { version, data: { categories, products, ... } }
   //   Flat/legacy (old desktop app): tables at top level
   let d;
   if (body?.version && body?.data && typeof body.data === 'object') {
@@ -96,37 +140,51 @@ exports.restoreBackup = async (req, res, next) => {
   }
 
   const client = await getClient();
+  const report = {};
+
+  const ins = async (table, cols, rows, mapper) => {
+    const inserted = await bulkInsert(client, table, cols, rows, mapper);
+    report[table] = { provided: rows?.length ?? 0, inserted };
+    return inserted;
+  };
+
   try {
     await client.query('BEGIN');
 
-    // Delete in FK-safe order
+    // Delete in FK-safe order (children before parents)
+    await client.query(`DELETE FROM exchange_items      WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM return_items        WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM returns             WHERE company_id=$1`, [cid]);
     await client.query(`DELETE FROM stock_adjustment_items WHERE adjustment_id IN (SELECT id FROM stock_adjustments WHERE company_id=$1)`, [cid]);
-    await client.query(`DELETE FROM stock_adjustments WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM sale_items     WHERE sale_id     IN (SELECT id FROM sales     WHERE company_id=$1)`, [cid]);
-    await client.query(`DELETE FROM purchase_items WHERE purchase_id IN (SELECT id FROM purchases WHERE company_id=$1)`, [cid]);
-    await client.query(`DELETE FROM sales          WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM purchases      WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM expenses       WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM expense_categories WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM products       WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM customers      WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM suppliers      WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM brands         WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM categories     WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM stock_adjustments   WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM sale_items          WHERE sale_id IN (SELECT id FROM sales WHERE company_id=$1)`, [cid]);
+    await client.query(`DELETE FROM sales               WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM purchase_payments   WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM purchase_items      WHERE purchase_id IN (SELECT id FROM purchases WHERE company_id=$1)`, [cid]);
+    await client.query(`DELETE FROM purchases           WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM expenses            WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM expense_categories  WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM product_variants    WHERE product_id IN (SELECT id FROM products WHERE company_id=$1)`, [cid]);
+    await client.query(`DELETE FROM products            WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM customers           WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM suppliers           WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM brands              WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM categories          WHERE company_id=$1`, [cid]);
 
-    await bulkInsert(client, 'categories',
+    // Insert in FK-safe order (parents before children)
+    await ins('categories',
       ['id','company_id','name','description','is_active','created_at','updated_at'],
       d.categories, r => [r.id, cid, r.name, r.description??null, r.is_active??true, r.created_at, r.updated_at??r.created_at]);
 
-    await bulkInsert(client, 'brands',
+    await ins('brands',
       ['id','company_id','name','description','is_active','created_at','updated_at'],
       d.brands, r => [r.id, cid, r.name, r.description??null, r.is_active??true, r.created_at, r.updated_at??r.created_at]);
 
-    await bulkInsert(client, 'suppliers',
+    await ins('suppliers',
       ['id','company_id','name','email','phone','address','city','is_active','created_at','updated_at'],
       d.suppliers, r => [r.id, cid, r.name, r.email??null, r.phone??null, r.address??null, r.city??null, r.is_active??true, r.created_at, r.updated_at??r.created_at]);
 
-    await bulkInsert(client, 'products',
+    await ins('products',
       ['id','company_id','name','sku','barcode','description','category_id','brand_id',
        'cost_price','sale_price','wholesale_price','tax_rate','stock_quantity','low_stock_alert','unit','is_active','created_at','updated_at'],
       d.products, r => [
@@ -137,11 +195,18 @@ exports.restoreBackup = async (req, res, next) => {
         r.stock_quantity??r.quantity??0, r.low_stock_alert??r.min_stock_level??r.reorder_level??5,
         r.unit??'pcs', r.is_active??true, r.created_at, r.updated_at??r.created_at]);
 
-    await bulkInsert(client, 'customers',
+    await ins('product_variants',
+      ['id','company_id','product_id','sku','barcode','size','color','cost_price','sale_price','stock_quantity','is_active','created_at','updated_at'],
+      d.product_variants, r => [
+        r.id, r.company_id??cid, r.product_id, r.sku??`VAR-${r.id}`, r.barcode??null,
+        r.size??null, r.color??null, r.cost_price??0, r.sale_price??0,
+        r.stock_quantity??0, r.is_active??true, r.created_at??new Date().toISOString(), r.updated_at??r.created_at??new Date().toISOString()]);
+
+    await ins('customers',
       ['id','company_id','name','email','phone','address','city','loyalty_points','is_active','created_at','updated_at'],
       d.customers, r => [r.id, cid, r.name, r.email??null, r.phone??null, r.address??null, r.city??null, r.loyalty_points??0, r.is_active??true, r.created_at, r.updated_at??r.created_at]);
 
-    await bulkInsert(client, 'sales',
+    await ins('sales',
       ['id','company_id','branch_id','customer_id','reference','status','sale_date',
        'subtotal','tax_amount','discount_amount','total_amount','paid_amount','change_amount','due_amount',
        'payment_method','notes','created_by','created_at','updated_at'],
@@ -156,11 +221,11 @@ exports.restoreBackup = async (req, res, next) => {
           r.created_by??r.user_id??null, r.created_at, r.updated_at??r.created_at];
       });
 
-    await bulkInsert(client, 'sale_items',
+    await ins('sale_items',
       ['id','company_id','sale_id','product_id','product_name','sku','quantity','unit_price','cost_price','discount','tax_amount','total','created_at'],
       d.sale_items, r => [r.id, cid, r.sale_id, r.product_id??null, r.product_name??r.name??'Product', r.sku??null, r.quantity??0, r.unit_price??r.price??0, r.cost_price??0, r.discount??0, r.tax_amount??0, r.total??r.subtotal??0, r.created_at]);
 
-    await bulkInsert(client, 'purchases',
+    await ins('purchases',
       ['id','company_id','branch_id','supplier_id','reference','status','purchase_date',
        'subtotal','tax_amount','discount_amount','total_amount','paid_amount','due_amount','notes','created_by','created_at','updated_at'],
       d.purchases, r => {
@@ -173,27 +238,43 @@ exports.restoreBackup = async (req, res, next) => {
           r.created_by??r.user_id??null, r.created_at, r.updated_at??r.created_at];
       });
 
-    await bulkInsert(client, 'purchase_items',
+    await ins('purchase_items',
       ['id','company_id','purchase_id','product_id','product_name','sku','quantity','unit_cost','discount','tax_amount','total','created_at'],
       d.purchase_items, r => [r.id, cid, r.purchase_id, r.product_id??null, r.product_name??r.name??'Product', r.sku??null, r.quantity??0, r.unit_cost??r.cost??0, r.discount??0, r.tax_amount??0, r.total??0, r.created_at]);
 
-    await bulkInsert(client, 'expense_categories',
+    await ins('purchase_payments',
+      ['id','company_id','purchase_id','amount','payment_method','reference','notes','paid_at','created_by','created_at','updated_at'],
+      d.purchase_payments, r => [r.id, cid, r.purchase_id, r.amount??0, r.payment_method??'cash', r.reference??null, r.notes??null, r.paid_at??r.created_at, r.created_by??null, r.created_at, r.updated_at??r.created_at]);
+
+    await ins('returns',
+      ['id','company_id','sale_id','reference','return_date','total_amount','refund_method','refund_amount','type','reason','notes','created_by','created_at','updated_at'],
+      d.returns, r => [r.id, cid, r.sale_id??null, r.reference??`IMPORT-RET-${r.id}`, r.return_date??r.created_at, r.total_amount??0, r.refund_method??'cash', r.refund_amount??r.total_amount??0, r.type??'return', r.reason??null, r.notes??null, r.created_by??null, r.created_at, r.updated_at??r.created_at]);
+
+    await ins('return_items',
+      ['id','company_id','return_id','product_id','variant_id','product_name','sku','quantity','unit_price','total','created_at'],
+      d.return_items, r => [r.id, cid, r.return_id, r.product_id??null, r.variant_id??null, r.product_name??'Product', r.sku??null, r.quantity??0, r.unit_price??0, r.total??0, r.created_at??new Date().toISOString()]);
+
+    await ins('exchange_items',
+      ['id','company_id','return_id','product_id','variant_id','product_name','sku','quantity','unit_price','total'],
+      d.exchange_items, r => [r.id, cid, r.return_id, r.product_id??null, r.variant_id??null, r.product_name??'Product', r.sku??null, r.quantity??0, r.unit_price??0, r.total??0]);
+
+    await ins('expense_categories',
       ['id','company_id','name','is_active','created_at'],
       d.expense_categories, r => [r.id, cid, r.name, r.is_active??true, r.created_at]);
 
-    await bulkInsert(client, 'expenses',
+    await ins('expenses',
       ['id','company_id','branch_id','category_id','title','amount','payment_method','expense_date','notes','created_by','created_at','updated_at'],
       d.expenses, r => [r.id, cid, r.branch_id??null, r.category_id??null, r.title??r.description??r.name??'Expense', r.amount??0, r.payment_method??'cash', r.expense_date??r.date??r.created_at, r.notes??null, r.created_by??r.user_id??null, r.created_at, r.updated_at??r.created_at]);
 
-    await bulkInsert(client, 'stock_adjustments',
+    await ins('stock_adjustments',
       ['id','company_id','branch_id','reference','type','reason','status','notes','created_by','created_at','updated_at'],
       d.stock_adjustments, r => [r.id, cid, r.branch_id??null, r.reference??`IMPORT-ADJ-${r.id}`, r.type??'adjustment', r.reason??null, r.status??'completed', r.notes??null, r.created_by??r.user_id??null, r.created_at, r.updated_at??r.created_at]);
 
-    await bulkInsert(client, 'stock_adjustment_items',
+    await ins('stock_adjustment_items',
       ['id','company_id','adjustment_id','product_id','product_name','sku','quantity_before','quantity_adjusted','quantity_after','unit_cost','created_at'],
       d.stock_adjustment_items, r => [r.id, cid, r.adjustment_id, r.product_id??null, r.product_name??r.name??'Product', r.sku??null, r.quantity_before??r.old_quantity??0, r.quantity_adjusted??r.quantity??0, r.quantity_after??r.new_quantity??0, r.unit_cost??0, r.created_at]);
 
-    // settings — upsert (don't wipe keys not in the backup)
+    // Settings — upsert (don't wipe keys not in the backup)
     for (const r of (d.settings || [])) {
       await client.query(
         `INSERT INTO settings (company_id,key,value,type,group_name,label)
@@ -209,16 +290,22 @@ exports.restoreBackup = async (req, res, next) => {
       'sales', 'sale_items', 'purchases', 'purchase_items',
       'expense_categories', 'expenses',
       'stock_adjustments', 'stock_adjustment_items',
+      'product_variants', 'purchase_payments',
+      'returns', 'return_items', 'exchange_items',
     ];
     for (const t of seqTables) {
-      await client.query(
-        `SELECT setval(pg_get_serial_sequence('${t}', 'id'), COALESCE(MAX(id), 1)) FROM ${t}`
-      );
+      try {
+        await client.query(
+          `SELECT setval(pg_get_serial_sequence('${t}', 'id'), COALESCE(MAX(id), 1)) FROM ${t}`
+        );
+      } catch (_) {
+        // skip if table has no serial sequence
+      }
     }
 
     await client.query('COMMIT');
     logger.info(`[Backup] Restore completed for company ${cid}`);
-    return success(res, null, 'Backup restored successfully.');
+    return success(res, { report }, 'Backup restored successfully.');
   } catch (err) {
     await client.query('ROLLBACK');
     logger.error(`[Backup] Restore failed for company ${cid}: ${err.message}`);

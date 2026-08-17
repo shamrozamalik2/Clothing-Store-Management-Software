@@ -16,6 +16,7 @@ import EmptyState from '@components/common/EmptyState';
 import { usePermission } from '@hooks/usePermission';
 import { stockAdjApi } from '@api/stock-adjustments.api';
 import { productsApi } from '@api/products.api';
+import { formatQty } from '@utils/formatQty';
 
 const TYPE_VARIANTS = {
   adjustment: 'info',
@@ -220,7 +221,7 @@ function CreateAdjustmentModal({ open, onClose, onCreated }) {
                         <p className="text-sm font-medium text-surface-100">{p.name}</p>
                         <p className="text-xs text-surface-500 font-mono">{p.sku}</p>
                       </div>
-                      <p className="text-xs text-surface-400 ml-4">Stock: {p.stock_quantity}</p>
+                      <p className="text-xs text-surface-400 ml-4">Stock: {formatQty(p.stock_quantity)}</p>
                     </button>
                   ))}
                 </div>
@@ -247,7 +248,7 @@ function CreateAdjustmentModal({ open, onClose, onCreated }) {
                     <td className="px-3 py-2">
                       <p className="font-medium text-surface-100">{item.product_name}</p>
                     </td>
-                    <td className="px-3 py-2 text-right text-surface-400">{item.current_stock}</td>
+                    <td className="px-3 py-2 text-right text-surface-400">{formatQty(item.current_stock)}</td>
                     <td className="px-3 py-2">
                       <input type="number" step="0.01"
                         value={item.quantity}
@@ -338,13 +339,13 @@ function AdjustmentDetailModal({ id, onClose }) {
                         <p className="font-medium text-surface-100">{item.product_name}</p>
                         {item.reason && <p className="text-surface-500 text-2xs">{item.reason}</p>}
                       </td>
-                      <td className="px-3 py-2 text-right text-surface-400">{item.old_quantity}</td>
+                      <td className="px-3 py-2 text-right text-surface-400">{formatQty(item.quantity_before)}</td>
                       <td className="px-3 py-2 text-right">
-                        <span className={parseFloat(item.quantity) >= 0 ? 'text-green-400' : 'text-red-400'}>
-                          {parseFloat(item.quantity) >= 0 ? '+' : ''}{item.quantity}
+                        <span className={parseFloat(item.quantity_adjusted) >= 0 ? 'text-green-400' : 'text-red-400'}>
+                          {parseFloat(item.quantity_adjusted) >= 0 ? '+' : ''}{formatQty(item.quantity_adjusted)}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right font-medium text-surface-100">{item.new_quantity}</td>
+                      <td className="px-3 py-2 text-right font-medium text-surface-100">{formatQty(item.quantity_after)}</td>
                     </tr>
                   ))}
                 </tbody>

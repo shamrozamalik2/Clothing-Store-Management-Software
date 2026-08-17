@@ -18,7 +18,12 @@ const PRODUCT_SELECT = `
            WHEN p.stock_quantity <= 0                THEN 'out_of_stock'
            WHEN p.stock_quantity <= p.low_stock_alert THEN 'low_stock'
            ELSE 'in_stock'
-         END AS stock_status
+         END AS stock_status,
+         (
+           EXISTS (SELECT 1 FROM sale_items            si  WHERE si.product_id  = p.id) OR
+           EXISTS (SELECT 1 FROM purchase_items         pi  WHERE pi.product_id  = p.id) OR
+           EXISTS (SELECT 1 FROM stock_adjustment_items sai WHERE sai.product_id = p.id)
+         ) AS has_transactions
   FROM products p
   LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
   LEFT JOIN brands     b ON b.id = p.brand_id     AND b.company_id = p.company_id
@@ -254,8 +259,8 @@ const update = async (req, res, next) => {
       UPDATE products SET
         name=$3, sku=$4, barcode=$5, category_id=$6, brand_id=$7, description=$8, image=$9,
         cost_price=$10, sale_price=$11, wholesale_price=$12, tax_rate=$13,
-        unit=$14, stock_quantity=$15, low_stock_alert=$16,
-        track_inventory=$17, allow_negative=$18, is_active=$19, updated_at=NOW()
+        unit=$14, low_stock_alert=$15,
+        track_inventory=$16, allow_negative=$17, is_active=$18, updated_at=NOW()
       WHERE id=$1 AND company_id=$2
       RETURNING *
     `, [
@@ -272,7 +277,6 @@ const update = async (req, res, next) => {
       num(wholesale_price, existing.wholesale_price),
       num(tax_rate,        existing.tax_rate),
       unit ?? existing.unit,
-      num(stock_quantity,  existing.stock_quantity),
       num(low_stock_alert, existing.low_stock_alert),
       track_inventory !== undefined ? Boolean(track_inventory) : existing.track_inventory,
       allow_negative  !== undefined ? Boolean(allow_negative)  : existing.allow_negative,

@@ -19,6 +19,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ReceiptRefundIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 import { selectSidebarCollapsed, toggleSidebar } from '@store/slices/uiSlice';
 import { selectCurrentUser } from '@store/slices/authSlice';
@@ -67,8 +68,9 @@ const NAV_GROUPS = [
   {
     label: 'System',
     items: [
-      { label: 'Users',        path: '/users',           icon: UsersIcon,                 permission: 'users' },
-      { label: 'Settings',     path: '/settings',        icon: Cog6ToothIcon,             permission: 'settings' },
+      { label: 'Users',        path: '/users',           icon: UsersIcon,        permission: 'users' },
+      { label: 'Settings',     path: '/settings',        icon: Cog6ToothIcon,    permission: 'settings' },
+      { label: 'Roles',        path: '/roles',           icon: ShieldCheckIcon,  permission: 'roles_admin' },
     ],
   },
 ];
@@ -111,8 +113,12 @@ export default function Sidebar() {
 
   function hasAccess(permission) {
     if (currentUser?.role === 'admin') return true;
-    if (permission === 'dashboard' || permission === 'pos') return permissions[permission] === true;
-    return !!permissions[permission];
+    if (permission === 'roles_admin') return false;  // admin-only sentinel
+    const perm = permissions[permission];
+    if (!perm) return false;
+    if (perm === true) return true;
+    if (typeof perm === 'object') return Object.values(perm).some(Boolean);
+    return false;
   }
 
   return (
@@ -191,7 +197,7 @@ export default function Sidebar() {
       <button
         onClick={() => dispatch(toggleSidebar())}
         className={cn(
-          'absolute -right-2 top-[81px] z-20',
+          'absolute right-[1rem] top-[81px] z-20',
           'h-6 w-6 rounded-full',
           'flex items-center justify-center',
           'transition-all duration-200',

@@ -1,4 +1,5 @@
 import Badge from './Badge';
+import { formatQty } from '@utils/formatQty';
 
 const MAP = {
   in_stock:     { label: 'In Stock',     variant: 'success' },
@@ -12,7 +13,7 @@ export default function StockBadge({ status, qty }) {
     <div className="flex flex-col gap-0.5">
       <Badge variant={cfg.variant} dot>{cfg.label}</Badge>
       {qty !== undefined && (
-        <span className="text-xs text-surface-500 pl-1">{qty} units</span>
+        <span className="text-xs text-surface-500 pl-1">{formatQty(qty)} units</span>
       )}
     </div>
   );

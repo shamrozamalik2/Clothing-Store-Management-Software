@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
@@ -15,6 +15,7 @@ import { categoriesApi } from '@api/categories.api';
 import { brandsApi } from '@api/brands.api';
 import { productsApi } from '@api/products.api';
 import { generateSku } from '@utils/sku';
+import { formatQty } from '@utils/formatQty';
 import VariantsSection from './components/VariantsSection';
 
 export default function ProductFormPage() {
@@ -241,8 +242,19 @@ export default function ProductFormPage() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Stock Quantity" type="number" min="0"
-                  {...register('stock_quantity')} />
+                {isEditing ? (
+                  <div>
+                    <label className="block text-xs font-medium text-surface-400 mb-1.5">Stock Quantity</label>
+                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-surface-700/50 border border-surface-600/60 text-surface-300 text-sm">
+                      <LockClosedIcon className="h-3.5 w-3.5 text-surface-500 shrink-0" />
+                      <span className="font-mono">{formatQty(watch('stock_quantity'))}</span>
+                    </div>
+                    <p className="text-2xs text-surface-500 mt-1.5">Use Stock Adjustment to change stock levels.</p>
+                  </div>
+                ) : (
+                  <Input label="Stock Quantity" type="number" min="0"
+                    {...register('stock_quantity')} />
+                )}
                 <Input label="Low Stock Alert at" type="number" min="0"
                   hint="Alert when stock falls at or below this number."
                   {...register('low_stock_alert')} />

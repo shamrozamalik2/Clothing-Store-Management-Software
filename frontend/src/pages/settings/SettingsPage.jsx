@@ -126,6 +126,16 @@ function CompanyTab() {
 
 // ─── Backup & Restore ─────────────────────────────────────────────────────────
 
+const TABLE_LABELS = {
+  categories: 'Categories', brands: 'Brands', suppliers: 'Suppliers',
+  products: 'Products', product_variants: 'Product Variants', customers: 'Customers',
+  sales: 'Sales', sale_items: 'Sale Items', purchases: 'Purchases',
+  purchase_items: 'Purchase Items', purchase_payments: 'Purchase Payments',
+  returns: 'Returns', return_items: 'Return Items', exchange_items: 'Exchange Items',
+  expense_categories: 'Expense Categories', expenses: 'Expenses',
+  stock_adjustments: 'Stock Adjustments', stock_adjustment_items: 'Adjustment Items',
+};
+
 function BackupTab() {
   const [exportState, setExportState] = useState('idle');   // idle | running | done | error
   const [restoreState, setRestoreState] = useState('idle');
@@ -134,6 +144,8 @@ function BackupTab() {
   const [exportError, setExportError] = useState('');
   const [restoreError, setRestoreError] = useState('');
   const [autoInfo, setAutoInfo]       = useState(null);
+  const [preview, setPreview]         = useState(null);   // parsed backup pending confirmation
+  const [restoreReport, setRestoreReport] = useState(null);
   const fileInputRef = useRef(null);
   const progressRef  = useRef(null);
 
@@ -182,17 +194,34 @@ function BackupTab() {
   function handleRestoreClick() {
     fileInputRef.current.value = '';
     fileInputRef.current.click();
+    setRestoreReport(null);
   }
 
   async function handleRestoreFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!window.confirm('This will replace ALL current data with the backup. Are you sure?')) return;
+    try {
+      const text   = await file.text();
+      const backup = JSON.parse(text);
+      if (!backup.data && !backup.products && !backup.categories) {
+        toast.error('Invalid backup file — missing expected data.');
+        return;
+      }
+      setPreview(backup);
+    } catch {
+      toast.error('Could not read backup file. Make sure it is a valid JSON backup.');
+    }
+  }
+
+  async function doRestore() {
+    if (!preview) return;
+    const backup = preview;
+    setPreview(null);
     setRestoreState('running');
     setRestoreProgress(0);
     setRestoreError('');
+    setRestoreReport(null);
 
-    // Animate progress 0→90% while waiting for the server
     let pct = 0;
     progressRef.current = setInterval(() => {
       pct = Math.min(pct + (pct < 50 ? 3 : pct < 80 ? 1 : 0.3), 90);
@@ -200,12 +229,11 @@ function BackupTab() {
     }, 500);
 
     try {
-      const text   = await file.text();
-      const backup = JSON.parse(text);
-      await client.post('/backup/restore', backup, { timeout: 300_000 });
+      const res = await client.post('/backup/restore', backup, { timeout: 300_000 });
       clearInterval(progressRef.current);
       setRestoreProgress(100);
-      setTimeout(() => { setRestoreState('idle'); setRestoreProgress(0); }, 800);
+      setRestoreReport(res.data?.report ?? null);
+      setTimeout(() => { setRestoreState('done'); setRestoreProgress(0); }, 400);
       toast.success('Backup restored successfully. Please refresh the page.');
     } catch (err) {
       clearInterval(progressRef.current);
@@ -215,8 +243,71 @@ function BackupTab() {
     }
   }
 
+  // Derive counts from backup for preview
+  function getPreviewCounts(bk) {
+    const src = bk.counts ?? {};
+    const d   = bk.data ?? bk;
+    return Object.keys(TABLE_LABELS).map(key => ({
+      key,
+      label: TABLE_LABELS[key],
+      count: src[key] ?? d[key]?.length ?? 0,
+    })).filter(r => r.count > 0);
+  }
+
   return (
     <div className="flex flex-col gap-4 max-w-2xl">
+
+      {/* Preview / Confirm modal */}
+      {preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-surface-600 shadow-2xl"
+            style={{ background: '#111827' }}>
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-surface-100">Confirm Restore</h3>
+                  <p className="text-xs text-surface-400 mt-0.5">
+                    All current data will be replaced. This cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              {preview.exported_at && (
+                <div className="flex justify-between text-xs text-surface-400 px-1">
+                  <span>Backup date</span>
+                  <span className="font-mono">{formatDate(preview.exported_at)}</span>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-surface-700 overflow-hidden max-h-56 overflow-y-auto">
+                <div className="bg-surface-800/50 px-3 py-1.5 border-b border-surface-700">
+                  <p className="text-2xs font-semibold uppercase tracking-wider text-surface-500">Records to restore</p>
+                </div>
+                {getPreviewCounts(preview).map(row => (
+                  <div key={row.key} className="flex justify-between px-3 py-1.5 text-xs border-b border-surface-700/40 last:border-0">
+                    <span className="text-surface-400">{row.label}</span>
+                    <span className="font-mono text-surface-200">{row.count.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setPreview(null)}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm text-surface-300 border border-surface-600 hover:bg-surface-700 transition-colors">
+                  Cancel
+                </button>
+                <button onClick={doRestore}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">
+                  Restore Now
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Auto-backup status */}
       <div className="card p-5 space-y-3">
@@ -333,6 +424,25 @@ function BackupTab() {
                 className="h-full rounded-full bg-red-500 transition-all duration-500"
                 style={{ width: `${restoreProgress}%` }}
               />
+            </div>
+          </div>
+        )}
+
+        {restoreState === 'done' && restoreReport && (
+          <div className="rounded-lg border border-green-500/20 bg-green-500/5 overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-green-500/20">
+              <CheckCircleIcon className="h-4 w-4 text-green-400 shrink-0" />
+              <p className="text-xs font-medium text-green-400">Restore complete — per-table results</p>
+            </div>
+            <div className="max-h-40 overflow-y-auto">
+              {Object.entries(restoreReport)
+                .filter(([, v]) => v.provided > 0)
+                .map(([key, v]) => (
+                  <div key={key} className="flex justify-between px-3 py-1.5 text-xs border-b border-surface-700/30 last:border-0">
+                    <span className="text-surface-400">{TABLE_LABELS[key] ?? key}</span>
+                    <span className="text-surface-300 font-mono">{v.inserted}/{v.provided} restored</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}

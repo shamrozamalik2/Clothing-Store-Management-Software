@@ -12,6 +12,7 @@ import { productsApi }   from '@api/products.api';
 import { customersApi }  from '@api/customers.api';
 import { salesApi }      from '@api/sales.api';
 import { formatCurrency } from '@utils/format';
+import { formatQty } from '@utils/formatQty';
 import { cn } from '@utils/cn';
 import CustomerFormModal from '@pages/customers/components/CustomerFormModal';
 
@@ -378,7 +379,7 @@ function ProductCard({ product, onAdd }) {
         <p className="text-xs font-bold text-primary-400">{formatCurrency(product.sale_price)}</p>
         {product.track_inventory && (
           <p className={cn('text-2xs', outOfStock ? 'text-red-400' : 'text-surface-500')}>
-            {outOfStock ? 'Out of stock' : `Stock: ${product.stock_quantity}`}
+            {outOfStock ? 'Out of stock' : `Stock: ${formatQty(product.stock_quantity)}`}
           </p>
         )}
       </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { PlusIcon, PencilSquareIcon, TrashIcon, CubeIcon, FunnelIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, TrashIcon, CubeIcon, FunnelIcon, ArrowUpTrayIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
@@ -178,7 +178,12 @@ export default function ProductsPage() {
                         </div>
                       )}
                       <div className="min-w-0">
-                        <p className="font-medium text-surface-100 truncate max-w-[220px]">{p.name}</p>
+                        <p className="font-medium text-surface-100 truncate max-w-[220px]">
+                          {p.name}
+                          {p.has_transactions && (
+                            <LockClosedIcon className="inline h-3 w-3 ml-1.5 text-surface-500 shrink-0" title="Has transaction history — stock quantity is protected" />
+                          )}
+                        </p>
                         <p className="text-xs text-surface-500 font-mono">{p.sku}</p>
                       </div>
                     </div>
@@ -250,10 +255,14 @@ export default function ProductsPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
         loading={deleteMutation.isPending}
-        title={`Delete "${deleteTarget?.name}"?`}
-        description="This will deactivate the product. Sales history will be preserved."
+        title={`Deactivate "${deleteTarget?.name}"?`}
+        description={
+          deleteTarget?.has_transactions
+            ? 'This product has sales/purchase history. It will be deactivated and hidden from POS, but all historical records will be fully preserved.'
+            : 'This will deactivate the product and hide it from POS. No data will be deleted.'
+        }
         variant="danger"
-        confirmLabel="Delete"
+        confirmLabel="Deactivate"
       />
 
       <ImportCsvModal
