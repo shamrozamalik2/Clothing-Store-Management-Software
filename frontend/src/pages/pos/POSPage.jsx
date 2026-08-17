@@ -16,6 +16,14 @@ import { formatQty } from '@utils/formatQty';
 import { cn } from '@utils/cn';
 import CustomerFormModal from '@pages/customers/components/CustomerFormModal';
 
+function stockLabel(product) {
+  const current = parseFloat(product.stock_quantity) || 0;
+  const sold    = parseFloat(product.total_sold)     || 0;
+  return sold > 0
+    ? `Stock: ${formatQty(current)}/${formatQty(current + sold)}`
+    : `Stock: ${formatQty(current)}`;
+}
+
 // ─── Cart reducer ─────────────────────────────────────────────────────────────
 
 function cartReducer(state, action) {
@@ -379,14 +387,7 @@ function ProductCard({ product, onAdd }) {
         <p className="text-xs font-bold text-primary-400">{formatCurrency(product.sale_price)}</p>
         {product.track_inventory && (
           <p className={cn('text-2xs', outOfStock ? 'text-red-400' : 'text-surface-500')}>
-            {outOfStock ? 'Out of stock' : (() => {
-              const current = parseFloat(product.stock_quantity) || 0;
-              const sold    = parseFloat(product.total_sold)    || 0;
-              const total   = current + sold;
-              return sold > 0
-                ? `Stock: ${formatQty(current)}/${formatQty(total)}`
-                : `Stock: ${formatQty(current)}`;
-            })()}
+            {outOfStock ? 'Out of stock' : stockLabel(product)}
           </p>
         )}
       </div>

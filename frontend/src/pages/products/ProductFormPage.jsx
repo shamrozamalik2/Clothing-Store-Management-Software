@@ -265,7 +265,13 @@ export default function ProductFormPage() {
                     <label className="block text-xs font-medium text-surface-400 mb-1.5">Stock Quantity</label>
                     <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-surface-700/50 border border-surface-600/60 text-surface-300 text-sm">
                       <LockClosedIcon className="h-3.5 w-3.5 text-surface-500 shrink-0" />
-                      <span className="font-mono">{formatQty(watch('stock_quantity'))}</span>
+                      <span className="font-mono">{(() => {
+                        const cur  = parseFloat(watch('stock_quantity')) || 0;
+                        const sold = parseFloat(productData?.data?.total_sold) || 0;
+                        return sold > 0
+                          ? `${formatQty(cur)}/${formatQty(cur + sold)}`
+                          : formatQty(cur);
+                      })()}</span>
                     </div>
                     <p className="text-2xs text-surface-500 mt-1.5">Use Stock Adjustment to change stock levels.</p>
                   </div>
