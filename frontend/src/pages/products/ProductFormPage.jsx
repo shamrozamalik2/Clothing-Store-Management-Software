@@ -345,7 +345,7 @@ function LockedField({ label, value }) {
       <label className="block text-xs font-medium text-surface-400 mb-1.5">{label}</label>
       <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-surface-700/50 border border-surface-600/60 text-surface-300 text-sm">
         <LockClosedIcon className="h-3.5 w-3.5 text-surface-500 shrink-0" />
-        <span className="font-mono">{value || '—'}</span>
+        <span className="font-mono">{value ? formatQty(value) : '—'}</span>
       </div>
     </div>
   );
