@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PlusIcon, PencilSquareIcon, TrashIcon, FolderIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, TrashIcon, FolderIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
@@ -9,6 +9,7 @@ import SearchInput from '@components/common/SearchInput';
 import Pagination from '@components/common/Pagination';
 import ConfirmDialog from '@components/common/ConfirmDialog';
 import EmptyState from '@components/common/EmptyState';
+import ImportCsvModal from '@components/common/ImportCsvModal';
 import { usePermission } from '@hooks/usePermission';
 import { categoriesApi } from '@api/categories.api';
 import CategoryFormModal from './components/CategoryFormModal';
@@ -24,6 +25,8 @@ export default function CategoriesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importOpen, setImportOpen]     = useState(false);
+  const [importing, setImporting]       = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['categories', { search, page }],
@@ -48,6 +51,21 @@ export default function CategoriesPage() {
     },
   });
 
+  async function handleImportCsv(file) {
+    setImporting(true);
+    try {
+      const res = await categoriesApi.importCsv(file);
+      qc.invalidateQueries({ queryKey: ['categories'] });
+      qc.invalidateQueries({ queryKey: ['categories-flat'] });
+      return res.data;
+    } catch (err) {
+      toast.error(err.message || 'Import failed');
+      return null;
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function openCreate() { setEditing(null); setModalOpen(true); }
   function openEdit(cat) { setEditing(cat); setModalOpen(true); }
 
@@ -59,11 +77,18 @@ export default function CategoriesPage() {
           <h1 className="text-xl font-semibold text-surface-100">Categories</h1>
           <p className="text-sm text-surface-400 mt-0.5">Organise products into hierarchical categories.</p>
         </div>
-        {can('categories', 'create') && (
-          <Button icon={<PlusIcon className="h-4 w-4" />} onClick={openCreate}>
-            New Category
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {can('categories', 'create') && (
+            <Button variant="ghost" icon={<ArrowUpTrayIcon className="h-4 w-4" />} onClick={() => setImportOpen(true)}>
+              Import CSV
+            </Button>
+          )}
+          {can('categories', 'create') && (
+            <Button icon={<PlusIcon className="h-4 w-4" />} onClick={openCreate}>
+              New Category
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -177,6 +202,16 @@ export default function CategoriesPage() {
         description="This will permanently remove the category. Products in this category will be unassigned."
         variant="danger"
         confirmLabel="Delete"
+      />
+
+      <ImportCsvModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImportCsv}
+        entityName="Categories"
+        columns={['name', 'slug', 'description', 'is_active']}
+        templateFilename="categories_template.csv"
+        loading={importing}
       />
     </div>
   );

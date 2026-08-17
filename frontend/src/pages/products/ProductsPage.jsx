@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { PlusIcon, PencilSquareIcon, TrashIcon, CubeIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, TrashIcon, CubeIcon, FunnelIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
@@ -17,6 +17,7 @@ import { categoriesApi } from '@api/categories.api';
 import { brandsApi } from '@api/brands.api';
 import { productsApi } from '@api/products.api';
 import { formatCurrency } from '@utils/format';
+import ImportCsvModal from '@components/common/ImportCsvModal';
 
 const LIMIT = 25;
 
@@ -31,6 +32,8 @@ export default function ProductsPage() {
   const [brandFilter, setBrand] = useState('');
   const [stockFilter, setStock] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importOpen, setImportOpen]     = useState(false);
+  const [importing, setImporting]       = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', { search, page, category_id: catFilter, brand_id: brandFilter, stock_status: stockFilter }],
@@ -59,6 +62,20 @@ export default function ProductsPage() {
     },
   });
 
+  async function handleImportCsv(file) {
+    setImporting(true);
+    try {
+      const res = await productsApi.importCsv(file);
+      qc.invalidateQueries({ queryKey: ['products'] });
+      return res.data;
+    } catch (err) {
+      toast.error(err.message || 'Import failed');
+      return null;
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function resetFilters() {
     setCat(''); setBrand(''); setStock(''); setSearch(''); setPage(1);
   }
@@ -73,11 +90,18 @@ export default function ProductsPage() {
           <h1 className="text-xl font-semibold text-surface-100">Products</h1>
           <p className="text-sm text-surface-400 mt-0.5">Manage your product catalogue, pricing, and stock levels.</p>
         </div>
-        {can('products', 'create') && (
-          <Button icon={<PlusIcon className="h-4 w-4" />} onClick={() => navigate('/products/new')}>
-            New Product
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {can('products', 'create') && (
+            <Button variant="ghost" icon={<ArrowUpTrayIcon className="h-4 w-4" />} onClick={() => setImportOpen(true)}>
+              Import CSV
+            </Button>
+          )}
+          {can('products', 'create') && (
+            <Button icon={<PlusIcon className="h-4 w-4" />} onClick={() => navigate('/products/new')}>
+              New Product
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -230,6 +254,16 @@ export default function ProductsPage() {
         description="This will deactivate the product. Sales history will be preserved."
         variant="danger"
         confirmLabel="Delete"
+      />
+
+      <ImportCsvModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImportCsv}
+        entityName="Products"
+        columns={['name', 'sku', 'barcode', 'description', 'unit', 'cost_price', 'sale_price', 'wholesale_price', 'tax_rate', 'stock_quantity', 'low_stock_alert', 'track_inventory', 'is_active']}
+        templateFilename="products_template.csv"
+        loading={importing}
       />
     </div>
   );

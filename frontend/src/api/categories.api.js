@@ -6,5 +6,6 @@ export const categoriesApi = {
   getOne:  (id)     => client.get(`/categories/${id}`),
   create:  (data)   => client.post('/categories', data),
   update:  (id, data) => client.put(`/categories/${id}`, data),
-  remove:  (id)     => client.delete(`/categories/${id}`),
+  remove:    (id)     => client.delete(`/categories/${id}`),
+  importCsv: (file)  => { const fd = new FormData(); fd.append('file', file); return client.post('/categories/import', fd); },
 };

@@ -157,4 +157,77 @@ async function remove(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { list, listCategories, create, update, remove };
+// ── importCsv (expenses) ──────────────────────────────────────────────────────
+
+async function importExpensesCsv(req, res, next) {
+  try {
+    if (!req.file) return error(res, 'CSV file is required.', 400);
+    const cid = req.companyId;
+    const { parseCsvBuffer, toDecimal } = require('../utils/csv-parser');
+    const { rows } = parseCsvBuffer(req.file.buffer);
+    let imported = 0;
+    const errors = [];
+
+    for (const row of rows) {
+      const line = row._line;
+      try {
+        if (!row.title)  { errors.push({ row: line, message: 'Title is required' }); continue; }
+        if (!row.amount) { errors.push({ row: line, message: 'Amount is required' }); continue; }
+
+        let catId = null;
+        if (row.category_name) {
+          const { rows: cr } = await query(
+            'SELECT id FROM expense_categories WHERE company_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1',
+            [cid, row.category_name]
+          );
+          catId = cr[0]?.id || null;
+        }
+
+        const method = ['cash','card','bank_transfer','cheque','other'].includes(row.payment_method)
+          ? row.payment_method : 'cash';
+        const expDate = row.expense_date || new Date().toISOString().slice(0,10);
+
+        await query(
+          `INSERT INTO expenses (company_id, category_id, title, amount, payment_method, expense_date, notes, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [cid, catId, row.title.trim(), toDecimal(row.amount,0), method, expDate, row.notes||null, req.user.id]
+        );
+        imported++;
+      } catch (e) { errors.push({ row: line, message: e.message }); }
+    }
+
+    await logAudit(cid, req.user.id, 'IMPORT', 'expenses', null, { imported, failed: errors.length });
+    return success(res, { imported, failed: errors.length, errors }, `${imported} expenses imported.`);
+  } catch (err) { next(err); }
+}
+
+// ── importCsv (expense categories) ───────────────────────────────────────────
+
+async function importExpenseCategoriesCsv(req, res, next) {
+  try {
+    if (!req.file) return error(res, 'CSV file is required.', 400);
+    const cid = req.companyId;
+    const { parseCsvBuffer, toBoolean } = require('../utils/csv-parser');
+    const { rows } = parseCsvBuffer(req.file.buffer);
+    let imported = 0;
+    const errors = [];
+
+    for (const row of rows) {
+      const line = row._line;
+      try {
+        if (!row.name) { errors.push({ row: line, message: 'Name is required' }); continue; }
+        await query(
+          `INSERT INTO expense_categories (company_id, name, is_active)
+           VALUES ($1,$2,$3) ON CONFLICT (company_id, name) DO NOTHING`,
+          [cid, row.name.trim(), toBoolean(row.is_active, true)]
+        );
+        imported++;
+      } catch (e) { errors.push({ row: line, message: e.message }); }
+    }
+
+    await logAudit(cid, req.user.id, 'IMPORT', 'expense_categories', null, { imported, failed: errors.length });
+    return success(res, { imported, failed: errors.length, errors }, `${imported} expense categories imported.`);
+  } catch (err) { next(err); }
+}
+
+module.exports = { list, listCategories, create, update, remove, importExpensesCsv, importExpenseCategoriesCsv };

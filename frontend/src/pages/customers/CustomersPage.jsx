@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PlusIcon, PencilSquareIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, TrashIcon, UserGroupIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
@@ -9,6 +9,7 @@ import SearchInput from '@components/common/SearchInput';
 import Pagination from '@components/common/Pagination';
 import ConfirmDialog from '@components/common/ConfirmDialog';
 import EmptyState from '@components/common/EmptyState';
+import ImportCsvModal from '@components/common/ImportCsvModal';
 import { usePermission } from '@hooks/usePermission';
 import { customersApi } from '@api/customers.api';
 import { formatCurrency } from '@utils/format';
@@ -25,6 +26,8 @@ export default function CustomersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importOpen, setImportOpen]     = useState(false);
+  const [importing, setImporting]       = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['customers', { search, page }],
@@ -45,6 +48,20 @@ export default function CustomersPage() {
     onError: (err) => { toast.error(err.message); setDeleteTarget(null); },
   });
 
+  async function handleImportCsv(file) {
+    setImporting(true);
+    try {
+      const res = await customersApi.importCsv(file);
+      qc.invalidateQueries({ queryKey: ['customers'] });
+      return res.data;
+    } catch (err) {
+      toast.error(err.message || 'Import failed');
+      return null;
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function openCreate() { setEditing(null); setModalOpen(true); }
   function openEdit(c)  { setEditing(c);    setModalOpen(true); }
 
@@ -55,9 +72,16 @@ export default function CustomersPage() {
           <h1 className="text-xl font-semibold text-surface-100">Customers</h1>
           <p className="text-sm text-surface-400 mt-0.5">Manage customer accounts, balances, and loyalty points.</p>
         </div>
-        {can('customers', 'create') && (
-          <Button icon={<PlusIcon className="h-4 w-4" />} onClick={openCreate}>New Customer</Button>
-        )}
+        <div className="flex items-center gap-2">
+          {can('customers', 'create') && (
+            <Button variant="ghost" icon={<ArrowUpTrayIcon className="h-4 w-4" />} onClick={() => setImportOpen(true)}>
+              Import CSV
+            </Button>
+          )}
+          {can('customers', 'create') && (
+            <Button icon={<PlusIcon className="h-4 w-4" />} onClick={openCreate}>New Customer</Button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
@@ -149,6 +173,16 @@ export default function CustomersPage() {
         title={`Deactivate "${deleteTarget?.name}"?`}
         description="The customer will be deactivated. Their sales history is preserved."
         variant="danger" confirmLabel="Deactivate" />
+
+      <ImportCsvModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImportCsv}
+        entityName="Customers"
+        columns={['name', 'email', 'phone', 'address', 'city', 'customer_group', 'credit_limit', 'is_active', 'notes']}
+        templateFilename="customers_template.csv"
+        loading={importing}
+      />
     </div>
   );
 }

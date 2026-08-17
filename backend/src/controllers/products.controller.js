@@ -428,4 +428,60 @@ module.exports = {
   create, update, remove,
   lowStock,
   listVariants, upsertVariant, deleteVariant,
+  importCsv,
 };
+
+// ── importCsv ─────────────────────────────────────────────────────────────────
+
+async function importCsv(req, res, next) {
+  try {
+    if (!req.file) return error(res, 'CSV file is required.', 400);
+    const cid = req.companyId;
+    const { parseCsvBuffer, toBoolean, toDecimal, toInt } = require('../utils/csv-parser');
+    const { rows } = parseCsvBuffer(req.file.buffer);
+    let imported = 0;
+    const errors = [];
+
+    for (const row of rows) {
+      const line = row._line;
+      try {
+        if (!row.name) { errors.push({ row: line, message: 'Name is required' }); continue; }
+        if (!row.sku)  { errors.push({ row: line, message: 'SKU is required' }); continue; }
+
+        // Resolve optional category/brand by name
+        let catId = null, brandId = null;
+        if (row.category_name) {
+          const { rows: cr } = await query('SELECT id FROM categories WHERE company_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1', [cid, row.category_name]);
+          catId = cr[0]?.id || null;
+        }
+        if (row.brand_name) {
+          const { rows: br } = await query('SELECT id FROM brands WHERE company_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1', [cid, row.brand_name]);
+          brandId = br[0]?.id || null;
+        }
+
+        await query(
+          `INSERT INTO products
+             (company_id, category_id, brand_id, name, sku, barcode, description, unit,
+              cost_price, sale_price, wholesale_price, tax_rate,
+              stock_quantity, low_stock_alert, track_inventory, allow_negative, is_active)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+           ON CONFLICT (company_id, sku) DO NOTHING`,
+          [
+            cid, catId, brandId,
+            row.name.trim(), row.sku.trim(), row.barcode||null, row.description||null,
+            row.unit||'pcs',
+            toDecimal(row.cost_price,0), toDecimal(row.sale_price,0),
+            toDecimal(row.wholesale_price,0), toDecimal(row.tax_rate,0),
+            toDecimal(row.stock_quantity,0), toInt(row.low_stock_alert,5),
+            toBoolean(row.track_inventory,true), toBoolean(row.allow_negative,false),
+            toBoolean(row.is_active,true),
+          ]
+        );
+        imported++;
+      } catch (e) { errors.push({ row: line, message: e.message }); }
+    }
+
+    await logAudit(cid, req.user.id, 'IMPORT', 'products', null, { imported, failed: errors.length });
+    return success(res, { imported, failed: errors.length, errors }, `${imported} products imported.`);
+  } catch (err) { next(err); }
+}

@@ -1,0 +1,11 @@
+name,slug,description,is_active
+Men's Clothing,mens-clothing,All clothing items for men,true
+Women's Clothing,womens-clothing,All clothing items for women,true
+Kids Clothing,kids-clothing,Clothing for boys and girls,true
+Formal Wear,formal-wear,Office and formal occasion clothing,true
+Casual Wear,casual-wear,Everyday casual clothing,true
+Winter Collection,winter-collection,Jackets coats and winter clothing,true
+Summer Collection,summer-collection,Light and breathable summer clothing,true
+Sportswear,sportswear,Athletic and gym clothing,true
+Undergarments,undergarments,Inner wear and undergarments,true
+Accessories,accessories,Belts scarves caps and other accessories,true

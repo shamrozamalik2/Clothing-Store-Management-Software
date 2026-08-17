@@ -6,5 +6,6 @@ export const brandsApi = {
   getOne:  (id)     => client.get(`/brands/${id}`),
   create:  (data)   => client.post('/brands', data),
   update:  (id, data) => client.put(`/brands/${id}`, data),
-  remove:  (id)     => client.delete(`/brands/${id}`),
+  remove:    (id)     => client.delete(`/brands/${id}`),
+  importCsv: (file)  => { const fd = new FormData(); fd.append('file', file); return client.post('/brands/import', fd); },
 };

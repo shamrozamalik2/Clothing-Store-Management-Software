@@ -1,0 +1,41 @@
+name,sku,barcode,description,unit,cost_price,sale_price,wholesale_price,tax_rate,stock_quantity,low_stock_alert,track_inventory,is_active
+Men's Plain Kameez (White),MNS-KAM-001,8901234560001,Plain white kameez for men available in all sizes,pcs,450,850,700,0,120,10,true,true
+Men's Plain Kameez (Blue),MNS-KAM-002,8901234560002,Plain blue kameez for men available in all sizes,pcs,450,850,700,0,95,10,true,true
+Men's Shalwar Kameez Set,MNS-SKS-001,8901234560010,Full shalwar kameez set cotton fabric,set,700,1400,1150,0,80,10,true,true
+Men's Formal Shirt (White),MNS-FSH-001,8901234560020,Formal white shirt for office wear,pcs,600,1200,950,0,60,5,true,true
+Men's Formal Shirt (Blue Check),MNS-FSH-002,8901234560021,Blue check formal shirt slim fit,pcs,650,1300,1050,0,45,5,true,true
+Men's Casual T-Shirt,MNS-TSH-001,8901234560030,100% cotton casual round neck t-shirt,pcs,300,650,500,0,150,15,true,true
+Men's Polo T-Shirt,MNS-POL-001,8901234560031,Premium polo t-shirt with collar,pcs,400,850,680,0,100,10,true,true
+Men's Denim Jeans (Blue),MNS-JNS-001,8901234560040,Slim fit blue denim jeans,pcs,900,2200,1800,0,70,8,true,true
+Men's Denim Jeans (Black),MNS-JNS-002,8901234560041,Slim fit black denim jeans,pcs,900,2200,1800,0,55,8,true,true
+Men's Trouser (Khaki),MNS-TRS-001,8901234560050,Formal khaki trouser cotton blend,pcs,750,1600,1300,0,40,5,true,true
+Men's Trouser (Grey),MNS-TRS-002,8901234560051,Formal grey trouser slim fit,pcs,750,1600,1300,0,35,5,true,true
+Men's Waistcoat,MNS-WST-001,8901234560060,Formal waistcoat for traditional wear,pcs,1200,2800,2200,0,30,5,true,true
+Men's Jacket (Black),MNS-JKT-001,8901234560070,Casual black jacket for winter,pcs,1800,4500,3600,0,25,5,true,true
+Men's Sherwani,MNS-SHR-001,8901234560080,Premium embroidered sherwani for weddings,pcs,3500,9000,7500,0,15,3,true,true
+Women's Lawn Suit (Printed),WMN-LWN-001,8901234561001,3-piece printed lawn suit summer,set,900,1800,1450,0,100,10,true,true
+Women's Lawn Suit (Embroidered),WMN-LWN-002,8901234561002,3-piece embroidered lawn suit,set,1400,3200,2600,0,60,8,true,true
+Women's Kameez (Cotton),WMN-KAM-001,8901234561010,Simple cotton kameez for women,pcs,500,1100,900,0,80,10,true,true
+Women's Shalwar Kameez (Silk),WMN-SKS-001,8901234561020,Silk shalwar kameez party wear,set,2200,5500,4400,0,35,5,true,true
+Women's Dupatta (Cotton),WMN-DUP-001,8901234561030,Printed cotton dupatta,pcs,250,550,440,0,120,15,true,true
+Women's Dupatta (Chiffon),WMN-DUP-002,8901234561031,Chiffon dupatta with lace border,pcs,400,950,760,0,90,10,true,true
+Women's Abaya (Black),WMN-ABY-001,8901234561040,Plain black abaya full length,pcs,1200,2800,2200,0,40,5,true,true
+Women's Palazzo Pants,WMN-PLC-001,8901234561050,Wide leg palazzo pants casual,pcs,600,1400,1120,0,65,8,true,true
+Women's Kurti (Printed),WMN-KRT-001,8901234561060,Short printed kurti casual wear,pcs,550,1200,960,0,85,10,true,true
+Women's Formal Dress,WMN-FRM-001,8901234561070,Formal evening dress party wear,pcs,2500,6500,5200,0,20,3,true,true
+Kids Boy T-Shirt,KDS-BTS-001,8901234562001,Cotton t-shirt for boys ages 5-12,pcs,200,450,360,0,100,15,true,true
+Kids Girl Frock,KDS-GFR-001,8901234562010,Printed cotton frock for girls,pcs,350,850,680,0,80,10,true,true
+Kids Shalwar Kameez Set,KDS-SKS-001,8901234562020,Shalwar kameez set for kids,set,400,950,760,0,70,10,true,true
+Kids Jeans,KDS-JNS-001,8901234562030,Denim jeans for kids boys,pcs,500,1100,880,0,60,8,true,true
+Kids Winter Jacket,KDS-WJK-001,8901234562040,Warm winter jacket for kids,pcs,800,2000,1600,0,40,5,true,true
+Kids School Uniform Shirt,KDS-UNI-001,8901234562050,White school uniform shirt,pcs,300,650,520,0,150,20,true,true
+Men's Trunks/Shorts,MNS-SHT-001,8901234563001,Cotton boxer shorts inner wear,pcs,180,400,320,0,200,20,true,true
+Men's Vest (Banyan),MNS-VST-001,8901234563010,100% cotton sleeveless vest,pcs,150,320,256,0,180,20,true,true
+Women's Innerwear Set,WMN-INR-001,8901234563020,Cotton innerwear comfort set,set,350,800,640,0,100,15,true,true
+Belt (Men's Leather),ACC-BLT-001,8901234564001,Genuine leather belt for men,pcs,400,1000,800,0,50,8,true,true
+Cap (Baseball),ACC-CAP-001,8901234564010,Cotton baseball cap adjustable,pcs,250,600,480,0,80,10,true,true
+Scarf (Winter Wool),ACC-SCF-001,8901234564020,Warm wool scarf for winter,pcs,350,850,680,0,60,8,true,true
+Socks (Pack of 3),ACC-SOK-001,8901234564030,Cotton socks pack of 3 pairs,pack,120,280,224,0,120,15,true,true
+Men's Waistcoat (Panjabi),MNS-PWS-001,8901234565001,Traditional panjabi style waistcoat,pcs,800,1900,1520,0,45,5,true,true
+Women's Gown (Maxi),WMN-GWN-001,8901234565010,Long maxi gown casual wear,pcs,1000,2400,1920,0,30,5,true,true
+Men's Sports Tracksuit,MNS-TRK-001,8901234565020,Polyester tracksuit top and bottom,set,900,2200,1760,0,35,5,true,true

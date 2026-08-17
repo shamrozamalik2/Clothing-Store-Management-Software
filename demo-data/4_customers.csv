@@ -1,0 +1,17 @@
+name,email,phone,address,city,customer_group,credit_limit,is_active,notes
+Ahmed Khan,ahmed.khan@gmail.com,0300-1111111,House 5 Block A DHA Phase 1,Lahore,general,0,true,Regular walk-in customer
+Fatima Malik,fatima.malik@gmail.com,0321-2222222,Flat 3 Garden Town,Lahore,retail,5000,true,Prefers women's clothing
+Muhammad Ali,m.ali@yahoo.com,0333-3333333,Shop 12 Anarkali,Lahore,wholesale,50000,true,Wholesale buyer
+Ayesha Siddiqui,ayesha.s@gmail.com,0311-4444444,House 22 Johar Town,Lahore,retail,10000,true,
+Bilal Hassan,bilal.h@gmail.com,0345-5555555,Flat 7B Gulberg III,Lahore,general,0,true,
+Sana Tariq,sana.tariq@outlook.com,0322-6666666,House 8 Model Town,Lahore,retail,8000,true,Loyal customer
+Usman Raza,usman.raza@gmail.com,0312-7777777,Plot 45 Bahria Town,Lahore,wholesale,100000,true,Major wholesale account
+Hira Asif,hira.asif@gmail.com,0344-8888888,House 3 Gulshan Ravi,Lahore,general,0,true,
+Zubair Ahmad,zubair.a@gmail.com,0301-9999999,Flat 12 Shadman,Lahore,retail,3000,true,
+Mariam Shah,mariam.shah@gmail.com,0300-1010101,House 67 Iqbal Town,Lahore,general,0,true,
+Tariq Mahmood,tariq.m@gmail.com,0321-2020202,Shop 5 Hafeez Centre,Lahore,wholesale,75000,true,Retailer buyer
+Nadia Iqbal,nadia.iqbal@hotmail.com,0333-3030303,House 9 Township,Lahore,retail,5000,true,
+Imran Butt,imran.butt@gmail.com,0311-4040404,Flat 2 Cavalry Ground,Lahore,general,0,true,
+Sara Hussain,sara.h@gmail.com,0345-5050505,House 14 Cantt,Lahore,general,0,true,
+Kamran Sheikh,kamran.s@gmail.com,0322-6060606,House 33 Wapda Town,Lahore,retail,6000,true,
+Walk-in Customer,,,,Lahore,general,0,true,Default walk-in customer for POS

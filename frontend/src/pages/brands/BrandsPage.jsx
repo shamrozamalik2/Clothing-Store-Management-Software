@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PlusIcon, PencilSquareIcon, TrashIcon, TagIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, TrashIcon, TagIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
@@ -9,6 +9,7 @@ import SearchInput from '@components/common/SearchInput';
 import Pagination from '@components/common/Pagination';
 import ConfirmDialog from '@components/common/ConfirmDialog';
 import EmptyState from '@components/common/EmptyState';
+import ImportCsvModal from '@components/common/ImportCsvModal';
 import { usePermission } from '@hooks/usePermission';
 import { brandsApi } from '@api/brands.api';
 import BrandFormModal from './components/BrandFormModal';
@@ -24,6 +25,8 @@ export default function BrandsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importOpen, setImportOpen]     = useState(false);
+  const [importing, setImporting]       = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['brands', { search, page }],
@@ -47,6 +50,20 @@ export default function BrandsPage() {
     },
   });
 
+  async function handleImportCsv(file) {
+    setImporting(true);
+    try {
+      const res = await brandsApi.importCsv(file);
+      qc.invalidateQueries({ queryKey: ['brands'] });
+      return res.data;
+    } catch (err) {
+      toast.error(err.message || 'Import failed');
+      return null;
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function openCreate() { setEditing(null); setModalOpen(true); }
   function openEdit(brand) { setEditing(brand); setModalOpen(true); }
 
@@ -58,11 +75,18 @@ export default function BrandsPage() {
           <h1 className="text-xl font-semibold text-surface-100">Brands</h1>
           <p className="text-sm text-surface-400 mt-0.5">Manage clothing brands associated with your products.</p>
         </div>
-        {can('brands', 'create') && (
-          <Button icon={<PlusIcon className="h-4 w-4" />} onClick={openCreate}>
-            New Brand
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {can('brands', 'create') && (
+            <Button variant="ghost" icon={<ArrowUpTrayIcon className="h-4 w-4" />} onClick={() => setImportOpen(true)}>
+              Import CSV
+            </Button>
+          )}
+          {can('brands', 'create') && (
+            <Button icon={<PlusIcon className="h-4 w-4" />} onClick={openCreate}>
+              New Brand
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -182,6 +206,16 @@ export default function BrandsPage() {
         description="This will permanently remove the brand. Products using this brand will be unassigned."
         variant="danger"
         confirmLabel="Delete"
+      />
+
+      <ImportCsvModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImportCsv}
+        entityName="Brands"
+        columns={['name', 'slug', 'description', 'is_active']}
+        templateFilename="brands_template.csv"
+        loading={importing}
       />
     </div>
   );

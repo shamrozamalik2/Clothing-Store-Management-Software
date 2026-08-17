@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PlusIcon, PencilSquareIcon, TrashIcon, TruckIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, TrashIcon, TruckIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
@@ -9,6 +9,7 @@ import SearchInput from '@components/common/SearchInput';
 import Pagination from '@components/common/Pagination';
 import ConfirmDialog from '@components/common/ConfirmDialog';
 import EmptyState from '@components/common/EmptyState';
+import ImportCsvModal from '@components/common/ImportCsvModal';
 import { usePermission } from '@hooks/usePermission';
 import { suppliersApi } from '@api/suppliers.api';
 import { formatCurrency } from '@utils/format';
@@ -23,6 +24,8 @@ export default function SuppliersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importOpen, setImportOpen]     = useState(false);
+  const [importing, setImporting]       = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['suppliers', { search, page }],
@@ -46,6 +49,20 @@ export default function SuppliersPage() {
     },
   });
 
+  async function handleImportCsv(file) {
+    setImporting(true);
+    try {
+      const res = await suppliersApi.importCsv(file);
+      qc.invalidateQueries({ queryKey: ['suppliers'] });
+      return res.data;
+    } catch (err) {
+      toast.error(err.message || 'Import failed');
+      return null;
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function openCreate() { setEditing(null); setModalOpen(true); }
   function openEdit(s)  { setEditing(s);    setModalOpen(true); }
 
@@ -56,11 +73,18 @@ export default function SuppliersPage() {
           <h1 className="text-xl font-semibold text-surface-100">Suppliers</h1>
           <p className="text-sm text-surface-400 mt-0.5">Manage your inventory suppliers and their balances.</p>
         </div>
-        {can('suppliers', 'create') && (
-          <Button icon={<PlusIcon className="h-4 w-4" />} onClick={openCreate}>
-            New Supplier
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {can('suppliers', 'create') && (
+            <Button variant="ghost" icon={<ArrowUpTrayIcon className="h-4 w-4" />} onClick={() => setImportOpen(true)}>
+              Import CSV
+            </Button>
+          )}
+          {can('suppliers', 'create') && (
+            <Button icon={<PlusIcon className="h-4 w-4" />} onClick={openCreate}>
+              New Supplier
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
@@ -167,6 +191,16 @@ export default function SuppliersPage() {
         description="The supplier will be deactivated. Existing purchases will be preserved."
         variant="danger"
         confirmLabel="Deactivate"
+      />
+
+      <ImportCsvModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImportCsv}
+        entityName="Suppliers"
+        columns={['name', 'email', 'phone', 'address', 'city', 'opening_balance', 'is_active', 'notes']}
+        templateFilename="suppliers_template.csv"
+        loading={importing}
       />
     </div>
   );

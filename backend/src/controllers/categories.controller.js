@@ -207,4 +207,35 @@ const remove = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { list, getOne, create, update, remove };
+// ── importCsv ─────────────────────────────────────────────────────────────────
+
+const importCsv = async (req, res, next) => {
+  try {
+    if (!req.file) return error(res, 'CSV file is required.', 400);
+    const cid = req.companyId;
+    const { parseCsvBuffer, toBoolean } = require('../utils/csv-parser');
+    const { rows } = parseCsvBuffer(req.file.buffer);
+    let imported = 0;
+    const errors = [];
+
+    for (const row of rows) {
+      const line = row._line;
+      try {
+        if (!row.name) { errors.push({ row: line, message: 'Name is required' }); continue; }
+        const name = row.name.trim();
+        const slug = await uniqueSlug('categories', cid, toSlug(name));
+        await query(
+          `INSERT INTO categories (company_id, name, slug, description, is_active)
+           VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+          [cid, name, slug, row.description || null, toBoolean(row.is_active, true)]
+        );
+        imported++;
+      } catch (e) { errors.push({ row: line, message: e.message }); }
+    }
+
+    await logAudit(cid, req.user.id, 'IMPORT', 'categories', null, { imported, failed: errors.length });
+    return success(res, { imported, failed: errors.length, errors }, `${imported} categories imported.`);
+  } catch (err) { next(err); }
+};
+
+module.exports = { list, getOne, create, update, remove, importCsv };

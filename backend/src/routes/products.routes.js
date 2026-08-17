@@ -4,7 +4,8 @@ const { Router } = require('express');
 const { body }   = require('express-validator');
 const { authenticate, requirePermission } = require('../middleware/auth.middleware');
 const { makeUploader } = require('../utils/upload');
-const ctrl = require('../controllers/products.controller');
+const ctrl      = require('../controllers/products.controller');
+const csvUpload = require('../utils/csv-uploader');
 
 const router = Router();
 const upload = makeUploader('products');
@@ -39,5 +40,6 @@ router.get('/:id/variants',        requirePermission('products', 'view'),   ctrl
 router.post('/:id/variants',       requirePermission('products', 'update'),  ctrl.upsertVariant);
 router.put('/:id/variants/:variantId',    requirePermission('products', 'update'), ctrl.upsertVariant);
 router.delete('/:id/variants/:variantId', requirePermission('products', 'delete'), ctrl.deleteVariant);
+router.post('/import', requirePermission('products', 'create'), csvUpload.single('file'), ctrl.importCsv);
 
 module.exports = router;

@@ -3,9 +3,10 @@ import { useDispatch } from 'react-redux';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { setPageTitle } from '@store/slices/uiSlice';
 import Card from '@components/ui/Card';
-import { PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon, PencilIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import { expensesApi } from '@api/expenses.api';
 import { formatCurrency } from '@utils/format';
+import ImportCsvModal from '@components/common/ImportCsvModal';
 
 const PAYMENT_METHODS = ['cash', 'card', 'bank_transfer', 'other'];
 const EMPTY = { category_id: '', amount: '', payment_method: 'cash', expense_date: '', description: '', notes: '' };
@@ -133,6 +134,9 @@ export default function ExpensesPage() {
   const [to,     setTo]     = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [page,   setPage]   = useState(1);
+  const [importExpOpen, setImportExpOpen]   = useState(false);
+  const [importCatOpen, setImportCatOpen]   = useState(false);
+  const [importing, setImporting]           = useState(false);
 
   useEffect(() => { dispatch(setPageTitle('Expenses')); }, []);
 
@@ -155,6 +159,24 @@ export default function ExpensesPage() {
     onSuccess:  () => queryClient.invalidateQueries({ queryKey: ['expenses'] }),
   });
 
+  async function handleImportExpenses(file) {
+    setImporting(true);
+    try {
+      const res = await expensesApi.importCsv(file);
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      return res.data;
+    } catch (err) { return null; } finally { setImporting(false); }
+  }
+
+  async function handleImportCategories(file) {
+    setImporting(true);
+    try {
+      const res = await expensesApi.importCategoriesCsv(file);
+      queryClient.invalidateQueries({ queryKey: ['expense-categories'] });
+      return res.data;
+    } catch (err) { return null; } finally { setImporting(false); }
+  }
+
   const handleDelete = (exp) => {
     if (!window.confirm(`Delete expense ${exp.reference}?`)) return;
     deleteMutation.mutate(exp.id);
@@ -176,12 +198,26 @@ export default function ExpensesPage() {
           <h2 className="text-xl font-bold text-surface-100">Expenses</h2>
           <p className="text-sm text-surface-500 mt-0.5">Track business expenditures</p>
         </div>
-        <button
-          onClick={() => setModal({})}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg"
-        >
-          <PlusIcon className="h-4 w-4" /> Add Expense
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setImportCatOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 border border-surface-600 hover:border-surface-500 text-surface-300 hover:text-surface-100 text-sm font-medium rounded-lg transition-colors"
+          >
+            <ArrowUpTrayIcon className="h-4 w-4" /> Import Categories
+          </button>
+          <button
+            onClick={() => setImportExpOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 border border-surface-600 hover:border-surface-500 text-surface-300 hover:text-surface-100 text-sm font-medium rounded-lg transition-colors"
+          >
+            <ArrowUpTrayIcon className="h-4 w-4" /> Import Expenses
+          </button>
+          <button
+            onClick={() => setModal({})}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg"
+          >
+            <PlusIcon className="h-4 w-4" /> Add Expense
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -311,6 +347,26 @@ export default function ExpensesPage() {
           onSaved={handleSaved}
         />
       )}
+
+      <ImportCsvModal
+        open={importExpOpen}
+        onClose={() => setImportExpOpen(false)}
+        onImport={handleImportExpenses}
+        entityName="Expenses"
+        columns={['title', 'amount', 'payment_method', 'expense_date', 'notes']}
+        templateFilename="expenses_template.csv"
+        loading={importing}
+      />
+
+      <ImportCsvModal
+        open={importCatOpen}
+        onClose={() => setImportCatOpen(false)}
+        onImport={handleImportCategories}
+        entityName="Expense Categories"
+        columns={['name', 'is_active']}
+        templateFilename="expense_categories_template.csv"
+        loading={importing}
+      />
     </div>
   );
 }

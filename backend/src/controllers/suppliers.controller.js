@@ -155,4 +155,34 @@ const remove = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { list, getOne, create, update, remove };
+// ── importCsv ─────────────────────────────────────────────────────────────────
+
+const importCsv = async (req, res, next) => {
+  try {
+    if (!req.file) return error(res, 'CSV file is required.', 400);
+    const cid = req.companyId;
+    const { parseCsvBuffer, toBoolean, toDecimal } = require('../utils/csv-parser');
+    const { rows } = parseCsvBuffer(req.file.buffer);
+    let imported = 0;
+    const errors = [];
+
+    for (const row of rows) {
+      const line = row._line;
+      try {
+        if (!row.name) { errors.push({ row: line, message: 'Name is required' }); continue; }
+        const ob = toDecimal(row.opening_balance, 0);
+        await query(
+          `INSERT INTO suppliers (company_id, name, email, phone, address, city, opening_balance, current_balance, is_active, notes)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8,$9) ON CONFLICT DO NOTHING`,
+          [cid, row.name.trim(), row.email||null, row.phone||null, row.address||null, row.city||null, ob, toBoolean(row.is_active, true), row.notes||null]
+        );
+        imported++;
+      } catch (e) { errors.push({ row: line, message: e.message }); }
+    }
+
+    await logAudit(cid, req.user.id, 'IMPORT', 'suppliers', null, { imported, failed: errors.length });
+    return success(res, { imported, failed: errors.length, errors }, `${imported} suppliers imported.`);
+  } catch (err) { next(err); }
+};
+
+module.exports = { list, getOne, create, update, remove, importCsv };

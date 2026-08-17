@@ -1,0 +1,10 @@
+name,is_active
+Rent,true
+Utilities,true
+Salaries,true
+Marketing,true
+Maintenance,true
+Packaging,true
+Transport,true
+Stationery,true
+Miscellaneous,true
