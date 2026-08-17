@@ -24,10 +24,11 @@ export default function ProductFormPage() {
   const { id }    = useParams();
   const isEditing = !!id;
 
-  const [imageFile, setImageFile]   = useState(null);
-  const [isActive, setIsActive]     = useState(true);
-  const [variants, setVariants]     = useState([]);
-  const [skuManual, setSkuManual]   = useState(false);
+  const [imageFile, setImageFile]       = useState(null);
+  const [isActive, setIsActive]         = useState(true);
+  const [variants, setVariants]         = useState([]);
+  const [skuManual, setSkuManual]       = useState(false);
+  const [hasTransactions, setHasTx]    = useState(false);
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
@@ -82,6 +83,7 @@ export default function ProductFormPage() {
     });
     setIsActive(!!p.is_active);
     setSkuManual(true);
+    setHasTx(!!p.has_transactions);
   }, [productData]);
 
   // Load variants for edit
@@ -203,26 +205,42 @@ export default function ProductFormPage() {
 
             {/* Pricing */}
             <div className="card space-y-4">
-              <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
-                Pricing
-              </h2>
+              <div className="flex items-center justify-between border-b border-surface-700 pb-2">
+                <h2 className="text-sm font-semibold text-surface-200">Pricing</h2>
+                {isEditing && hasTransactions && (
+                  <div className="flex items-center gap-1.5 text-2xs text-amber-400">
+                    <LockClosedIcon className="h-3 w-3" />
+                    <span>Locked — product has sales history</span>
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-3 gap-4">
-                <Input label="Cost Price (₨)" type="number" step="0.01" min="0"
-                  placeholder="0.00"
-                  error={errors.cost_price?.message}
-                  {...register('cost_price', {
-                    min: { value: 0, message: 'Must be ≥ 0' },
-                  })} />
-                <Input label="Sale Price (₨)" required type="number" step="0.01" min="0"
-                  placeholder="0.00"
-                  error={errors.sale_price?.message}
-                  {...register('sale_price', {
-                    required: 'Sale price is required.',
-                    min: { value: 0, message: 'Must be ≥ 0' },
-                  })} />
-                <Input label="Wholesale Price (₨)" type="number" step="0.01" min="0"
-                  placeholder="Optional"
-                  {...register('wholesale_price')} />
+                {isEditing && hasTransactions ? (
+                  <>
+                    <LockedField label="Cost Price (₨)" value={watch('cost_price')} />
+                    <LockedField label="Sale Price (₨)"  value={watch('sale_price')} />
+                    <LockedField label="Wholesale Price (₨)" value={watch('wholesale_price')} />
+                  </>
+                ) : (
+                  <>
+                    <Input label="Cost Price (₨)" type="number" step="0.01" min="0"
+                      placeholder="0.00"
+                      error={errors.cost_price?.message}
+                      {...register('cost_price', {
+                        min: { value: 0, message: 'Must be ≥ 0' },
+                      })} />
+                    <Input label="Sale Price (₨)" required type="number" step="0.01" min="0"
+                      placeholder="0.00"
+                      error={errors.sale_price?.message}
+                      {...register('sale_price', {
+                        required: 'Sale price is required.',
+                        min: { value: 0, message: 'Must be ≥ 0' },
+                      })} />
+                    <Input label="Wholesale Price (₨)" type="number" step="0.01" min="0"
+                      placeholder="Optional"
+                      {...register('wholesale_price')} />
+                  </>
+                )}
               </div>
             </div>
 
@@ -311,6 +329,18 @@ export default function ProductFormPage() {
           </div>
         </div>
       </form>
+    </div>
+  );
+}
+
+function LockedField({ label, value }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-surface-400 mb-1.5">{label}</label>
+      <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-surface-700/50 border border-surface-600/60 text-surface-300 text-sm">
+        <LockClosedIcon className="h-3.5 w-3.5 text-surface-500 shrink-0" />
+        <span className="font-mono">{value || '—'}</span>
+      </div>
     </div>
   );
 }

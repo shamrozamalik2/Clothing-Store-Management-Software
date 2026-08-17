@@ -379,7 +379,14 @@ function ProductCard({ product, onAdd }) {
         <p className="text-xs font-bold text-primary-400">{formatCurrency(product.sale_price)}</p>
         {product.track_inventory && (
           <p className={cn('text-2xs', outOfStock ? 'text-red-400' : 'text-surface-500')}>
-            {outOfStock ? 'Out of stock' : `Stock: ${formatQty(product.stock_quantity)}`}
+            {outOfStock ? 'Out of stock' : (() => {
+              const current = parseFloat(product.stock_quantity) || 0;
+              const sold    = parseFloat(product.total_sold)    || 0;
+              const total   = current + sold;
+              return sold > 0
+                ? `Stock: ${formatQty(current)}/${formatQty(total)}`
+                : `Stock: ${formatQty(current)}`;
+            })()}
           </p>
         )}
       </div>

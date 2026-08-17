@@ -23,7 +23,8 @@ const PRODUCT_SELECT = `
            EXISTS (SELECT 1 FROM sale_items            si  WHERE si.product_id  = p.id) OR
            EXISTS (SELECT 1 FROM purchase_items         pi  WHERE pi.product_id  = p.id) OR
            EXISTS (SELECT 1 FROM stock_adjustment_items sai WHERE sai.product_id = p.id)
-         ) AS has_transactions
+         ) AS has_transactions,
+         COALESCE((SELECT SUM(si.quantity) FROM sale_items si WHERE si.product_id = p.id), 0) AS total_sold
   FROM products p
   LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
   LEFT JOIN brands     b ON b.id = p.brand_id     AND b.company_id = p.company_id
