@@ -68,7 +68,7 @@ class SplashScreen extends ConsumerWidget {
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 24),
                       child: Image.asset(
-                        'assets/images/softwarelogo.png',
+                        'assets/images/newlogo.png',
                         width:  220,
                         fit:    BoxFit.contain,
                       ),
