@@ -131,7 +131,7 @@ const create = async (req, res, next) => {
               });
             } else {
               const { rows: [product] } = await client.query(
-                'SELECT * FROM products WHERE id = $1 AND company_id = $2 AND is_active = TRUE',
+                'SELECT * FROM products WHERE id = $1 AND company_id = $2',
                 [ei.product_id, cid]
               );
               if (!product) throw new Error(`Product ${ei.product_id} not found.`);

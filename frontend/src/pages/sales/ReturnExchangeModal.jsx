@@ -20,7 +20,7 @@ function ProductSearch({ onSelect }) {
 
   const { data } = useQuery({
     queryKey: ['product-search-exchange', q],
-    queryFn:  () => productsApi.list({ search: q, limit: 10, is_active: true }),
+    queryFn:  () => productsApi.list({ search: q, limit: 10, status: 'active' }),
     enabled:  q.length >= 1,
   });
 
