@@ -51,6 +51,9 @@ dependencies:
   # Connectivity
   connectivity_plus: ^6.0.3
 
+  # Bluetooth printing (ESC/POS thermal receipts)
+  print_bluetooth_thermal: ^1.2.2
+
   # Utilities
   uuid: ^4.4.0
   equatable: ^2.0.5

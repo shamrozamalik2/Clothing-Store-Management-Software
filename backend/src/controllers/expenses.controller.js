@@ -76,12 +76,15 @@ async function create(req, res, next) {
     const cid = req.companyId;
     const { category_id, amount, payment_method = 'cash', expense_date, description, notes } = req.body;
 
+    const { is_recurring, recurring_day } = req.body;
+
     const id = await withTransaction(async (client) => {
       const ref = await generateReference(client, cid);
       const { rows: [row] } = await client.query(`
         INSERT INTO expenses
-          (company_id, category_id, reference, title, amount, payment_method, expense_date, notes, created_by)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          (company_id, category_id, reference, title, amount, payment_method, expense_date,
+           notes, is_recurring, recurring_day, created_by)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
         RETURNING id
       `, [
         cid,
@@ -92,6 +95,8 @@ async function create(req, res, next) {
         payment_method,
         expense_date || new Date().toISOString().slice(0, 10),
         notes?.trim() || null,
+        !!is_recurring,
+        is_recurring ? (parseInt(recurring_day) || 1) : null,
         req.user.id,
       ]);
       return row.id;

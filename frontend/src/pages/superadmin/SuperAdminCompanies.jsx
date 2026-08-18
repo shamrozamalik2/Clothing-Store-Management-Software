@@ -3,6 +3,7 @@ import {
   PencilIcon, TrashIcon, NoSymbolIcon, CheckCircleIcon,
   ArrowRightOnRectangleIcon, PlusIcon, MagnifyingGlassIcon,
   ClipboardDocumentIcon, ClipboardDocumentCheckIcon,
+  AdjustmentsHorizontalIcon,
 } from '@heroicons/react/24/outline';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '@store/slices/authSlice';
@@ -10,6 +11,7 @@ import SuperAdminLayout, { SuperAdminGuard } from './SuperAdminLayout';
 import {
   saListCompanies, saCreateCompany, saSuspendCompany,
   saReinstateCompany, saUpdateCompany, saDeleteCompany, saImpersonate,
+  saUpdatePlan, saUpdateFeatures,
 } from '@api/superAdminClient';
 
 const STATUS = {
@@ -325,6 +327,101 @@ function EditModal({ company, onClose, onSaved }) {
   );
 }
 
+const FEATURE_DEFS = [
+  { key: 'manufacturing',    label: 'Manufacturing / BOM' },
+  { key: 'hr',               label: 'HR & Payroll' },
+  { key: 'ledger',           label: 'Ledger / AR-AP' },
+  { key: 'audit',            label: 'Audit Trail' },
+  { key: 'mobile_app',       label: 'Mobile App Access' },
+  { key: 'multi_branch',     label: 'Multi-Branch' },
+  { key: 'reports_advanced', label: 'Advanced Reports' },
+];
+
+function PlanModal({ company, onClose, onSaved }) {
+  const [plan, setPlan]     = useState(company.plan || 'standard');
+  const [maxUsers, setMaxUsers] = useState(company.max_users || 5);
+  const [trialEnds, setTrialEnds] = useState(
+    company.trial_ends_at ? company.trial_ends_at.slice(0, 10) : ''
+  );
+  const [features, setFeatures] = useState({ ...(company.features || {}) });
+  const [busy,  setBusy]    = useState(false);
+  const [error, setError]   = useState('');
+
+  const toggleFeature = (key) =>
+    setFeatures(f => ({ ...f, [key]: !f[key] }));
+
+  async function save(e) {
+    e.preventDefault();
+    setBusy(true); setError('');
+    try {
+      await saUpdatePlan(company.id, { plan, max_users: maxUsers, trial_ends_at: trialEnds || null });
+      await saUpdateFeatures(company.id, features);
+      onSaved();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update plan.');
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+          <div>
+            <h3 className="text-white font-semibold">Plan & Features</h3>
+            <p className="text-xs text-slate-500 mt-0.5">{company.name}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={save} className="p-6 space-y-5">
+          {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-2 text-sm">{error}</div>}
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Plan">
+              <select value={plan} onChange={e => setPlan(e.target.value)} className={INPUT}>
+                <option value="standard">Standard</option>
+                <option value="pro">Pro</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+            </Field>
+            <Field label="Max Users">
+              <input type="number" min={1} max={500} value={maxUsers}
+                onChange={e => setMaxUsers(e.target.value)} className={INPUT} />
+            </Field>
+          </div>
+
+          <Field label="Trial Ends At">
+            <input type="date" value={trialEnds}
+              onChange={e => setTrialEnds(e.target.value)} className={INPUT} />
+          </Field>
+
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Feature Flags</p>
+            <div className="space-y-2">
+              {FEATURE_DEFS.map(({ key, label }) => (
+                <label key={key} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-800 cursor-pointer">
+                  <span className="text-sm text-slate-300">{label}</span>
+                  <div onClick={() => toggleFeature(key)}
+                    className={`relative h-5 w-9 rounded-full cursor-pointer transition-colors duration-200 ${features[key] ? 'bg-purple-500' : 'bg-slate-600'}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${features[key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-1">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
+            <button type="submit" disabled={busy}
+              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
+              {busy ? 'Saving…' : 'Save Plan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function SuspendModal({ company, onClose, onDone }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -367,6 +464,7 @@ export default function SuperAdminCompanies() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing,    setEditing]    = useState(null);
   const [suspending, setSuspending] = useState(null);
+  const [managing,   setManaging]   = useState(null);
   const [error,      setError]      = useState('');
 
   const PER_PAGE = 15;
@@ -480,6 +578,7 @@ export default function SuperAdminCompanies() {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <ActionBtn Icon={PencilIcon} title="Edit" color="blue" onClick={() => setEditing(c)} />
+                        <ActionBtn Icon={AdjustmentsHorizontalIcon} title="Plan & Features" color="purple" onClick={() => setManaging(c)} />
                         <ActionBtn Icon={ArrowRightOnRectangleIcon} title="Login As" color="purple" onClick={() => impersonate(c)} />
                         {c.subscription_status === 'suspended'
                           ? <ActionBtn Icon={CheckCircleIcon} title="Reinstate" color="green" onClick={() => reinstate(c.id)} />
@@ -511,6 +610,7 @@ export default function SuperAdminCompanies() {
         {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={() => load()} />}
         {editing    && <EditModal    company={editing}    onClose={() => setEditing(null)}    onSaved={() => { setEditing(null); load(); }} />}
         {suspending && <SuspendModal company={suspending} onClose={() => setSuspending(null)} onDone={() => { setSuspending(null); load(); }} />}
+        {managing   && <PlanModal    company={managing}   onClose={() => setManaging(null)}   onSaved={() => { setManaging(null); load(); }} />}
       </SuperAdminLayout>
     </SuperAdminGuard>
   );

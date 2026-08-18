@@ -1,10 +1,11 @@
 'use strict';
 
-const { query, withTransaction } = require('../config/database');
-const { success, created, error } = require('../utils/response');
+const { query, withTransaction, pool } = require('../config/database');
+const { success, created, error }      = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
-const { AUDIT_ACTIONS } = require('../config/constants');
-const { logAudit }      = require('../utils/audit');
+const { AUDIT_ACTIONS }  = require('../config/constants');
+const { logAudit }       = require('../utils/audit');
+const { notifySale }     = require('../utils/fcm');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -131,6 +132,20 @@ const create = async (req, res, next) => {
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
     if (!parsedItems?.length) return error(res, 'At least one item is required.', 422);
 
+    // Credit limit check
+    if (customer_id && payment_method === 'credit') {
+      const { rows: [cust] } = await query(
+        'SELECT credit_limit, current_balance FROM customers WHERE id=$1 AND company_id=$2',
+        [customer_id, cid]
+      );
+      if (cust && parseFloat(cust.credit_limit) > 0) {
+        const projected = parseFloat(cust.current_balance) + parseFloat(paid_amount || 0);
+        if (projected > parseFloat(cust.credit_limit)) {
+          return error(res, `Credit limit exceeded. Customer limit: ₨${cust.credit_limit}, current balance: ₨${cust.current_balance}.`, 422);
+        }
+      }
+    }
+
     let saleId;
     try {
       saleId = await withTransaction(async (client) => {
@@ -256,6 +271,16 @@ const create = async (req, res, next) => {
     const items_out = await getItems(saleId);
     await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'sales', saleId, null,
       { reference: sale.reference, total: sale.total_amount });
+
+    // Push notification to admin(s)
+    notifySale(pool, cid, {
+      id:            saleId,
+      reference:     sale.reference,
+      customer_name: sale.customer_name,
+      total_amount:  sale.total_amount,
+      items:         items_out.length,
+    });
+
     return created(res, { ...sale, items: items_out }, 'Sale completed successfully.');
   } catch (err) { next(err); }
 };

@@ -24,6 +24,10 @@ import ReportsPage from '@pages/reports/ReportsPage';
 import SettingsPage from '@pages/settings/SettingsPage';
 import RolesPage from '@pages/settings/RolesPage';
 import ReturnsPage from '@pages/returns/ReturnsPage';
+import ManufacturingPage from '@pages/manufacturing/ManufacturingPage';
+import EmployeesPage from '@pages/hr/EmployeesPage';
+import LedgerPage from '@pages/ledger/LedgerPage';
+import AuditPage from '@pages/audit/AuditPage';
 
 // Protected route wrapper
 function ProtectedRoute({ roles }) {
@@ -78,8 +82,10 @@ export const router = createHashRouter([
           { path: '/roles',               element: <RolesPage /> },
           { path: '/expenses',             element: <ExpensesPage /> },
           { path: '/returns',              element: <ReturnsPage /> },
-          // Future phases:
-          // { path: '/expenses',         element: <ExpensesPage /> },
+          { path: '/manufacturing',        element: <ManufacturingPage /> },
+          { path: '/hr',                   element: <EmployeesPage /> },
+          { path: '/ledger',               element: <LedgerPage /> },
+          { path: '/audit',                element: <AuditPage /> },
         ],
       },
     ],

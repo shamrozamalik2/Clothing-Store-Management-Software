@@ -9,7 +9,7 @@ import { formatCurrency } from '@utils/format';
 import ImportCsvModal from '@components/common/ImportCsvModal';
 
 const PAYMENT_METHODS = ['cash', 'card', 'bank_transfer', 'other'];
-const EMPTY = { category_id: '', amount: '', payment_method: 'cash', expense_date: '', description: '', notes: '' };
+const EMPTY = { category_id: '', amount: '', payment_method: 'cash', expense_date: '', description: '', notes: '', is_recurring: false, recurring_day: 1 };
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -17,6 +17,7 @@ function today() {
 
 function ExpenseModal({ initial, categories, onClose, onSaved }) {
   const [form, setForm] = useState({ ...EMPTY, expense_date: today(), ...initial });
+  const [recurring, setRecurring] = useState(!!initial?.is_recurring);
   const [error, setError] = useState('');
   const [busy,  setBusy]  = useState(false);
   const isEdit = !!initial?.id;
@@ -32,6 +33,8 @@ function ExpenseModal({ initial, categories, onClose, onSaved }) {
         ...form,
         category_id: form.category_id || undefined,
         amount: parseFloat(form.amount),
+        is_recurring: recurring,
+        recurring_day: recurring ? parseInt(form.recurring_day, 10) || 1 : undefined,
       };
       if (isEdit) {
         await expensesApi.update(initial.id, payload);
@@ -111,6 +114,28 @@ function ExpenseModal({ initial, categories, onClose, onSaved }) {
               placeholder="Optional notes…"
             />
           </div>
+
+          {/* Recurring toggle */}
+          <div className="flex items-center justify-between border-t border-surface-700 pt-3">
+            <div>
+              <p className="text-sm font-medium text-surface-200">Recurring Expense</p>
+              <p className="text-xs text-surface-500">Repeat automatically each month</p>
+            </div>
+            <button type="button" onClick={() => setRecurring(r => !r)}
+              className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${recurring ? 'bg-primary-500' : 'bg-surface-600'}`}>
+              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${recurring ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+          {recurring && (
+            <div>
+              <label className="block text-xs text-surface-400 mb-1">Day of Month (1–31)</label>
+              <input
+                type="number" min={1} max={31}
+                value={form.recurring_day} onChange={set('recurring_day')}
+                className="w-full bg-surface-800 border border-surface-700 text-surface-100 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-1">
             <button type="button" onClick={onClose} className="px-4 py-2 text-surface-400 hover:text-surface-100 text-sm">Cancel</button>
@@ -293,7 +318,15 @@ export default function ExpensesPage() {
                     {exp.expense_date ? new Date(exp.expense_date).toLocaleDateString('en-PK') : '—'}
                   </td>
                   <td className="px-4 py-3 text-surface-300">{exp.category_name || '—'}</td>
-                  <td className="px-4 py-3 text-surface-400 max-w-xs truncate">{exp.title || exp.description || '—'}</td>
+                  <td className="px-4 py-3 text-surface-400 max-w-xs">
+                    <div className="flex items-center gap-1.5 truncate">
+                      {exp.is_recurring && (
+                        <span title={`Recurring on day ${exp.recurring_day}`}
+                          className="shrink-0 px-1.5 py-0.5 rounded text-2xs bg-primary-500/15 text-primary-400 font-medium">↻</span>
+                      )}
+                      <span className="truncate">{exp.title || exp.description || '—'}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-0.5 rounded-full text-xs bg-surface-700 text-surface-300 capitalize">
                       {exp.payment_method?.replace('_', ' ')}

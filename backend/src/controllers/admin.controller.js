@@ -203,6 +203,43 @@ exports.updateCompany = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// PUT /admin/companies/:id/plan
+exports.updatePlan = async (req, res, next) => {
+  try {
+    const id   = parseInt(req.params.id, 10);
+    const { plan, max_users, trial_ends_at } = req.body;
+    if (!plan) return res.status(422).json({ success: false, message: 'plan is required.' });
+
+    const { rows: [updated] } = await query(`
+      UPDATE companies SET plan=$2, max_users=COALESCE($3, max_users),
+        trial_ends_at=COALESCE($4::timestamptz, trial_ends_at), updated_at=NOW()
+      WHERE id=$1 RETURNING id, name, plan, max_users, trial_ends_at
+    `, [id, plan, max_users ? parseInt(max_users) : null, trial_ends_at || null]);
+
+    if (!updated) return res.status(404).json({ success: false, message: 'Company not found.' });
+    logger.info(`[SuperAdmin] Plan updated: id=${id} plan=${plan}`);
+    return res.json({ success: true, data: updated, message: 'Plan updated.' });
+  } catch (err) { next(err); }
+};
+
+// PUT /admin/companies/:id/features
+exports.updateFeatures = async (req, res, next) => {
+  try {
+    const id       = parseInt(req.params.id, 10);
+    const features = req.body.features;
+    if (!features || typeof features !== 'object') {
+      return res.status(422).json({ success: false, message: 'features object is required.' });
+    }
+
+    const { rows: [updated] } = await query(
+      'UPDATE companies SET features=$2, updated_at=NOW() WHERE id=$1 RETURNING id, name, features',
+      [id, JSON.stringify(features)]
+    );
+    if (!updated) return res.status(404).json({ success: false, message: 'Company not found.' });
+    return res.json({ success: true, data: updated, message: 'Features updated.' });
+  } catch (err) { next(err); }
+};
+
 exports.suspendCompany = async (req, res, next) => {
   try {
     const id     = parseInt(req.params.id, 10);

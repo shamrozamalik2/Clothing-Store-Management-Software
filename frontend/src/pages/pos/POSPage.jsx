@@ -11,6 +11,7 @@ import { categoriesApi } from '@api/categories.api';
 import { productsApi }   from '@api/products.api';
 import { customersApi }  from '@api/customers.api';
 import { salesApi }      from '@api/sales.api';
+import { holdsApi }      from '@api/holds.api';
 import { formatCurrency } from '@utils/format';
 import { formatQty } from '@utils/formatQty';
 import { cn } from '@utils/cn';
@@ -83,6 +84,7 @@ export default function POSPage() {
   const [payOpen, setPayOpen]             = useState(false);
   const [newCustOpen, setNewCustOpen]     = useState(false);
   const [receipt, setReceipt]             = useState(null);
+  const [holdsOpen, setHoldsOpen]         = useState(false);
 
   const searchRef = useRef(null);
 
@@ -250,12 +252,18 @@ export default function POSPage() {
               Cart {cart.length > 0 && <span className="text-primary-400">({cart.length})</span>}
             </span>
           </div>
-          {cart.length > 0 && (
-            <button onClick={() => { dispatch({ type: 'CLEAR' }); setCustomer(null); setDiscValue(''); }}
-              className="text-xs text-surface-500 hover:text-red-400 transition-colors flex items-center gap-1">
-              <TrashIcon className="h-3.5 w-3.5" /> Clear
+          <div className="flex items-center gap-2">
+            <button onClick={() => setHoldsOpen(true)}
+              className="text-xs text-surface-500 hover:text-primary-400 transition-colors px-2 py-1 rounded bg-surface-700 hover:bg-surface-600">
+              Holds
             </button>
-          )}
+            {cart.length > 0 && (
+              <button onClick={() => { dispatch({ type: 'CLEAR' }); setCustomer(null); setDiscValue(''); }}
+                className="text-xs text-surface-500 hover:text-red-400 transition-colors flex items-center gap-1">
+                <TrashIcon className="h-3.5 w-3.5" /> Clear
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Cart items */}
@@ -356,6 +364,25 @@ export default function POSPage() {
         onClose={() => setNewCustOpen(false)}
         onCreated={(c) => setCustomer(c)}
       />
+
+      {holdsOpen && (
+        <HoldsModal
+          cart={cart}
+          customer={customer}
+          discType={discType}
+          discValue={discValue}
+          onClose={() => setHoldsOpen(false)}
+          onLoad={(hold) => {
+            const d = hold.cart_data;
+            dispatch({ type: 'CLEAR' });
+            (d.items || []).forEach(item => dispatch({ type: 'ADD', product: item }));
+            if (d.customer) setCustomer(d.customer);
+            if (d.discType)  setDiscType(d.discType);
+            if (d.discValue !== undefined) setDiscValue(d.discValue);
+            setHoldsOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -831,6 +858,83 @@ function TotalRow({ label, value, signed = false }) {
     <div className="flex justify-between text-sm">
       <span className="text-surface-400">{label}</span>
       <span className={cn('text-surface-300', signed && value < 0 && 'text-green-400')}>{display}</span>
+    </div>
+  );
+}
+
+// ─── Holds Modal ───────────────────────────────────────────────────────────────
+
+function HoldsModal({ cart, customer, discType, discValue, onClose, onLoad }) {
+  const qc = useQueryClient();
+  const [label, setLabel] = useState('');
+
+  const { data } = useQuery({ queryKey: ['holds'], queryFn: holdsApi.list });
+  const holds = data?.data ?? [];
+
+  const saveMut = useMutation({
+    mutationFn: (d) => holdsApi.create(d),
+    onSuccess: () => { toast.success('Cart saved to holds.'); qc.invalidateQueries({ queryKey: ['holds'] }); setLabel(''); },
+    onError:   (e) => toast.error(e.message),
+  });
+  const delMut = useMutation({
+    mutationFn: (id) => holdsApi.remove(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['holds'] }),
+  });
+
+  function saveCart() {
+    if (!cart.length) return toast.error('Cart is empty.');
+    saveMut.mutate({
+      label: label || `Hold ${new Date().toLocaleTimeString()}`,
+      cart_data: { items: cart.map(i => ({ ...i })), customer, discType, discValue },
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-surface-800 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-surface-700">
+          <h3 className="font-semibold text-surface-100">Cart Holds</h3>
+          <button onClick={onClose} className="text-surface-500 hover:text-surface-300 text-xl">×</button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Save current cart */}
+          <div className="flex gap-2">
+            <input value={label} onChange={e => setLabel(e.target.value)} placeholder="Label (optional)"
+              className="flex-1 bg-surface-700 border border-surface-600 rounded-lg px-3 py-2 text-sm text-surface-200 placeholder:text-surface-500 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+            <button onClick={saveCart} disabled={saveMut.isPending || !cart.length}
+              className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium disabled:opacity-40 transition-colors">
+              Save
+            </button>
+          </div>
+
+          {/* Saved holds */}
+          {holds.length === 0 ? (
+            <p className="text-sm text-center text-surface-600 py-4">No saved holds.</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {holds.map(h => (
+                <div key={h.id} className="flex items-center justify-between bg-surface-700/50 rounded-lg px-3 py-2">
+                  <div>
+                    <p className="text-sm text-surface-200">{h.label || 'Unnamed hold'}</p>
+                    <p className="text-xs text-surface-500">{new Date(h.created_at).toLocaleString()} · {h.user_name}</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => onLoad(h)}
+                      className="px-3 py-1 rounded bg-primary-600/80 hover:bg-primary-600 text-xs text-white transition-colors">
+                      Load
+                    </button>
+                    <button onClick={() => delMut.mutate(h.id)}
+                      className="px-2 py-1 rounded bg-red-500/20 hover:bg-red-500/40 text-xs text-red-400 transition-colors">
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

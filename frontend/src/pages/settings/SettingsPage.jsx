@@ -201,15 +201,16 @@ function BackupTab() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const text   = await file.text();
+      let text = await file.text();
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
       const backup = JSON.parse(text);
-      if (!backup.data && !backup.products && !backup.categories) {
-        toast.error('Invalid backup file — missing expected data.');
+      if (!backup || typeof backup !== 'object' || Array.isArray(backup)) {
+        toast.error('Invalid backup file — content must be a JSON object.');
         return;
       }
       setPreview(backup);
     } catch {
-      toast.error('Could not read backup file. Make sure it is a valid JSON backup.');
+      toast.error('Could not read backup file. The file content must be valid JSON.');
     }
   }
 
@@ -450,7 +451,6 @@ function BackupTab() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".json"
           className="hidden"
           onChange={handleRestoreFile}
         />

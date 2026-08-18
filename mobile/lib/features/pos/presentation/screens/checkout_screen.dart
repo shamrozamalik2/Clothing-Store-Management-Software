@@ -8,6 +8,8 @@ import '../providers/cart_provider.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../data/sources/pos_remote_source.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
+import '../../../../core/services/printer_service.dart';
 
 // ---------------------------------------------------------------------------
 // CheckoutScreen
@@ -37,6 +39,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   // State
   bool _submitting = false;
+  bool _printing   = false;
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -146,6 +149,124 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
+  // ── Bluetooth printing ──────────────────────────────────────────────────────
+
+  Future<String?> _showPrinterPicker(
+      List<BluetoothPrinter> devices) async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Select Printer'),
+        content: SizedBox(
+          width: 300,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: devices.length.clamp(0, 8),
+            itemBuilder: (_, i) {
+              final d = devices[i];
+              return ListTile(
+                dense: true,
+                leading: const Icon(Icons.print_outlined),
+                title: Text(d.name),
+                subtitle: Text(d.address,
+                    style: const TextStyle(fontSize: 11)),
+                onTap: () => Navigator.pop(ctx, d.address),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Cancel')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _printReceipt(
+      CartState cart, String invoiceNumber) async {
+    if (!mounted) return;
+    setState(() => _printing = true);
+    try {
+      // Check Bluetooth permission
+      final granted =
+          await PrintBluetoothThermal.isPermissionBluetoothGranted;
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Bluetooth permission required. Enable in Settings.')),
+        );
+        return;
+      }
+
+      // Resolve printer address
+      String? address =
+          await PrinterService.getDefaultPrinterAddress();
+      if (address == null) {
+        final devices = await PrinterService.getPairedDevices();
+        if (!mounted) return;
+        if (devices.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'No paired Bluetooth printers found. Pair your printer in device settings first.')),
+          );
+          return;
+        }
+        final picked = await _showPrinterPicker(devices);
+        if (picked == null || !mounted) return;
+        address = picked;
+        // Remember choice for next time
+        await PrinterService.setDefaultPrinterAddress(address);
+      }
+
+      // Build receipt
+      final receiptData = ReceiptData(
+        companyName: 'SAS Garments',
+        companyAddress: '',
+        companyPhone: '',
+        invoiceNo: invoiceNumber,
+        cashierName: '',
+        paymentMethod: _paymentMethod,
+        date: DateTime.now(),
+        items: cart.items
+            .map((item) => ReceiptItem(
+                  name: item.name,
+                  qty: item.quantity,
+                  price: item.price,
+                  discount: item.discount,
+                ))
+            .toList(),
+        subtotal: cart.subtotal,
+        discount: cart.discountAmount,
+        tax: cart.taxAmount,
+        total: cart.total,
+        customerName: cart.customerName,
+        footerMessage: 'Thank you for your business!',
+      );
+
+      await PrinterService.printReceipt(receiptData, address: address);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              backgroundColor: Colors.green,
+              content: Text('Receipt printed successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Print failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
   Future<void> _showSuccessDialog(
       CartState cart, String invoiceNumber) {
     return showDialog<void>(
@@ -190,15 +311,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ),
         actions: [
           OutlinedButton.icon(
-            // Placeholder — hook up to a real print service when ready.
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Print feature coming soon')),
-              );
-            },
-            icon: const Icon(Icons.print_outlined),
-            label: const Text('Print Receipt'),
+            onPressed: _printing
+                ? null
+                : () {
+                    // Close dialog first, then print so snackbars are visible
+                    Navigator.pop(ctx);
+                    _printReceipt(cart, invoiceNumber);
+                  },
+            icon: _printing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.print_outlined),
+            label: Text(_printing ? 'Printing…' : 'Print Receipt'),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.pop(ctx),

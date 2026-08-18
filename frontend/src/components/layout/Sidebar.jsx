@@ -20,6 +20,10 @@ import {
   ChevronRightIcon,
   ReceiptRefundIcon,
   ShieldCheckIcon,
+  CubeIcon,
+  BriefcaseIcon,
+  BookOpenIcon,
+  DocumentMagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { selectSidebarCollapsed, toggleSidebar } from '@store/slices/uiSlice';
 import { selectCurrentUser } from '@store/slices/authSlice';
@@ -63,6 +67,15 @@ const NAV_GROUPS = [
     label: 'Analytics',
     items: [
       { label: 'Reports',      path: '/reports',         icon: ChartBarIcon,              permission: 'reports' },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { label: 'Manufacturing',path: '/manufacturing',   icon: CubeIcon,                      permission: 'manufacturing' },
+      { label: 'HR & Payroll', path: '/hr',              icon: BriefcaseIcon,                 permission: 'hr' },
+      { label: 'Ledger',       path: '/ledger',          icon: BookOpenIcon,                  permission: 'ledger' },
+      { label: 'Audit Trail',  path: '/audit',           icon: DocumentMagnifyingGlassIcon,   permission: 'roles_admin' },
     ],
   },
   {

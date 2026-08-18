@@ -44,6 +44,10 @@ export const saSuspendCompany   = (id, r)  => sa.post(`/companies/${id}/suspend`
 export const saReinstateCompany = (id)     => sa.post(`/companies/${id}/reinstate`);
 export const saImpersonate      = (id)     => sa.post(`/companies/${id}/impersonate`);
 
+// ── Plan & Features ───────────────────────────────────────────────────────────
+export const saUpdatePlan     = (id, d) => sa.put(`/companies/${id}/plan`, d);
+export const saUpdateFeatures = (id, d) => sa.put(`/companies/${id}/features`, d);
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const saListUsers          = (params) => sa.get('/users', { params });
 export const saUpdateUser         = (id, d)  => sa.patch(`/users/${id}`, d);

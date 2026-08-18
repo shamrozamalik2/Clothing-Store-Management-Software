@@ -121,12 +121,12 @@ const update = async (req, res, next) => {
     );
     if (!existing) return error(res, 'Customer not found.', 404);
 
-    const { name, email, phone, address, city, customer_group, notes, is_active } = req.body;
+    const { name, email, phone, address, city, customer_group, credit_limit, notes, is_active } = req.body;
 
     const { rows: [updated] } = await query(`
       UPDATE customers
       SET name=$3, email=$4, phone=$5, address=$6, city=$7,
-          customer_group=$8, notes=$9, is_active=$10, updated_at=NOW()
+          customer_group=$8, credit_limit=$9, notes=$10, is_active=$11, updated_at=NOW()
       WHERE id=$1 AND company_id=$2
       RETURNING *
     `, [id, cid,
@@ -135,7 +135,8 @@ const update = async (req, res, next) => {
         phone   !== undefined ? (phone?.trim() || null)  : existing.phone,
         address !== undefined ? (address?.trim() || null): existing.address,
         city    !== undefined ? (city?.trim() || null)   : existing.city,
-        customer_group        !== undefined ? customer_group : existing.customer_group,
+        customer_group !== undefined ? customer_group    : existing.customer_group,
+        credit_limit   !== undefined ? parseFloat(credit_limit) || 0 : existing.credit_limit,
         notes   !== undefined ? (notes?.trim() || null)  : existing.notes,
         is_active !== undefined ? Boolean(is_active)     : existing.is_active]);
 

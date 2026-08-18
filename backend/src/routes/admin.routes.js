@@ -33,6 +33,8 @@ router.post('/companies', [
   body('admin_password').isLength({ min: 8 }),
 ], ctrl.createCompany);
 router.patch('/companies/:id',               ctrl.updateCompany);
+router.put('/companies/:id/plan',            ctrl.updatePlan);
+router.put('/companies/:id/features',        ctrl.updateFeatures);
 router.delete('/companies/:id',              ctrl.deleteCompany);
 router.post('/companies/:id/suspend',        ctrl.suspendCompany);
 router.post('/companies/:id/reinstate',      ctrl.reinstateCompany);

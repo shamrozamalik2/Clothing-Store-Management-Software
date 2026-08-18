@@ -26,6 +26,8 @@ export default function ProductFormPage() {
 
   const [imageFile, setImageFile]       = useState(null);
   const [isActive, setIsActive]         = useState(true);
+  const [isRawMaterial, setIsRawMaterial]   = useState(false);
+  const [isFinishedGood, setIsFinishedGood] = useState(false);
   const [variants, setVariants]         = useState([]);
   const [skuManual, setSkuManual]       = useState(false);
   const [hasTransactions, setHasTx]    = useState(false);
@@ -82,6 +84,8 @@ export default function ProductFormPage() {
       track_inventory: p.track_inventory ? '1' : '0',
     });
     setIsActive(!!p.is_active);
+    setIsRawMaterial(!!p.is_raw_material);
+    setIsFinishedGood(!!p.is_finished_good);
     setSkuManual(true);
     setHasTx(!!p.has_transactions);
   }, [productData]);
@@ -104,6 +108,8 @@ export default function ProductFormPage() {
         if (v !== undefined && v !== '') fd.append(k, v);
       });
       fd.set('is_active', isActive ? '1' : '0');
+      fd.set('is_raw_material', isRawMaterial ? '1' : '0');
+      fd.set('is_finished_good', isFinishedGood ? '1' : '0');
       if (variants.length > 0) fd.set('variants', JSON.stringify(variants));
       if (imageFile) fd.append('image', imageFile);
       return isEditing ? productsApi.update(id, fd) : productsApi.create(fd);
@@ -315,6 +321,33 @@ export default function ProductFormPage() {
                   </p>
                 </div>
                 <Toggle checked={isActive} onChange={setIsActive} />
+              </div>
+            </div>
+
+            <div className="card space-y-4">
+              <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
+                Manufacturing Type
+              </h2>
+              <p className="text-xs text-surface-500 -mt-2">Used by BOM &amp; Production module.</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-surface-200">Raw Material</p>
+                  <p className="text-xs text-surface-500">Input consumed in production.</p>
+                </div>
+                <Toggle
+                  checked={isRawMaterial}
+                  onChange={(v) => { setIsRawMaterial(v); if (v) setIsFinishedGood(false); }}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-surface-200">Finished Good</p>
+                  <p className="text-xs text-surface-500">Output produced from raw materials.</p>
+                </div>
+                <Toggle
+                  checked={isFinishedGood}
+                  onChange={(v) => { setIsFinishedGood(v); if (v) setIsRawMaterial(false); }}
+                />
               </div>
             </div>
 

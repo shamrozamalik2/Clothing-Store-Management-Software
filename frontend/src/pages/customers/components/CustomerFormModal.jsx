@@ -27,9 +27,10 @@ export default function CustomerFormModal({ open, onClose, editCustomer = null, 
         address:         editCustomer.address ?? '',
         city:            editCustomer.city    ?? '',
         customer_group:  editCustomer.customer_group ?? 'general',
+        credit_limit:    editCustomer.credit_limit ?? 0,
         opening_balance: editCustomer.opening_balance ?? 0,
         notes:           editCustomer.notes   ?? '',
-      } : { customer_group: 'general', opening_balance: 0 });
+      } : { customer_group: 'general', credit_limit: 0, opening_balance: 0 });
       setIsActive(isEditing ? !!editCustomer.is_active : true);
     }
   }, [open, editCustomer]);
@@ -83,10 +84,15 @@ export default function CustomerFormModal({ open, onClose, editCustomer = null, 
 
           <Textarea label="Address" rows={2} placeholder="Optional…" {...register('address')} />
 
-          <Input label="Opening Balance (₨)" type="number" step="0.01" min="0"
-            hint={isEditing ? 'Balance is adjusted via sales and payments.' : 'Initial credit balance owed by this customer.'}
-            disabled={isEditing}
-            {...register('opening_balance')} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Credit Limit (₨)" type="number" step="0.01" min="0"
+              hint="0 = no limit. POS blocks credit sales that exceed this."
+              {...register('credit_limit')} />
+            <Input label="Opening Balance (₨)" type="number" step="0.01" min="0"
+              hint={isEditing ? 'Balance is adjusted via sales and payments.' : 'Initial credit balance owed by this customer.'}
+              disabled={isEditing}
+              {...register('opening_balance')} />
+          </div>
 
           <Textarea label="Notes" rows={2} placeholder="Optional…" {...register('notes')} />
 

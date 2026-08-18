@@ -62,4 +62,16 @@ router.patch('/:id/reset-password',
 router.patch('/:id/toggle-status', authorize('admin'), param('id').isInt(), toggleStatus);
 router.post('/me/avatar', upload.single('avatar'), updateAvatar);
 
+// FCM token registration (called by mobile app after login)
+router.post('/me/fcm-token', async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(422).json({ success: false, message: 'token is required.' });
+    await require('../config/database').query(
+      'UPDATE users SET fcm_token=$1 WHERE id=$2', [token, req.user.id]
+    );
+    return res.json({ success: true, message: 'FCM token registered.' });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
