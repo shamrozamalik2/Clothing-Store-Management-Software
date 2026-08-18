@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusIcon, PencilSquareIcon, CalendarDaysIcon, BanknotesIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, TrashIcon, CalendarDaysIcon, BanknotesIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { employeesApi } from '@api/employees.api';
 import { cn } from '@utils/cn';
@@ -39,6 +39,8 @@ export default function EmployeesPage() {
 function EmployeesTab() {
   const qc = useQueryClient();
   const [modal, setModal] = useState(null); // null | { mode:'new'|'edit', emp? }
+  const [selectedIds, setSelectedIds]   = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const { data, isLoading } = useQuery({ queryKey: ['employees'], queryFn: () => employeesApi.list({ limit: 100 }) });
   const employees = data?.data ?? [];
@@ -53,6 +55,17 @@ function EmployeesTab() {
     onSuccess: () => { toast.success('Employee deactivated.'); qc.invalidateQueries({ queryKey: ['employees'] }); },
   });
 
+  async function handleBulkDelete() {
+    if (!window.confirm(`Deactivate ${selectedIds.size} employee(s)?`)) return;
+    setBulkDeleting(true);
+    const ids = [...selectedIds];
+    await Promise.allSettled(ids.map(id => employeesApi.remove(id)));
+    toast.success(`${ids.length} employee(s) deactivated.`);
+    setSelectedIds(new Set());
+    qc.invalidateQueries({ queryKey: ['employees'] });
+    setBulkDeleting(false);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center">
@@ -60,12 +73,28 @@ function EmployeesTab() {
         <Button onClick={() => setModal({ mode: 'new' })}><PlusIcon className="h-4 w-4" /> Add Employee</Button>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-900/30 border border-primary-700/40 rounded-xl">
+          <span className="text-sm text-primary-300 font-medium">{selectedIds.size} selected</span>
+          <button onClick={handleBulkDelete} disabled={bulkDeleting}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50">
+            <TrashIcon className="h-3.5 w-3.5" /> Deactivate selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-surface-400 hover:text-surface-200 transition-colors">Clear</button>
+        </div>
+      )}
+
       <div className="card overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-700 bg-surface-800/50">
-                {['Name','Designation','Department','Base Salary','Status',''].map(h => (
+                <th className="w-10 px-4 py-3">
+                  <input type="checkbox" className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    checked={employees.length > 0 && selectedIds.size === employees.length}
+                    onChange={ex => setSelectedIds(ex.target.checked ? new Set(employees.map(e => e.id)) : new Set())} />
+                </th>
+              {['Name','Designation','Department','Base Salary','Status',''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-surface-400 font-medium">{h}</th>
                 ))}
               </tr>
@@ -75,6 +104,11 @@ function EmployeesTab() {
               {!isLoading && employees.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-surface-600 text-sm">No employees added yet.</td></tr>}
               {employees.map(e => (
                 <tr key={e.id} className="hover:bg-surface-800/40 transition-colors">
+                  <td className="px-4 py-3">
+                    <input type="checkbox" className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      checked={selectedIds.has(e.id)}
+                      onChange={ev => { const n = new Set(selectedIds); ev.target.checked ? n.add(e.id) : n.delete(e.id); setSelectedIds(n); }} />
+                  </td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-surface-200">{e.name}</p>
                     <p className="text-xs text-surface-500">{e.email}</p>

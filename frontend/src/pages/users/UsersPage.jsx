@@ -46,6 +46,8 @@ export default function UsersPage() {
   const [editUser,  setEditUser]  = useState(null);
   const [resetUser, setResetUser] = useState(null);
   const [deleteUser,setDeleteUser]= useState(null);
+  const [selectedIds, setSelectedIds]   = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => { dispatch(setPageTitle('User Management')); }, []);
 
@@ -79,6 +81,18 @@ export default function UsersPage() {
     onError: (err) => toast.error(err.message),
   });
 
+  async function handleBulkDelete() {
+    if (!window.confirm(`Delete ${selectedIds.size} user(s)?`)) return;
+    setBulkDeleting(true);
+    const ids = [...selectedIds];
+    const results = await Promise.allSettled(ids.map(id => usersApi.remove(id)));
+    const failed = results.filter(r => r.status === 'rejected').length;
+    failed ? toast.error(`${failed} could not be deleted.`) : toast.success(`${ids.length} user(s) deleted.`);
+    setSelectedIds(new Set());
+    qc.invalidateQueries({ queryKey: ['users'] });
+    setBulkDeleting(false);
+  }
+
   function openEdit(user) { setEditUser(user); setFormOpen(true); }
   function openCreate()   { setEditUser(null);  setFormOpen(true); }
   function closeForm()    { setFormOpen(false);  setEditUser(null); }
@@ -99,6 +113,18 @@ export default function UsersPage() {
       </div>
 
       <Card>
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-900/30 border-b border-primary-700/40">
+            <span className="text-sm text-primary-300 font-medium">{selectedIds.size} selected</span>
+            <button onClick={handleBulkDelete} disabled={bulkDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50">
+              <TrashIcon className="h-3.5 w-3.5" /> Delete selected
+            </button>
+            <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-surface-400 hover:text-surface-200 transition-colors">Clear</button>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="px-4 py-3 border-b border-surface-700 flex flex-wrap gap-3 items-center">
           <SearchInput
@@ -135,6 +161,11 @@ export default function UsersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-700 bg-surface-800/50">
+                <th className="w-10 px-4 py-3">
+                  <input type="checkbox" className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    checked={users.length > 0 && selectedIds.size === users.length}
+                    onChange={e => setSelectedIds(e.target.checked ? new Set(users.map(u => u.id)) : new Set())} />
+                </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500 uppercase tracking-wider">User</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500 uppercase tracking-wider">Role</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500 uppercase tracking-wider hidden md:table-cell">Phone</th>
@@ -184,6 +215,8 @@ export default function UsersPage() {
                     user={user}
                     can={can}
                     isAdmin={isAdmin}
+                    selected={selectedIds.has(user.id)}
+                    onSelect={e => { const n = new Set(selectedIds); e.target.checked ? n.add(user.id) : n.delete(user.id); setSelectedIds(n); }}
                     onEdit={() => openEdit(user)}
                     onResetPwd={() => setResetUser(user)}
                     onToggle={() => toggleMutation.mutate(user.id)}
@@ -226,9 +259,13 @@ export default function UsersPage() {
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
-function UserRow({ user, can, isAdmin, onEdit, onResetPwd, onToggle, onDelete }) {
+function UserRow({ user, can, isAdmin, selected, onSelect, onEdit, onResetPwd, onToggle, onDelete }) {
   return (
     <tr className="border-b border-surface-700/50 hover:bg-surface-800/40 transition-colors">
+      <td className="px-4 py-3">
+        <input type="checkbox" className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
+          checked={selected} onChange={onSelect} />
+      </td>
       {/* User info */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">

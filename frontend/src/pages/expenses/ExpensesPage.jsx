@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { setPageTitle } from '@store/slices/uiSlice';
 import Card from '@components/ui/Card';
 import { PlusIcon, TrashIcon, PencilIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 import { expensesApi } from '@api/expenses.api';
 import { formatCurrency } from '@utils/format';
 import ImportCsvModal from '@components/common/ImportCsvModal';
@@ -157,6 +158,8 @@ export default function ExpensesPage() {
   const [modal,  setModal]  = useState(null); // null | {} | expense object
   const [from,   setFrom]   = useState('');
   const [to,     setTo]     = useState('');
+  const [selectedIds, setSelectedIds]   = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [catFilter, setCatFilter] = useState('');
   const [page,   setPage]   = useState(1);
   const [importExpOpen, setImportExpOpen]   = useState(false);
@@ -206,6 +209,18 @@ export default function ExpensesPage() {
     if (!window.confirm(`Delete expense ${exp.reference}?`)) return;
     deleteMutation.mutate(exp.id);
   };
+
+  async function handleBulkDelete() {
+    if (!window.confirm(`Delete ${selectedIds.size} expense(s)?`)) return;
+    setBulkDeleting(true);
+    const ids = [...selectedIds];
+    const results = await Promise.allSettled(ids.map(id => expensesApi.remove(id)));
+    const failed = results.filter(r => r.status === 'rejected').length;
+    failed ? toast.error(`${failed} could not be deleted.`) : toast.success(`${ids.length} expense(s) deleted.`);
+    setSelectedIds(new Set());
+    queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    setBulkDeleting(false);
+  }
 
   const handleSaved = () => {
     setModal(null);
@@ -279,12 +294,29 @@ export default function ExpensesPage() {
         </Card.Content>
       </Card>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-900/30 border border-primary-700/40 rounded-xl">
+          <span className="text-sm text-primary-300 font-medium">{selectedIds.size} selected</span>
+          <button onClick={handleBulkDelete} disabled={bulkDeleting}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50">
+            <TrashIcon className="h-3.5 w-3.5" /> Delete selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-surface-400 hover:text-surface-200 transition-colors">Clear</button>
+        </div>
+      )}
+
       {/* Table */}
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-800 text-surface-400 text-xs uppercase tracking-wider">
+                <th className="px-4 py-3 w-10">
+                  <input type="checkbox" className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    checked={expenses.length > 0 && selectedIds.size === expenses.length}
+                    onChange={e => setSelectedIds(e.target.checked ? new Set(expenses.map(x => x.id)) : new Set())} />
+                </th>
                 <th className="px-4 py-3 text-left">Reference</th>
                 <th className="px-4 py-3 text-left">Date</th>
                 <th className="px-4 py-3 text-left">Category</th>
@@ -298,7 +330,7 @@ export default function ExpensesPage() {
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
-                    {[...Array(7)].map((_, j) => (
+                    {[...Array(8)].map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 bg-surface-700 animate-pulse rounded" />
                       </td>
@@ -307,12 +339,17 @@ export default function ExpensesPage() {
                 ))
               ) : expenses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-surface-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-surface-500">
                     No expenses found. Click "Add Expense" to record one.
                   </td>
                 </tr>
               ) : expenses.map(exp => (
                 <tr key={exp.id} className="hover:bg-surface-800/50 transition-colors">
+                  <td className="px-4 py-3">
+                    <input type="checkbox" className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      checked={selectedIds.has(exp.id)}
+                      onChange={e => { const n = new Set(selectedIds); e.target.checked ? n.add(exp.id) : n.delete(exp.id); setSelectedIds(n); }} />
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-surface-300">{exp.reference}</td>
                   <td className="px-4 py-3 text-surface-300">
                     {exp.expense_date ? new Date(exp.expense_date).toLocaleDateString('en-PK') : '—'}

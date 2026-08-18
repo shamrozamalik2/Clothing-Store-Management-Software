@@ -34,6 +34,8 @@ export default function ProductsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [importOpen, setImportOpen]     = useState(false);
   const [importing, setImporting]       = useState(false);
+  const [selectedIds, setSelectedIds]   = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', { search, page, category_id: catFilter, brand_id: brandFilter, stock_status: stockFilter }],
@@ -74,6 +76,18 @@ export default function ProductsPage() {
     } finally {
       setImporting(false);
     }
+  }
+
+  async function handleBulkDelete() {
+    if (!window.confirm(`Delete ${selectedIds.size} product(s)? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    const ids = [...selectedIds];
+    const results = await Promise.allSettled(ids.map(id => productsApi.remove(id)));
+    const failed = results.filter(r => r.status === 'rejected').length;
+    failed ? toast.error(`${failed} item(s) could not be deleted.`) : toast.success(`${ids.length} product(s) deleted.`);
+    setSelectedIds(new Set());
+    qc.invalidateQueries({ queryKey: ['products'] });
+    setBulkDeleting(false);
   }
 
   function resetFilters() {
@@ -139,6 +153,20 @@ export default function ProductsPage() {
         <span className="text-sm text-surface-500 ml-auto">{pagination?.total ?? 0} product{(pagination?.total ?? 0) !== 1 ? 's' : ''}</span>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-900/30 border border-primary-700/40 rounded-xl">
+          <span className="text-sm text-primary-300 font-medium">{selectedIds.size} selected</span>
+          <button onClick={handleBulkDelete} disabled={bulkDeleting}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50">
+            <TrashIcon className="h-3.5 w-3.5" /> Delete selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-surface-400 hover:text-surface-200 transition-colors">
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="card overflow-hidden p-0">
         {isLoading ? (
@@ -156,6 +184,13 @@ export default function ProductsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-700 bg-surface-800/50">
+                <th className="w-10 px-4 py-3">
+                  <input type="checkbox"
+                    className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    checked={products.length > 0 && selectedIds.size === products.length}
+                    onChange={e => setSelectedIds(e.target.checked ? new Set(products.map(p => p.id)) : new Set())}
+                  />
+                </th>
                 <th className="text-left px-4 py-3 text-surface-400 font-medium">Product</th>
                 <th className="text-left px-4 py-3 text-surface-400 font-medium hidden md:table-cell">Category / Brand</th>
                 <th className="text-right px-4 py-3 text-surface-400 font-medium">Price</th>
@@ -167,6 +202,13 @@ export default function ProductsPage() {
             <tbody className="divide-y divide-surface-700/50">
               {products.map(p => (
                 <tr key={p.id} className="hover:bg-surface-800/30 transition-colors">
+                  <td className="px-4 py-3">
+                    <input type="checkbox"
+                      className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      checked={selectedIds.has(p.id)}
+                      onChange={e => { const n = new Set(selectedIds); e.target.checked ? n.add(p.id) : n.delete(p.id); setSelectedIds(n); }}
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {p.image ? (
