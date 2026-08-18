@@ -432,16 +432,7 @@ function CartItem({ item, dispatch }) {
     <div className="flex items-center gap-2 px-3 py-2.5 hover:bg-surface-800/40 transition-colors">
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-surface-100 truncate">{item.name}</p>
-        {/* Editable price */}
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className="text-2xs text-surface-500">₨</span>
-          <input
-            type="number" min="0" step="0.01"
-            value={item.unitPrice}
-            onChange={e => dispatch({ type: 'SET_PRICE', key: item.key, price: parseFloat(e.target.value) || 0 })}
-            className="w-20 h-5 px-1 text-xs text-surface-200 bg-surface-700 rounded border border-surface-600 focus:outline-none focus:ring-1 focus:ring-primary-500 text-right"
-          />
-        </div>
+        <p className="text-2xs text-surface-400 mt-0.5">{formatCurrency(item.unitPrice)}</p>
       </div>
 
       {/* Qty controls */}
