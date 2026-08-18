@@ -115,7 +115,7 @@ export default function LoginPage() {
         {/* Logo — transparent PNG, rendered white for the dark panel */}
         <div className="relative z-10">
           <img
-            src="/logo.png"
+            src="/newlogo.png"
             alt="ProBusinessCloud"
             className="select-none"
             style={{
@@ -173,7 +173,7 @@ export default function LoginPage() {
           {/* Mobile logo — transparent, no plate */}
           <div className="lg:hidden mb-8 flex justify-center">
             <img
-              src="/logo.png"
+              src="/newlogo.png"
               alt="ProBusinessCloud"
               className="brand-logo"
               style={{ height: 48 }}

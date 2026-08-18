@@ -4,20 +4,14 @@ import { useSelector } from 'react-redux';
 import { selectIsAuth } from '@store/slices/authSlice';
 import { Bars3Icon, XMarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 
-/* ─── PBC Logo mark ──────────────────────────────────────────────────────────── */
+/* ─── PBC Logo ───────────────────────────────────────────────────────────────── */
 function PBCMark({ size = 28 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      <path d="M36 20C36 28.837 28.837 36 20 36C11.163 36 4 28.837 4 20C4 11.163 11.163 4 20 4C24.418 4 28.418 5.791 31.314 8.686"
-        stroke="#60a5fa" strokeWidth="2.8" strokeLinecap="round" />
-      <path d="M29 20C29 25.523 24.523 30 19 30C13.477 30 9 25.523 9 20C9 14.477 13.477 10 19 10C21.761 10 24.261 11.119 26.071 12.929"
-        stroke="#3b82f6" strokeWidth="2.2" strokeLinecap="round" />
-      <rect x="12" y="14" width="1.8" height="12" rx="0.9" fill="white" />
-      <path d="M13.8 14H17.2C18.746 14 20 15.254 20 16.8C20 18.346 18.746 19.6 17.2 19.6H13.8V14Z" fill="white" />
-      <rect x="21.5" y="14" width="1.8" height="12" rx="0.9" fill="white" />
-      <path d="M23.3 14H26.2C27.526 14 28.6 15.074 28.6 16.4C28.6 17.726 27.526 18.8 26.2 18.8H23.3V14Z" fill="white" />
-      <path d="M23.3 18.8H26.5C27.936 18.8 29.1 19.964 29.1 21.4C29.1 22.836 27.936 24 26.5 24H23.3V18.8Z" fill="white" />
-    </svg>
+    <img
+      src="/newlogo.png"
+      alt="ProBusinessCloud"
+      style={{ height: size, width: 'auto', objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }}
+    />
   );
 }
 
@@ -134,11 +128,9 @@ function Navbar() {
           <div style={{ display: 'flex', alignItems: 'center', height: 68, gap: '2rem' }}>
 
             {/* Logo */}
-            <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', textDecoration: 'none', flexShrink: 0 }}>
-              <PBCMark size={30} />
-              <span style={{ fontWeight: 700, fontSize: '1rem', color: '#e8f0fe', letterSpacing: '-0.01em' }}>
-                ProBusiness<span style={{ color: '#60a5fa' }}>Cloud</span>
-              </span>
+            <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flexShrink: 0 }}>
+              <img src="/newlogo.png" alt="ProBusinessCloud"
+                style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }} />
             </Link>
 
             {/* Desktop nav links */}
@@ -256,11 +248,9 @@ function Footer() {
 
           {/* Brand */}
           <div style={{ gridColumn: 'span 2' }} className="md:col-span-1">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1rem' }}>
-              <PBCMark size={28} />
-              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#e8f0fe' }}>
-                ProBusiness<span style={{ color: '#60a5fa' }}>Cloud</span>
-              </span>
+            <div style={{ marginBottom: '1rem' }}>
+              <img src="/newlogo.png" alt="ProBusinessCloud"
+                style={{ height: 32, width: 'auto', objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }} />
             </div>
             <p style={{ fontSize: '0.85rem', lineHeight: 1.7, color: '#3d5070', maxWidth: 260 }}>
               Complete cloud-based POS and business management platform for modern businesses.

@@ -85,7 +85,7 @@ export default function SuperAdminLoginPage() {
         {/* ── Brand header ── */}
         <div className="flex flex-col items-center text-center mb-7">
           <img
-            src="/logo.png"
+            src="/newlogo.png"
             alt="ProBusinessCloud"
             className="select-none mb-6"
             style={{

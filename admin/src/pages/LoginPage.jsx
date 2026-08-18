@@ -105,7 +105,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <img src="/logo.png" alt="ProBusinessCloud" className="brand-logo" style={{ height: 60 }} />
+          <img src="/newlogo.png" alt="ProBusinessCloud" className="brand-logo" style={{ height: 60 }} />
         </div>
 
         {/* Hero */}
@@ -173,7 +173,7 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="lg:hidden mb-8 flex justify-center">
-            <img src="/logo.png" alt="ProBusinessCloud" className="brand-logo" style={{ height: 44 }} />
+            <img src="/newlogo.png" alt="ProBusinessCloud" className="brand-logo" style={{ height: 44 }} />
           </div>
 
           {/* Heading */}
