@@ -318,7 +318,7 @@ function UserRow({ user, can, isAdmin, selected, onSelect, onEdit, onResetPwd, o
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <Menu.Items className="absolute right-0 z-20 mt-1 w-44 rounded-xl bg-surface-800 border border-surface-700 shadow-xl focus:outline-none py-1">
+            <Menu.Items className="fixed right-10 z-20 mt-1 w-44 rounded-xl bg-surface-800 border border-surface-700 shadow-xl focus:outline-none py-1">
               {can('users', 'update') && (
                 <Menu.Item>
                   {({ active }) => (

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShieldCheckIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ShieldCheckIcon, InformationCircleIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
@@ -39,6 +39,21 @@ export default function RolesPage() {
   const [perms, setPerms]           = useState({});
   const [dirty, setDirty]           = useState(false);
   const [saving, setSaving]         = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newLabel, setNewLabel]     = useState('');
+  const newLabelRef                 = useRef(null);
+
+  const createMutation = useMutation({
+    mutationFn: (label) => rolesApi.create(label),
+    onSuccess: (res) => {
+      toast.success('Role created.');
+      qc.invalidateQueries({ queryKey: ['roles'] });
+      setSelectedId(res.data?.id ?? null);
+      setShowCreate(false);
+      setNewLabel('');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || err.message || 'Failed to create role.'),
+  });
 
   const selectedRole = roles.find(r => r.id === selectedId) ?? null;
   const isAdmin      = selectedRole?.name === 'admin';
@@ -47,6 +62,10 @@ export default function RolesPage() {
   useEffect(() => {
     if (roles.length > 0 && !selectedId) setSelectedId(roles[0].id);
   }, [roles]);
+
+  useEffect(() => {
+    if (showCreate) setTimeout(() => newLabelRef.current?.focus(), 50);
+  }, [showCreate]);
 
   // Load permissions when selection changes
   useEffect(() => {
@@ -135,6 +154,13 @@ export default function RolesPage() {
                 </button>
               ))
           }
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-1.5 w-full px-3 py-2 mt-1 rounded-lg text-xs text-surface-500 hover:text-primary-400 hover:bg-primary-500/5 border border-dashed border-surface-700 hover:border-primary-500/40 transition-colors"
+          >
+            <PlusIcon className="h-3.5 w-3.5" />
+            New Role
+          </button>
         </div>
 
         {/* Permission matrix */}
@@ -223,6 +249,60 @@ export default function RolesPage() {
           )}
         </div>
       </div>
+
+      {/* Create Role Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-surface-900 border border-surface-700 rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-surface-800">
+              <h3 className="text-surface-100 font-semibold text-sm">Create New Role</h3>
+              <button onClick={() => { setShowCreate(false); setNewLabel(''); }} className="text-surface-400 hover:text-surface-100 p-1">
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newLabel.trim()) return;
+                createMutation.mutate(newLabel.trim());
+              }}
+              className="p-5 flex flex-col gap-4"
+            >
+              <div>
+                <label className="block text-xs text-surface-400 mb-1.5">Role Name</label>
+                <input
+                  ref={newLabelRef}
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  placeholder="e.g. Manager, Cashier, Inventory Clerk"
+                  className="w-full text-sm bg-surface-800 border border-surface-700 text-surface-100 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                {newLabel.trim() && (
+                  <p className="text-2xs text-surface-500 mt-1">
+                    Slug: <span className="font-mono text-surface-400">{newLabel.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}</span>
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowCreate(false); setNewLabel(''); }}
+                  className="px-4 py-2 text-surface-400 hover:text-surface-100 text-sm"
+                >
+                  Cancel
+                </button>
+                <Button
+                  type="submit"
+                  loading={createMutation.isPending}
+                  disabled={!newLabel.trim()}
+                >
+                  Create Role
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
