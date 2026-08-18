@@ -2,7 +2,14 @@ import { createHashRouter, Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectIsAuth, selectUserRole } from '@store/slices/authSlice';
 import AppLayout from '@components/layout/AppLayout';
-import LoginPage from '@pages/auth/LoginPage';
+import PublicLayout from '@pages/public/PublicLayout';
+import HomePage from '@pages/public/HomePage';
+import AboutPage from '@pages/public/AboutPage';
+import FeaturesPage from '@pages/public/FeaturesPage';
+import PricingPage from '@pages/public/PricingPage';
+import FAQPage from '@pages/public/FAQPage';
+import ContactPage from '@pages/public/ContactPage';
+import PublicLoginPage from '@pages/public/PublicLoginPage';
 import DashboardPage from '@pages/dashboard/DashboardPage';
 import ExpensesPage from '@pages/expenses/ExpensesPage';
 import UsersPage from '@pages/users/UsersPage';
@@ -29,38 +36,58 @@ import EmployeesPage from '@pages/hr/EmployeesPage';
 import LedgerPage from '@pages/ledger/LedgerPage';
 import AuditPage from '@pages/audit/AuditPage';
 
-// Protected route wrapper
+// Redirect authenticated users to dashboard; unauthenticated users to login
 function ProtectedRoute({ roles }) {
   const isAuth = useSelector(selectIsAuth);
   const role   = useSelector(selectUserRole);
   if (!isAuth) return <Navigate to="/login" replace />;
-  if (roles && !roles.includes(role)) return <Navigate to="/" replace />;
+  if (roles && !roles.includes(role)) return <Navigate to="/dashboard" replace />;
   return <Outlet />;
 }
 
-// Redirect to dashboard if already logged in
+// Redirect to dashboard if already logged in (used for /login)
 function PublicRoute() {
   const isAuth = useSelector(selectIsAuth);
-  return isAuth ? <Navigate to="/" replace /> : <Outlet />;
+  return isAuth ? <Navigate to="/dashboard" replace /> : <Outlet />;
+}
+
+// Smart catch-all: authenticated → dashboard, otherwise → home
+function CatchAll() {
+  const isAuth = useSelector(selectIsAuth);
+  return <Navigate to={isAuth ? '/dashboard' : '/'} replace />;
 }
 
 export const router = createHashRouter([
-  // Public routes
+
+  // ── Public marketing website (always accessible) ──────────────────────────
   {
-    element: <PublicRoute />,
+    element: <PublicLayout />,
     children: [
-      { path: '/login', element: <LoginPage /> },
+      { path: '/',         element: <HomePage /> },
+      { path: '/about',    element: <AboutPage /> },
+      { path: '/features', element: <FeaturesPage /> },
+      { path: '/pricing',  element: <PricingPage /> },
+      { path: '/faq',      element: <FAQPage /> },
+      { path: '/contact',  element: <ContactPage /> },
     ],
   },
 
-  // Protected app routes
+  // ── Login — redirect to dashboard if already authenticated ────────────────
+  {
+    element: <PublicRoute />,
+    children: [
+      { path: '/login', element: <PublicLoginPage /> },
+    ],
+  },
+
+  // ── Protected application routes ──────────────────────────────────────────
   {
     element: <ProtectedRoute />,
     children: [
       {
         element: <AppLayout />,
         children: [
-          { path: '/',                    element: <DashboardPage /> },
+          { path: '/dashboard',           element: <DashboardPage /> },
           { path: '/users',               element: <UsersPage /> },
           { path: '/settings/profile',    element: <ProfilePage /> },
           { path: '/categories',          element: <CategoriesPage /> },
@@ -68,28 +95,28 @@ export const router = createHashRouter([
           { path: '/products',            element: <ProductsPage /> },
           { path: '/products/new',        element: <ProductFormPage /> },
           { path: '/products/:id/edit',   element: <ProductFormPage /> },
-          { path: '/suppliers',            element: <SuppliersPage /> },
-          { path: '/purchases',            element: <PurchasesPage /> },
-          { path: '/purchases/new',        element: <PurchaseFormPage /> },
-          { path: '/purchases/:id',        element: <PurchaseDetailPage /> },
-          { path: '/inventory/adjust',     element: <StockAdjustPage /> },
-          { path: '/customers',            element: <CustomersPage /> },
-          { path: '/pos',                  element: <POSPage /> },
-          { path: '/sales',                element: <SalesPage /> },
-          { path: '/sales/:id',            element: <SaleDetailPage /> },
-          { path: '/reports',              element: <ReportsPage /> },
-          { path: '/settings',             element: <SettingsPage /> },
+          { path: '/suppliers',           element: <SuppliersPage /> },
+          { path: '/purchases',           element: <PurchasesPage /> },
+          { path: '/purchases/new',       element: <PurchaseFormPage /> },
+          { path: '/purchases/:id',       element: <PurchaseDetailPage /> },
+          { path: '/inventory/adjust',    element: <StockAdjustPage /> },
+          { path: '/customers',           element: <CustomersPage /> },
+          { path: '/pos',                 element: <POSPage /> },
+          { path: '/sales',               element: <SalesPage /> },
+          { path: '/sales/:id',           element: <SaleDetailPage /> },
+          { path: '/reports',             element: <ReportsPage /> },
+          { path: '/settings',            element: <SettingsPage /> },
           { path: '/roles',               element: <RolesPage /> },
-          { path: '/expenses',             element: <ExpensesPage /> },
-          { path: '/returns',              element: <ReturnsPage /> },
-          { path: '/manufacturing',        element: <ManufacturingPage /> },
-          { path: '/hr',                   element: <EmployeesPage /> },
-          { path: '/ledger',               element: <LedgerPage /> },
-          { path: '/audit',                element: <AuditPage /> },
+          { path: '/expenses',            element: <ExpensesPage /> },
+          { path: '/returns',             element: <ReturnsPage /> },
+          { path: '/manufacturing',       element: <ManufacturingPage /> },
+          { path: '/hr',                  element: <EmployeesPage /> },
+          { path: '/ledger',              element: <LedgerPage /> },
+          { path: '/audit',               element: <AuditPage /> },
         ],
       },
     ],
   },
 
-  { path: '*', element: <Navigate to="/" replace /> },
+  { path: '*', element: <CatchAll /> },
 ]);

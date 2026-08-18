@@ -34,7 +34,7 @@ import { cn } from '@utils/cn';
 const NAV_GROUPS = [
   {
     items: [
-      { label: 'Dashboard',    path: '/',                icon: HomeIcon,                  permission: 'dashboard' },
+      { label: 'Dashboard',    path: '/dashboard',       icon: HomeIcon,                  permission: 'dashboard' },
     ],
   },
   {
@@ -247,7 +247,7 @@ function NavItem({ item, collapsed }) {
   return (
     <NavLink
       to={item.path}
-      end={item.path === '/'}
+      end={item.path === '/dashboard'}
       title={collapsed ? item.label : undefined}
       className={({ isActive }) =>
         cn(
