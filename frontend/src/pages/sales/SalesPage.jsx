@@ -93,6 +93,7 @@ export default function SalesPage() {
                 <th className="text-left px-4 py-3 text-surface-400 font-medium hidden md:table-cell">Customer</th>
                 <th className="text-center px-4 py-3 text-surface-400 font-medium hidden sm:table-cell">Method</th>
                 <th className="text-right px-4 py-3 text-surface-400 font-medium">Total</th>
+                <th className="text-right px-4 py-3 text-surface-400 font-medium hidden lg:table-cell">Discount</th>
                 <th className="text-right px-4 py-3 text-surface-400 font-medium hidden lg:table-cell">Paid</th>
                 <th className="text-right px-4 py-3 text-surface-400 font-medium hidden lg:table-cell">Due</th>
                 <th className="text-center px-4 py-3 text-surface-400 font-medium">Status</th>
@@ -116,6 +117,11 @@ export default function SalesPage() {
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-surface-100">
                     {formatCurrency(sale.total_amount)}
+                  </td>
+                  <td className="px-4 py-3 text-right hidden lg:table-cell">
+                    {sale.discount_amount > 0
+                      ? <span className="text-amber-400">{formatCurrency(sale.discount_amount)}</span>
+                      : <span className="text-surface-500">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right text-surface-300 hidden lg:table-cell">
                     {formatCurrency(sale.paid_amount)}
