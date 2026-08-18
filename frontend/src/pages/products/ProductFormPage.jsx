@@ -213,15 +213,15 @@ export default function ProductFormPage() {
             <div className="card space-y-4">
               <div className="flex items-center justify-between border-b border-surface-700 pb-2">
                 <h2 className="text-sm font-semibold text-surface-200">Pricing</h2>
-                {isEditing && hasTransactions && (
+                {isEditing && (
                   <div className="flex items-center gap-1.5 text-2xs text-amber-400">
                     <LockClosedIcon className="h-3 w-3" />
-                    <span>Locked — product has sales history</span>
+                    <span>Locked — cannot change after creation</span>
                   </div>
                 )}
               </div>
               <div className="grid grid-cols-3 gap-4">
-                {isEditing && hasTransactions ? (
+                {isEditing ? (
                   <>
                     <LockedField label="Cost Price (₨)" value={watch('cost_price')} />
                     <LockedField label="Sale Price (₨)"  value={watch('sale_price')} />
@@ -274,9 +274,7 @@ export default function ProductFormPage() {
                       <span className="font-mono">{(() => {
                         const cur  = parseFloat(watch('stock_quantity')) || 0;
                         const sold = parseFloat(productData?.data?.total_sold) || 0;
-                        return sold > 0
-                          ? `${formatQty(cur)}/${formatQty(cur + sold)}`
-                          : formatQty(cur);
+                        return `${formatQty(cur)}/${formatQty(cur + sold)}`;
                       })()}</span>
                     </div>
                     <p className="text-2xs text-surface-500 mt-1.5">Use Stock Adjustment to change stock levels.</p>

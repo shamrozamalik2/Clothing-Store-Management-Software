@@ -4,7 +4,9 @@
  */
 export function formatCurrency(amount, symbol = '₨') {
   if (amount === null || amount === undefined) return `${symbol} —`;
-  return `${symbol} ${Number(amount).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const n = Number(amount);
+  const decimals = n % 1 === 0 ? 0 : 2;
+  return `${symbol} ${n.toLocaleString('en-PK', { minimumFractionDigits: decimals, maximumFractionDigits: 2 })}`;
 }
 
 export function formatNumber(n, decimals = 0) {

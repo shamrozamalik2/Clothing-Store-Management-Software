@@ -20,9 +20,7 @@ import CustomerFormModal from '@pages/customers/components/CustomerFormModal';
 function stockLabel(product) {
   const current = parseFloat(product.stock_quantity) || 0;
   const sold    = parseFloat(product.total_sold)     || 0;
-  return sold > 0
-    ? `Stock: ${formatQty(current)}/${formatQty(current + sold)}`
-    : `Stock: ${formatQty(current)}`;
+  return `Stock: ${formatQty(current)}/${formatQty(current + sold)}`;
 }
 
 // ─── Cart reducer ─────────────────────────────────────────────────────────────

@@ -3,5 +3,5 @@ export function formatQty(val) {
   const n = parseFloat(val);
   if (isNaN(n)) return String(val);
   if (n % 1 === 0) return n.toFixed(0);
-  return parseFloat(n.toFixed(4)).toString();
+  return parseFloat(n.toFixed(2)).toString();
 }
