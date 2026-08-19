@@ -771,9 +771,9 @@ function ReceiptModal({ receipt, onClose }) {
         {/* Header — company branding */}
         <div className="text-center px-6 pt-6 pb-4 border-b border-gray-200">
           {companyLogo && (
-            <div className="flex justify-center mb-2">
+            <div className="flex justify-center mb-3">
               <img src={companyLogo} alt={companyName}
-                className="max-h-12 max-w-[160px] object-contain" />
+                className="w-16 h-16 rounded-full object-cover border-2 border-gray-100 shadow-sm" />
             </div>
           )}
           <h2 className="text-lg font-bold text-gray-900">{companyName}</h2>

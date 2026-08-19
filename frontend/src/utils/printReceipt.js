@@ -77,7 +77,7 @@ export function printReceipt(sale, items, settings) {
     .bold   { font-weight: bold; }
 
     /* ── store header ── */
-    .store-logo { max-height: 52px; max-width: 100%; object-fit: contain; margin-bottom: 5px; }
+    .store-logo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; margin-bottom: 6px; border: 2px solid #e5e7eb; }
     .store-name {
       font-size: 17px;
       font-weight: bold;
