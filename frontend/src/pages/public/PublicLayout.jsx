@@ -2,18 +2,8 @@ import { useState, useEffect } from 'react';
 import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectIsAuth } from '@store/slices/authSlice';
-import { Bars3Icon, XMarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
-
-/* ─── PBC Logo ───────────────────────────────────────────────────────────────── */
-function PBCMark({ size = 28 }) {
-  return (
-    <img
-      src="/newlogo.png"
-      alt="ProBusinessCloud"
-      style={{ height: size, width: 'auto', objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }}
-    />
-  );
-}
+import { Bars3Icon, XMarkIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
+import { ThemeProvider, usePublicTheme } from './ThemeContext';
 
 const NAV_LINKS = [
   { label: 'Home',     to: '/',        end: true },
@@ -24,183 +14,233 @@ const NAV_LINKS = [
   { label: 'Contact',  to: '/contact', end: false },
 ];
 
-const C = {
-  bg:        '#070c1c',
-  nav:       'rgba(7,12,28,0.88)',
-  border:    'rgba(255,255,255,0.07)',
-  text:      '#d1daf5',
-  textMuted: '#5a7299',
-  blue:      '#3b82f6',
-  cyan:      '#06b6d4',
-};
-
 /* ─── Navbar ─────────────────────────────────────────────────────────────────── */
 function Navbar() {
-  const [open, setOpen]       = useState(false);
+  const { c, isDark, toggle } = usePublicTheme();
+  const [open, setOpen]         = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const isAuth                = useSelector(selectIsAuth);
-  const navigate              = useNavigate();
-  const location              = useLocation();
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const isAuth                  = useSelector(selectIsAuth);
+  const navigate                = useNavigate();
+  const location                = useLocation();
 
   useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handler, { passive: true });
-    return () => window.removeEventListener('scroll', handler);
+    const onScroll = () => setScrolled(window.scrollY > 60);
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
 
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
+  // On the blue hero (not scrolled) → white text; scrolled over content → themed
+  const onHero  = !scrolled;
+  const linkCol = onHero ? 'rgba(255,255,255,0.88)' : c.text;
+  const activeCol = onHero ? '#ffffff' : c.accentLink;
+  const logoFilter = onHero ? 'brightness(0) invert(1)' : c.logoFilter;
+  const navHoverHex = onHero ? '#ffffff' : (isDark ? '#93c5fd' : '#1d4ed8');
+
   const navLinkStyle = ({ isActive }) => ({
-    fontSize: '0.875rem',
-    fontWeight: 500,
-    color: isActive ? '#93c5fd' : C.text,
-    textDecoration: 'none',
-    padding: '0.375rem 0.5rem',
-    borderRadius: '0.5rem',
+    fontSize: '0.875rem', fontWeight: 500,
+    color: isActive ? activeCol : linkCol,
+    textDecoration: 'none', padding: '0.4rem 0.625rem', borderRadius: 8,
     transition: 'color 0.2s',
   });
+
+  const toggleBtn = (
+    <button
+      onClick={toggle}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      style={{
+        background: onHero ? 'rgba(255,255,255,0.12)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
+        border: `1px solid ${onHero ? 'rgba(255,255,255,0.25)' : c.border}`,
+        borderRadius: 8, cursor: 'pointer',
+        width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: onHero ? 'white' : c.text, transition: 'all 0.2s', flexShrink: 0,
+      }}
+    >
+      {isDark
+        ? <SunIcon style={{ width: 17, height: 17 }} />
+        : <MoonIcon style={{ width: 17, height: 17 }} />}
+    </button>
+  );
 
   return (
     <>
       <style>{`
-        .pub-nav-link:hover { color: #93c5fd !important; }
-        .pub-btn-outline:hover { background: rgba(59,130,246,0.15) !important; border-color: rgba(59,130,246,0.5) !important; color: #bfdbfe !important; }
-        .pub-btn-solid:hover { opacity: 0.88; transform: translateY(-1px); }
-        @keyframes pub-gradient { 0%,100% { background-position: 0% 50% } 50% { background-position: 100% 50% } }
-        @keyframes pub-float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-12px) } }
-        @keyframes pub-fade-up { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
-        @keyframes pub-glow { 0%,100% { opacity:0.3; transform:scale(1) } 50% { opacity:0.7; transform:scale(1.2) } }
+        /* ── Hero: always blue-purple gradient ──────────────────── */
         .pub-hero-bg {
-          background: radial-gradient(ellipse 80% 60% at 20% 40%, rgba(29,78,216,0.18) 0%, transparent 60%),
-                      radial-gradient(ellipse 60% 50% at 80% 20%, rgba(6,182,212,0.12) 0%, transparent 55%),
-                      #070c1c;
+          background: linear-gradient(135deg, #3730a3 0%, #4f46e5 55%, #7c3aed 100%);
+          position: relative;
         }
+
+        /* ── CSS variable definitions (content sections) ─────────── */
+        [data-pub-theme] {
+          --pub-bg: #070c1c;
+          --pub-bg-alt: #080f20;
+          --pub-bg-card: #0e1a30;
+          --pub-bg-card-hover: #111f3a;
+          --pub-text: #d1daf5;
+          --pub-border: rgba(255,255,255,0.07);
+          --pub-border-card-hover: rgba(99,102,241,0.3);
+          --pub-input-bg: rgba(255,255,255,0.04);
+          --pub-input-placeholder: #3d5070;
+          --pub-card-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        [data-pub-theme="light"] {
+          --pub-bg: #f8f9ff;
+          --pub-bg-alt: #f0f2ff;
+          --pub-bg-card: #ffffff;
+          --pub-bg-card-hover: #f5f7ff;
+          --pub-text: #1e293b;
+          --pub-border: rgba(0,0,0,0.07);
+          --pub-border-card-hover: rgba(99,102,241,0.25);
+          --pub-input-bg: rgba(0,0,0,0.04);
+          --pub-input-placeholder: #94a3b8;
+          --pub-card-shadow: 0 4px 24px rgba(79,70,229,0.08), 0 1px 4px rgba(0,0,0,0.05);
+        }
+
+        /* ── Themed CSS classes ─────────────────────────────────── */
+        .pub-nav-link:hover { color: var(--nav-lh, #93c5fd) !important; }
+        .pub-btn-outline:hover {
+          background: rgba(99,102,241,0.12) !important;
+          border-color: rgba(99,102,241,0.45) !important;
+          color: #6366f1 !important;
+        }
+        .pub-btn-solid:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 12px 32px rgba(79,70,229,0.45) !important; }
+
+        @keyframes pub-glow { 0%,100% { opacity:0.4; transform:scale(1) } 50% { opacity:0.75; transform:scale(1.15) } }
+        @keyframes pub-fade-up { from { opacity:0; transform:translateY(22px) } to { opacity:1; transform:translateY(0) } }
+
         .pub-gradient-text {
-          background: linear-gradient(135deg, #60a5fa, #06b6d4);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+          background: linear-gradient(135deg, #818cf8, #c4b5fd);
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
         .pub-gradient-btn {
-          background: linear-gradient(135deg, #2563eb, #0891b2);
-          color: white;
-          transition: all 0.25s;
+          background: linear-gradient(135deg, #4f46e5, #7c3aed);
+          color: white; transition: all 0.25s;
+          box-shadow: 0 6px 20px rgba(79,70,229,0.35);
         }
-        .pub-section { background: #070c1c; }
-        .pub-section-alt { background: #080f20; }
+        .pub-section     { background: var(--pub-bg); }
+        .pub-section-alt { background: var(--pub-bg-alt); }
+
         .pub-card {
-          background: #0e1a30;
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 16px;
-          transition: all 0.25s;
+          background: var(--pub-bg-card);
+          border: 1px solid var(--pub-border);
+          border-radius: 16px; transition: all 0.25s;
+          box-shadow: var(--pub-card-shadow);
         }
         .pub-card:hover {
-          background: #111f3a;
-          border-color: rgba(59,130,246,0.2);
-          transform: translateY(-3px);
-          box-shadow: 0 16px 48px rgba(0,0,0,0.35), 0 0 0 1px rgba(59,130,246,0.08);
+          background: var(--pub-bg-card-hover);
+          border-color: var(--pub-border-card-hover);
+          transform: translateY(-4px);
+          box-shadow: 0 16px 40px rgba(79,70,229,0.14), 0 2px 8px rgba(0,0,0,0.06);
         }
         .pub-icon-wrap {
-          width: 48px; height: 48px;
-          border-radius: 12px;
+          width: 52px; height: 52px; border-radius: 14px;
           display: flex; align-items: center; justify-content: center;
-          background: rgba(59,130,246,0.1);
-          border: 1px solid rgba(59,130,246,0.15);
+          background: rgba(79,70,229,0.08); border: 1px solid rgba(79,70,229,0.15);
         }
         .pub-input {
           width: 100%; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.9rem;
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
-          color: #d1daf5; outline: none; transition: all 0.2s;
+          background: var(--pub-input-bg); border: 1px solid var(--pub-border);
+          color: var(--pub-text); outline: none; transition: all 0.2s; font-family: inherit;
         }
-        .pub-input:focus { border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.05); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
-        .pub-input::placeholder { color: #3d5070; }
-        .faq-item { border-bottom: 1px solid rgba(255,255,255,0.07); }
+        .pub-input:focus { border-color: rgba(99,102,241,0.5); background: rgba(99,102,241,0.04); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        .pub-input::placeholder { color: var(--pub-input-placeholder); }
+        .pub-input option { background: var(--pub-bg-card); color: var(--pub-text); }
+        .faq-item { border-bottom: 1px solid var(--pub-border); }
       `}</style>
 
-      <nav style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-        background: scrolled ? C.nav : 'transparent',
-        borderBottom: scrolled ? `1px solid ${C.border}` : '1px solid transparent',
-        backdropFilter: scrolled ? 'blur(16px)' : 'none',
-        transition: 'all 0.35s ease',
-      }}>
+      <nav
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+          background: scrolled ? c.navBg : 'transparent',
+          borderBottom: scrolled ? `1px solid ${c.border}` : '1px solid transparent',
+          backdropFilter: scrolled ? 'blur(20px) saturate(180%)' : 'none',
+          transition: 'all 0.35s ease',
+          '--nav-lh': navHoverHex,
+        }}
+      >
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', height: 68, gap: '2rem' }}>
 
             {/* Logo */}
             <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flexShrink: 0 }}>
               <img src="/newlogo.png" alt="ProBusinessCloud"
-                style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }} />
+                style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block', filter: logoFilter, transition: 'filter 0.3s' }} />
             </Link>
 
             {/* Desktop nav links */}
-            <div className="hidden md:flex" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-              {NAV_LINKS.map(l => (
-                <NavLink key={l.to} to={l.to} end={l.end}
-                  className="pub-nav-link"
-                  style={navLinkStyle}>
-                  {l.label}
-                </NavLink>
-              ))}
-            </div>
+            {!isMobile && (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.125rem' }}>
+                {NAV_LINKS.map(l => (
+                  <NavLink key={l.to} to={l.to} end={l.end} className="pub-nav-link" style={navLinkStyle}>
+                    {l.label}
+                  </NavLink>
+                ))}
+              </div>
+            )}
 
-            {/* Desktop CTAs */}
-            <div className="hidden md:flex" style={{ alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
-              {isAuth ? (
-                <button onClick={() => navigate('/dashboard')}
-                  className="pub-btn-solid"
-                  style={{
-                    padding: '0.5rem 1.25rem', borderRadius: 10, fontSize: '0.875rem',
-                    fontWeight: 600, cursor: 'pointer', border: 'none',
-                  }}>
-                  <span className="pub-gradient-btn" style={{ padding: '0.5rem 1.25rem', borderRadius: 10, display: 'block' }}>
+            {/* Desktop CTAs + toggle */}
+            {!isMobile && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexShrink: 0 }}>
+                {toggleBtn}
+                {isAuth ? (
+                  <button onClick={() => navigate('/dashboard')}
+                    className="pub-gradient-btn pub-btn-solid"
+                    style={{ padding: '0.5rem 1.375rem', borderRadius: 50, fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', border: 'none' }}>
                     Go to App
-                  </span>
-                </button>
-              ) : (
-                <>
-                  <Link to="/login" className="pub-btn-outline" style={{
-                    padding: '0.5rem 1.125rem', borderRadius: 10, fontSize: '0.875rem',
-                    fontWeight: 500, color: '#93c5fd', textDecoration: 'none',
-                    border: '1px solid rgba(59,130,246,0.3)',
-                    background: 'rgba(59,130,246,0.06)',
-                    transition: 'all 0.2s',
-                  }}>
-                    Login
-                  </Link>
-                  <Link to="/login" className="pub-btn-solid pub-gradient-btn" style={{
-                    padding: '0.5rem 1.25rem', borderRadius: 10, fontSize: '0.875rem',
-                    fontWeight: 600, textDecoration: 'none', display: 'inline-block',
-                    boxShadow: '0 4px 16px rgba(37,99,235,0.35)',
-                  }}>
-                    Get Started
-                  </Link>
-                </>
-              )}
-            </div>
+                  </button>
+                ) : (
+                  <>
+                    <Link to="/login" style={{
+                      padding: '0.5rem 1.25rem', borderRadius: 50, fontSize: '0.875rem', fontWeight: 500,
+                      color: onHero ? 'rgba(255,255,255,0.9)' : c.text, textDecoration: 'none',
+                      border: `1px solid ${onHero ? 'rgba(255,255,255,0.35)' : c.border}`,
+                      background: onHero ? 'rgba(255,255,255,0.1)' : 'transparent',
+                      transition: 'all 0.2s',
+                    }}>
+                      Login
+                    </Link>
+                    <Link to="/login" className="pub-gradient-btn pub-btn-solid" style={{
+                      padding: '0.5rem 1.375rem', borderRadius: 50, fontSize: '0.875rem',
+                      fontWeight: 700, textDecoration: 'none', display: 'inline-block',
+                    }}>
+                      Get Started
+                    </Link>
+                  </>
+                )}
+              </div>
+            )}
 
-            {/* Mobile hamburger */}
-            <button
-              className="md:hidden"
-              onClick={() => setOpen(v => !v)}
-              style={{ marginLeft: 'auto', color: C.text, background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
-            >
-              {open ? <XMarkIcon style={{ width: 24, height: 24 }} /> : <Bars3Icon style={{ width: 24, height: 24 }} />}
-            </button>
+            {/* Mobile: toggle + hamburger */}
+            {isMobile && (
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {toggleBtn}
+                <button
+                  onClick={() => setOpen(v => !v)}
+                  style={{ color: onHero ? 'white' : c.text, background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                >
+                  {open ? <XMarkIcon style={{ width: 24, height: 24 }} /> : <Bars3Icon style={{ width: 24, height: 24 }} />}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Mobile menu */}
         {open && (
-          <div style={{
-            background: '#080f22', borderTop: `1px solid ${C.border}`,
-            padding: '1rem 1.5rem 1.5rem',
-          }}>
+          <div style={{ background: c.bgMobileMenu, borderTop: `1px solid ${c.border}`, padding: '1rem 1.5rem 1.5rem' }}>
             {NAV_LINKS.map(l => (
               <NavLink key={l.to} to={l.to} end={l.end} style={({ isActive }) => ({
                 display: 'block', padding: '0.75rem 0', fontSize: '0.95rem', fontWeight: 500,
-                color: isActive ? '#93c5fd' : C.text, textDecoration: 'none',
-                borderBottom: `1px solid ${C.border}`,
+                color: isActive ? '#6366f1' : c.text, textDecoration: 'none',
+                borderBottom: `1px solid ${c.border}`,
               })}>
                 {l.label}
               </NavLink>
@@ -209,22 +249,21 @@ function Navbar() {
               {isAuth ? (
                 <button onClick={() => navigate('/dashboard')}
                   className="pub-gradient-btn"
-                  style={{ padding: '0.75rem', borderRadius: 12, fontWeight: 600, border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>
+                  style={{ padding: '0.75rem', borderRadius: 50, fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>
                   Go to App
                 </button>
               ) : (
                 <>
                   <Link to="/login" style={{
                     display: 'block', textAlign: 'center', padding: '0.75rem',
-                    borderRadius: 12, fontWeight: 500, color: '#93c5fd', textDecoration: 'none',
-                    border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.06)',
+                    borderRadius: 50, fontWeight: 500, color: c.text, textDecoration: 'none',
+                    border: `1px solid ${c.border}`, background: 'transparent',
                   }}>
                     Login
                   </Link>
                   <Link to="/login" className="pub-gradient-btn" style={{
                     display: 'block', textAlign: 'center', padding: '0.75rem',
-                    borderRadius: 12, fontWeight: 600, textDecoration: 'none',
-                    boxShadow: '0 4px 16px rgba(37,99,235,0.35)',
+                    borderRadius: 50, fontWeight: 700, textDecoration: 'none',
                   }}>
                     Get Started Free
                   </Link>
@@ -240,9 +279,10 @@ function Navbar() {
 
 /* ─── Footer ─────────────────────────────────────────────────────────────────── */
 function Footer() {
+  const { c, isDark } = usePublicTheme();
   const year = new Date().getFullYear();
   return (
-    <footer style={{ background: '#050914', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '4rem 1.5rem 2rem' }}>
+    <footer style={{ background: isDark ? '#050912' : '#1e1b4b', borderTop: `1px solid rgba(255,255,255,0.08)`, padding: '4rem 1.5rem 2rem' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '3rem', marginBottom: '3rem' }}>
 
@@ -252,17 +292,15 @@ function Footer() {
               <img src="/newlogo.png" alt="ProBusinessCloud"
                 style={{ height: 32, width: 'auto', objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }} />
             </div>
-            <p style={{ fontSize: '0.85rem', lineHeight: 1.7, color: '#3d5070', maxWidth: 260 }}>
+            <p style={{ fontSize: '0.85rem', lineHeight: 1.7, color: 'rgba(255,255,255,0.45)', maxWidth: 260 }}>
               Complete cloud-based POS and business management platform for modern businesses.
             </p>
-            {/* Social links */}
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
               {['𝕏', 'in', 'fb', 'ig'].map(s => (
                 <span key={s} style={{
-                  width: 34, height: 34, borderRadius: 8, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700,
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-                  color: '#5a7299', cursor: 'pointer',
+                  width: 34, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '0.7rem', fontWeight: 700, background: 'rgba(255,255,255,0.07)',
+                  border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
                 }}>
                   {s}
                 </span>
@@ -270,20 +308,15 @@ function Footer() {
             </div>
           </div>
 
-          {/* Product */}
           <FooterCol title="Product" links={[
             { label: 'Features', to: '/features' },
             { label: 'Pricing',  to: '/pricing' },
             { label: 'FAQ',      to: '/faq' },
           ]} />
-
-          {/* Company */}
           <FooterCol title="Company" links={[
             { label: 'About',   to: '/about' },
             { label: 'Contact', to: '/contact' },
           ]} />
-
-          {/* Support */}
           <FooterCol title="Support" links={[
             { label: 'Login',       to: '/login' },
             { label: 'Get Started', to: '/login' },
@@ -291,13 +324,9 @@ function Footer() {
           ]} />
         </div>
 
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <p style={{ fontSize: '0.8rem', color: '#253550' }}>
-            © {year} ProBusinessCloud. All rights reserved.
-          </p>
-          <p style={{ fontSize: '0.8rem', color: '#253550' }}>
-            Built for modern businesses
-          </p>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.25)' }}>© {year} ProBusinessCloud. All rights reserved.</p>
+          <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.25)' }}>Built for modern businesses</p>
         </div>
       </div>
     </footer>
@@ -307,14 +336,15 @@ function Footer() {
 function FooterCol({ title, links }) {
   return (
     <div>
-      <p style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#3d5070', marginBottom: '1rem' }}>
+      <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)', marginBottom: '1rem' }}>
         {title}
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
         {links.map(l => (
-          <Link key={l.label} to={l.to} style={{ fontSize: '0.875rem', color: '#475e87', textDecoration: 'none', transition: 'color 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#93c5fd'}
-            onMouseLeave={e => e.currentTarget.style.color = '#475e87'}>
+          <Link key={l.label} to={l.to}
+            style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.5)', textDecoration: 'none', transition: 'color 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'white'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}>
             {l.label}
           </Link>
         ))}
@@ -323,15 +353,27 @@ function FooterCol({ title, links }) {
   );
 }
 
-/* ─── Public Layout ───────────────────────────────────────────────────────────── */
-export default function PublicLayout() {
+/* ─── Layout wrapper ─────────────────────────────────────────────────────────── */
+function PublicLayoutInner() {
+  const { c, isDark } = usePublicTheme();
   return (
-    <div style={{ minHeight: '100vh', background: '#070c1c', color: '#d1daf5' }}>
+    <div
+      data-pub-theme={isDark ? 'dark' : 'light'}
+      style={{ minHeight: '100vh', background: c.bg, color: c.text, transition: 'background-color 0.25s ease, color 0.25s ease' }}
+    >
       <Navbar />
-      <main style={{ paddingTop: 68 }}>
+      <main>
         <Outlet />
       </main>
       <Footer />
     </div>
+  );
+}
+
+export default function PublicLayout() {
+  return (
+    <ThemeProvider>
+      <PublicLayoutInner />
+    </ThemeProvider>
   );
 }

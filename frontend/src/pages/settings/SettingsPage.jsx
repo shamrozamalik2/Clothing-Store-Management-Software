@@ -148,6 +148,7 @@ function BackupTab() {
   const [restoreReport, setRestoreReport] = useState(null);
   const fileInputRef = useRef(null);
   const progressRef  = useRef(null);
+  const fileRef      = useRef(null);   // holds raw File for FormData upload
 
   useEffect(() => {
     window.electronAPI?.backup?.getAutoInfo?.().then(setAutoInfo);
@@ -170,13 +171,13 @@ function BackupTab() {
     setExportState('running');
     setExportError('');
     try {
-      const data = await client.get('/backup/export');
+      // Download raw bytes from server — no parse/re-stringify so file is always valid JSON
+      const blob = await client.get('/backup/export', { responseType: 'blob' });
       const today = new Date().toISOString().slice(0, 10);
       const filename = `backup-${today}.json`;
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
+      const url = URL.createObjectURL(blob);
+      const a  = document.createElement('a');
+      a.href   = url;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -200,23 +201,71 @@ function BackupTab() {
   async function handleRestoreFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      let text = await file.text();
-      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-      const backup = JSON.parse(text);
-      if (!backup || typeof backup !== 'object' || Array.isArray(backup)) {
-        toast.error('Invalid backup file — content must be a JSON object.');
-        return;
-      }
-      setPreview(backup);
-    } catch {
-      toast.error('Could not read backup file. The file content must be valid JSON.');
+    fileRef.current = file;
+
+    // Read first 16 bytes to check for SQLite magic "SQLite format 3\0"
+    const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    const isSqlite = (
+      header[0] === 0x53 && header[1] === 0x51 &&
+      header[2] === 0x4C && header[3] === 0x69
+    );
+
+    if (isSqlite) {
+      setPreview({ _isSqlite: true, _fileName: file.name, _fileSize: file.size });
+      return;
     }
+
+    // Try to parse as JSON so we can show record counts in the preview
+    let text;
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes  = new Uint8Array(buffer);
+      let decoder = new TextDecoder('utf-8');
+      if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
+        decoder = new TextDecoder('utf-16le');
+        text = decoder.decode(bytes.slice(2));
+      } else if (bytes[0] === 0xFE && bytes[1] === 0xFF) {
+        decoder = new TextDecoder('utf-16be');
+        text = decoder.decode(bytes.slice(2));
+      } else if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+        text = decoder.decode(bytes.slice(3));
+      } else {
+        text = decoder.decode(bytes);
+      }
+    } catch (err) {
+      toast.error(`Could not read file: ${err.message}`);
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text.trim());
+    } catch {
+      toast.error('This file is not a SQLite database or a valid JSON backup.');
+      return;
+    }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      toast.error('Invalid backup structure.');
+      return;
+    }
+
+    if (parsed.success === true && parsed.data?.version && parsed.data?.data) {
+      parsed = parsed.data;
+    }
+
+    const hasContent = parsed.data || parsed.categories || parsed.products ||
+                       parsed.sales || parsed.customers || parsed.settings;
+    if (!hasContent) {
+      toast.error('This file does not appear to be a ProBusinessCloud backup. No recognisable data found.');
+      return;
+    }
+
+    setPreview(parsed);
   }
 
   async function doRestore() {
-    if (!preview) return;
-    const backup = preview;
+    if (!preview || !fileRef.current) return;
     setPreview(null);
     setRestoreState('running');
     setRestoreProgress(0);
@@ -230,16 +279,20 @@ function BackupTab() {
     }, 500);
 
     try {
-      const res = await client.post('/backup/restore', backup, { timeout: 300_000 });
+      const formData = new FormData();
+      formData.append('file', fileRef.current);
+      // Send the raw file — backend detects SQLite vs JSON automatically
+      const res = await client.post('/backup/restore-file', formData, { timeout: 300_000 });
       clearInterval(progressRef.current);
       setRestoreProgress(100);
-      setRestoreReport(res.data?.report ?? null);
+      const report = res?.data?.report ?? res?.report ?? null;
+      setRestoreReport(report);
       setTimeout(() => { setRestoreState('done'); setRestoreProgress(0); }, 400);
       toast.success('Backup restored successfully. Please refresh the page.');
     } catch (err) {
       clearInterval(progressRef.current);
       setRestoreProgress(0);
-      setRestoreError(err.message || 'Restore failed. Make sure the file is a valid backup.');
+      setRestoreError(err.message || 'Restore failed.');
       setRestoreState('error');
     }
   }
@@ -276,24 +329,35 @@ function BackupTab() {
                 </div>
               </div>
 
-              {preview.exported_at && (
-                <div className="flex justify-between text-xs text-surface-400 px-1">
-                  <span>Backup date</span>
-                  <span className="font-mono">{formatDate(preview.exported_at)}</span>
+              {preview._isSqlite ? (
+                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-3 space-y-1">
+                  <p className="text-xs font-semibold text-blue-300">SQLite database detected</p>
+                  <p className="text-xs text-blue-400/80 font-mono truncate">{preview._fileName}</p>
+                  <p className="text-xs text-blue-400/60">
+                    {formatBytes(preview._fileSize)} — the server will convert and import all records automatically.
+                  </p>
                 </div>
-              )}
-
-              <div className="rounded-lg border border-surface-700 overflow-hidden max-h-56 overflow-y-auto">
-                <div className="bg-surface-800/50 px-3 py-1.5 border-b border-surface-700">
-                  <p className="text-2xs font-semibold uppercase tracking-wider text-surface-500">Records to restore</p>
-                </div>
-                {getPreviewCounts(preview).map(row => (
-                  <div key={row.key} className="flex justify-between px-3 py-1.5 text-xs border-b border-surface-700/40 last:border-0">
-                    <span className="text-surface-400">{row.label}</span>
-                    <span className="font-mono text-surface-200">{row.count.toLocaleString()}</span>
+              ) : (
+                <>
+                  {preview.exported_at && (
+                    <div className="flex justify-between text-xs text-surface-400 px-1">
+                      <span>Backup date</span>
+                      <span className="font-mono">{formatDate(preview.exported_at)}</span>
+                    </div>
+                  )}
+                  <div className="rounded-lg border border-surface-700 overflow-hidden max-h-56 overflow-y-auto">
+                    <div className="bg-surface-800/50 px-3 py-1.5 border-b border-surface-700">
+                      <p className="text-2xs font-semibold uppercase tracking-wider text-surface-500">Records to restore</p>
+                    </div>
+                    {getPreviewCounts(preview).map(row => (
+                      <div key={row.key} className="flex justify-between px-3 py-1.5 text-xs border-b border-surface-700/40 last:border-0">
+                        <span className="text-surface-400">{row.label}</span>
+                        <span className="font-mono text-surface-200">{row.count.toLocaleString()}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              )}
 
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setPreview(null)}
