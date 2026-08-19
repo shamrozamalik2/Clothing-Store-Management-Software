@@ -149,7 +149,7 @@ export default function Sidebar() {
         {collapsed ? (
           companyLogo ? (
             <img src={companyLogo} alt={companyName}
-              style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', display: 'block', border: '2px solid rgba(255,255,255,0.15)' }} />
+              style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', display: 'block', border: '2px solid rgba(255,255,255,0.15)' }} />
           ) : (
             <PBCMark size={30} />
           )
@@ -157,7 +157,7 @@ export default function Sidebar() {
           <div className="flex items-center justify-center w-full">
             {companyLogo ? (
               <img src={companyLogo} alt={companyName}
-                style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', display: 'block', border: '2px solid rgba(255,255,255,0.15)' }} />
+                style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', display: 'block', border: '2px solid rgba(255,255,255,0.15)' }} />
             ) : (
               <div className="rounded-xl overflow-hidden flex items-center justify-center select-none"
                 style={{ padding: '5px 14px' }}>
