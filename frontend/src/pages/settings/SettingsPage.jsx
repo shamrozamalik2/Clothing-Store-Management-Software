@@ -281,8 +281,12 @@ function BackupTab() {
     try {
       const formData = new FormData();
       formData.append('file', fileRef.current);
-      // Send the raw file — backend detects SQLite vs JSON automatically
-      const res = await client.post('/backup/restore-file', formData, { timeout: 300_000 });
+      // client.js sets Content-Type: application/json globally — delete it so the
+      // browser can set multipart/form-data with the correct boundary automatically
+      const res = await client.post('/backup/restore-file', formData, {
+        timeout: 300_000,
+        transformRequest: [(data, headers) => { delete headers['Content-Type']; return data; }],
+      });
       clearInterval(progressRef.current);
       setRestoreProgress(100);
       const report = res?.data?.report ?? res?.report ?? null;
