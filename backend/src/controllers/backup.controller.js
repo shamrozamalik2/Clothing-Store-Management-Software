@@ -20,7 +20,14 @@ async function sqliteBufferToData(buf) {
   const SQL = await initSqlJs();
   const db  = new SQL.Database(new Uint8Array(buf));
 
+  // List every user table that actually exists in this file
+  const masterRes  = db.exec(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`);
+  const tableNames = masterRes.length ? masterRes[0].values.map(r => String(r[0])) : [];
+  logger.info(`[Backup] SQLite tables found: ${tableNames.join(', ') || '(none)'}`);
+
+  // Read a table by exact name → array of row objects
   function tbl(name) {
+    if (!tableNames.includes(name)) return [];
     try {
       const res = db.exec(`SELECT * FROM "${name}"`);
       if (!res.length) return [];
@@ -29,29 +36,53 @@ async function sqliteBufferToData(buf) {
     } catch { return []; }
   }
 
+  // Try a list of candidate names, return the first that has rows
+  function tblAny(...names) {
+    for (const n of names) {
+      const rows = tbl(n);
+      if (rows.length) return rows;
+    }
+    // Fallback: return rows from first existing name even if empty
+    for (const n of names) {
+      if (tableNames.includes(n)) return tbl(n);
+    }
+    return [];
+  }
+
   const data = {
-    categories:             tbl('categories'),
-    brands:                 tbl('brands'),
-    suppliers:              tbl('suppliers'),
-    products:               tbl('products'),
-    product_variants:       tbl('product_variants'),
-    customers:              tbl('customers'),
-    sales:                  tbl('sales'),
-    sale_items:             tbl('sale_items'),
-    purchases:              tbl('purchases'),
-    purchase_items:         tbl('purchase_items'),
-    purchase_payments:      tbl('purchase_payments'),
-    returns:                tbl('returns'),
-    return_items:           tbl('return_items'),
-    exchange_items:         tbl('exchange_items'),
-    expense_categories:     tbl('expense_categories'),
-    expenses:               tbl('expenses'),
-    stock_adjustments:      tbl('stock_adjustments'),
-    stock_adjustment_items: tbl('stock_adjustment_items'),
-    settings:               tbl('settings'),
+    categories:             tblAny('categories',           'category'),
+    brands:                 tblAny('brands',               'brand'),
+    suppliers:              tblAny('suppliers',            'supplier'),
+    products:               tblAny('products',             'product', 'items', 'inventory'),
+    product_variants:       tblAny('product_variants',     'variants', 'product_variant'),
+    customers:              tblAny('customers',            'customer', 'clients', 'client'),
+    sales:                  tblAny('sales',                'sale',    'orders',  'invoices'),
+    sale_items:             tblAny('sale_items',           'sale_item','order_items','invoice_items'),
+    purchases:              tblAny('purchases',            'purchase', 'purchase_orders'),
+    purchase_items:         tblAny('purchase_items',       'purchase_item'),
+    purchase_payments:      tblAny('purchase_payments',    'purchase_payment'),
+    returns:                tblAny('returns',              'return',  'refunds'),
+    return_items:           tblAny('return_items',         'return_item'),
+    exchange_items:         tblAny('exchange_items',       'exchange_item', 'exchanges'),
+    expense_categories:     tblAny('expense_categories',   'expense_category', 'expense_cats'),
+    expenses:               tblAny('expenses',             'expense'),
+    stock_adjustments:      tblAny('stock_adjustments',    'stock_adjustment', 'adjustments'),
+    stock_adjustment_items: tblAny('stock_adjustment_items','stock_adjustment_item'),
+    settings:               tblAny('settings',             'setting',  'config', 'configuration'),
   };
 
   db.close();
+
+  const totalRows = Object.values(data).reduce((s, r) => s + r.length, 0);
+  logger.info(`[Backup] SQLite total rows extracted: ${totalRows}`);
+
+  if (totalRows === 0) {
+    throw new Error(
+      `No data could be read from the SQLite file. Tables found: [${tableNames.join(', ') || 'none'}]. ` +
+      `Expected tables like: products, sales, customers, categories.`
+    );
+  }
+
   return data;
 }
 
@@ -80,6 +111,12 @@ async function bulkInsert(client, table, cols, rows, mapper) {
 
 // ── Core restore — shared by both endpoints ────────────────────────────────────
 async function performRestore(client, cid, d) {
+  // Safety guard: never delete existing data if the backup contains nothing
+  const totalRows = Object.values(d).reduce((s, rows) => s + (Array.isArray(rows) ? rows.length : 0), 0);
+  if (totalRows === 0) {
+    throw new Error('Backup file contains no data rows. Restore aborted — your existing data has not been changed.');
+  }
+
   const report = {};
 
   const ins = async (table, cols, rows, mapper) => {
