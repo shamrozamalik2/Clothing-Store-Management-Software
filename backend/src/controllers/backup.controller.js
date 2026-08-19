@@ -17,13 +17,41 @@ async function sqliteBufferToData(buf) {
   try { initSqlJs = require('sql.js'); }
   catch { throw new Error('sql.js is not installed on the server.'); }
 
+  // Detect WAL mode from the file header (byte 18 = write version; 2 = WAL)
+  // In WAL mode the live data is split between .db and .db-wal — opening only
+  // the .db file shows an empty database if no checkpoint has run yet.
+  const isWal = buf.length > 19 && buf[18] === 2 && buf[19] === 2;
+
   const SQL = await initSqlJs();
   const db  = new SQL.Database(new Uint8Array(buf));
+
+  // Diagnostics
+  let pageCount = 0;
+  try {
+    const pc = db.exec('PRAGMA page_count');
+    pageCount = pc[0]?.values[0]?.[0] ?? 0;
+  } catch {}
 
   // List every user table that actually exists in this file
   const masterRes  = db.exec(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`);
   const tableNames = masterRes.length ? masterRes[0].values.map(r => String(r[0])) : [];
-  logger.info(`[Backup] SQLite tables found: ${tableNames.join(', ') || '(none)'}`);
+  logger.info(`[Backup] SQLite: wal=${isWal}, pages=${pageCount}, tables=[${tableNames.join(', ') || 'none'}]`);
+
+  if (tableNames.length === 0) {
+    db.close();
+    if (isWal) {
+      throw new Error(
+        'The database file is in WAL (Write-Ahead Logging) mode. ' +
+        'The actual data is stored in a separate .db-wal file that was not uploaded. ' +
+        'To fix this: completely close the old desktop application, then copy and upload the .db file again. ' +
+        'Closing the app triggers a checkpoint that merges the WAL back into the main file.'
+      );
+    }
+    throw new Error(
+      `The database file contains no tables (${pageCount} pages). ` +
+      'Please make sure you are uploading the correct database file from your old desktop application.'
+    );
+  }
 
   // Read a table by exact name → array of row objects
   function tbl(name) {
@@ -42,7 +70,6 @@ async function sqliteBufferToData(buf) {
       const rows = tbl(n);
       if (rows.length) return rows;
     }
-    // Fallback: return rows from first existing name even if empty
     for (const n of names) {
       if (tableNames.includes(n)) return tbl(n);
     }
@@ -50,36 +77,37 @@ async function sqliteBufferToData(buf) {
   }
 
   const data = {
-    categories:             tblAny('categories',           'category'),
-    brands:                 tblAny('brands',               'brand'),
-    suppliers:              tblAny('suppliers',            'supplier'),
-    products:               tblAny('products',             'product', 'items', 'inventory'),
-    product_variants:       tblAny('product_variants',     'variants', 'product_variant'),
-    customers:              tblAny('customers',            'customer', 'clients', 'client'),
-    sales:                  tblAny('sales',                'sale',    'orders',  'invoices'),
-    sale_items:             tblAny('sale_items',           'sale_item','order_items','invoice_items'),
-    purchases:              tblAny('purchases',            'purchase', 'purchase_orders'),
-    purchase_items:         tblAny('purchase_items',       'purchase_item'),
-    purchase_payments:      tblAny('purchase_payments',    'purchase_payment'),
-    returns:                tblAny('returns',              'return',  'refunds'),
-    return_items:           tblAny('return_items',         'return_item'),
-    exchange_items:         tblAny('exchange_items',       'exchange_item', 'exchanges'),
-    expense_categories:     tblAny('expense_categories',   'expense_category', 'expense_cats'),
-    expenses:               tblAny('expenses',             'expense'),
-    stock_adjustments:      tblAny('stock_adjustments',    'stock_adjustment', 'adjustments'),
+    categories:             tblAny('categories',            'category'),
+    brands:                 tblAny('brands',                'brand'),
+    suppliers:              tblAny('suppliers',             'supplier'),
+    products:               tblAny('products',              'product', 'items', 'inventory'),
+    product_variants:       tblAny('product_variants',      'variants', 'product_variant'),
+    customers:              tblAny('customers',             'customer', 'clients', 'client'),
+    sales:                  tblAny('sales',                 'sale', 'orders', 'invoices'),
+    sale_items:             tblAny('sale_items',            'sale_item', 'order_items', 'invoice_items'),
+    purchases:              tblAny('purchases',             'purchase', 'purchase_orders'),
+    purchase_items:         tblAny('purchase_items',        'purchase_item'),
+    purchase_payments:      tblAny('purchase_payments',     'purchase_payment'),
+    returns:                tblAny('returns',               'return', 'refunds'),
+    return_items:           tblAny('return_items',          'return_item'),
+    exchange_items:         tblAny('exchange_items',        'exchange_item', 'exchanges'),
+    expense_categories:     tblAny('expense_categories',    'expense_category', 'expense_cats'),
+    expenses:               tblAny('expenses',              'expense'),
+    stock_adjustments:      tblAny('stock_adjustments',     'stock_adjustment', 'adjustments'),
     stock_adjustment_items: tblAny('stock_adjustment_items','stock_adjustment_item'),
-    settings:               tblAny('settings',             'setting',  'config', 'configuration'),
+    settings:               tblAny('settings',              'setting', 'config', 'configuration'),
   };
 
   db.close();
 
   const totalRows = Object.values(data).reduce((s, r) => s + r.length, 0);
-  logger.info(`[Backup] SQLite total rows extracted: ${totalRows}`);
+  logger.info(`[Backup] SQLite rows extracted: ${totalRows} across ${tableNames.length} tables`);
 
   if (totalRows === 0) {
     throw new Error(
-      `No data could be read from the SQLite file. Tables found: [${tableNames.join(', ') || 'none'}]. ` +
-      `Expected tables like: products, sales, customers, categories.`
+      `Tables were found [${tableNames.join(', ')}] but all are empty. ` +
+      'The database may have been copied while the old application was still running. ' +
+      'Close the old application completely and upload the file again.'
     );
   }
 
