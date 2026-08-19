@@ -148,24 +148,23 @@ export default function Sidebar() {
       )}>
         {collapsed ? (
           companyLogo ? (
-            <div className="rounded-lg overflow-hidden flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.94)', width: 36, height: 36, padding: 3 }}>
-              <img src={companyLogo} alt={companyName}
-                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
-            </div>
+            <img src={companyLogo} alt={companyName}
+              style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', display: 'block', border: '2px solid rgba(255,255,255,0.15)' }} />
           ) : (
             <PBCMark size={30} />
           )
         ) : (
           <div className="flex items-center justify-center w-full">
-            <div className="rounded-xl overflow-hidden flex items-center justify-center select-none"
-              style={{ background: 'rgba(255,255,255,0.96)', padding: '5px 14px' }}>
-              <img
-                src={companyLogo || '/newlogo.png'}
-                alt={companyName}
-                style={{ height: 36, width: 'auto', maxWidth: 160, objectFit: 'contain', display: 'block' }}
-              />
-            </div>
+            {companyLogo ? (
+              <img src={companyLogo} alt={companyName}
+                style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', display: 'block', border: '2px solid rgba(255,255,255,0.15)' }} />
+            ) : (
+              <div className="rounded-xl overflow-hidden flex items-center justify-center select-none"
+                style={{ padding: '5px 14px' }}>
+                <img src="/newlogo.png" alt="ProBusinessCloud"
+                  style={{ height: 36, width: 'auto', maxWidth: 160, objectFit: 'contain', display: 'block' }} />
+              </div>
+            )}
           </div>
         )}
       </div>
