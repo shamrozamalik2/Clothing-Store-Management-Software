@@ -59,6 +59,29 @@ export default function SettingsPage() {
 
 // ─── Company Info ─────────────────────────────────────────────────────────────
 
+function resizeLogoToBase64(file, maxW = 400, maxH = 200) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width: w, height: h } = img;
+      if (w > maxW || h > maxH) {
+        const ratio = Math.min(maxW / w, maxH / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/png', 0.92));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 function CompanyTab() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
@@ -70,8 +93,13 @@ function CompanyTab() {
 
   const { register, handleSubmit, reset, formState: { isDirty } } = useForm();
 
+  // Logo state — managed separately from react-hook-form
+  const [logoPreview, setLogoPreview] = useState(null); // current img src to display
+  const [logoData,    setLogoData]    = useState(null); // null = unchanged, '' = removed, string = new base64
+  const logoInputRef = useRef(null);
+
   useEffect(() => {
-    if (company.company_name) {
+    if (data) {
       reset({
         company_name:    company.company_name?.value    ?? '',
         company_tagline: company.company_tagline?.value ?? '',
@@ -81,17 +109,44 @@ function CompanyTab() {
         company_email:   company.company_email?.value   ?? '',
         company_website: company.company_website?.value ?? '',
       });
+      const saved = company.company_logo?.value ?? '';
+      setLogoPreview(saved || null);
+      setLogoData(null); // reset "pending" flag
     }
   }, [data]);
 
+  async function handleLogoFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file.'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Logo must be under 2 MB.'); return; }
+    try {
+      const b64 = await resizeLogoToBase64(file);
+      setLogoPreview(b64);
+      setLogoData(b64);
+    } catch { toast.error('Could not read image file.'); }
+  }
+
+  function removeLogo() {
+    setLogoPreview(null);
+    setLogoData(''); // empty string = clear saved logo
+  }
+
   const saveMutation = useMutation({
-    mutationFn: (values) => settingsApi.updateBulk(values),
+    mutationFn: (values) => {
+      const payload = { ...values };
+      if (logoData !== null) payload.company_logo = logoData; // include only if changed
+      return settingsApi.updateBulk(payload);
+    },
     onSuccess: () => {
       toast.success('Company settings saved.');
+      setLogoData(null);
       qc.invalidateQueries({ queryKey: ['settings'] });
     },
     onError: (err) => toast.error(err.message),
   });
+
+  const canSave = isDirty || logoData !== null;
 
   if (isLoading) {
     return <div className="h-40 rounded-xl bg-surface-700/40 animate-pulse" />;
@@ -100,6 +155,46 @@ function CompanyTab() {
   return (
     <form onSubmit={handleSubmit(v => saveMutation.mutate(v))} className="card p-6 space-y-5 max-w-2xl">
       <h2 className="text-sm font-semibold text-surface-200">Company Information</h2>
+
+      {/* Logo upload */}
+      <div>
+        <p className="text-xs font-semibold text-surface-400 mb-2 uppercase tracking-wider">Company Logo</p>
+        <div className="flex items-center gap-4">
+          <div className="w-28 h-16 rounded-xl border border-surface-600 bg-surface-800 flex items-center justify-center overflow-hidden shrink-0">
+            <img
+              src={logoPreview || '/newlogo.png'}
+              alt="Company logo"
+              className="max-w-full max-h-full object-contain p-1"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+              className="hidden"
+              onChange={handleLogoFile}
+            />
+            <button
+              type="button"
+              onClick={() => { logoInputRef.current.value = ''; logoInputRef.current.click(); }}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-surface-600 text-surface-300 hover:bg-surface-700 transition-colors"
+            >
+              {logoPreview ? 'Change Logo' : 'Upload Logo'}
+            </button>
+            {logoPreview && (
+              <button
+                type="button"
+                onClick={removeLogo}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                Remove (use default)
+              </button>
+            )}
+            <p className="text-xs text-surface-500">PNG · JPG · WebP · max 2 MB</p>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <Input label="Company Name" {...register('company_name')} placeholder="e.g. SAS Garments" />
@@ -116,7 +211,7 @@ function CompanyTab() {
       </div>
 
       <div className="flex justify-end pt-2">
-        <Button type="submit" loading={saveMutation.isPending} disabled={!isDirty && !saveMutation.isPending}>
+        <Button type="submit" loading={saveMutation.isPending} disabled={!canSave && !saveMutation.isPending}>
           Save Changes
         </Button>
       </div>

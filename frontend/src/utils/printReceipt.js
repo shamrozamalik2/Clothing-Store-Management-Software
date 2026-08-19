@@ -16,6 +16,7 @@ export function printReceipt(sale, items, settings) {
   const companyCity    = co.company_city?.value    || '';
   const companyPhone   = co.company_phone?.value   || '';
   const companyEmail   = co.company_email?.value   || '';
+  const companyLogo    = co.company_logo?.value    || '';
   const receiptHeader  = rc.receipt_header?.value  || '';
   const receiptFooter  = rc.receipt_footer?.value  || 'Thank you for shopping!';
   const currencySymbol = settings?.billing?.currency_symbol?.value || 'Rs';
@@ -76,6 +77,7 @@ export function printReceipt(sale, items, settings) {
     .bold   { font-weight: bold; }
 
     /* ── store header ── */
+    .store-logo { max-height: 52px; max-width: 100%; object-fit: contain; margin-bottom: 5px; }
     .store-name {
       font-size: 17px;
       font-weight: bold;
@@ -134,6 +136,7 @@ export function printReceipt(sale, items, settings) {
 
   <!-- store header -->
   <div class="center">
+    ${companyLogo ? `<div><img class="store-logo" src="${companyLogo}" alt="${companyName}" /></div>` : ''}
     <div class="store-name">${companyName}</div>
     ${companyTagline ? `<div class="store-tag">${companyTagline}</div>` : ''}
     ${companyAddress ? `<div class="store-tag">${companyAddress}${companyCity ? ', ' + companyCity : ''}</div>` : ''}

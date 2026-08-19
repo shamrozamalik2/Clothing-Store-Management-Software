@@ -12,6 +12,7 @@ const DEFAULTS = [
   { key: 'company_phone',        value: '',                                 type: 'string',  group_name: 'company', label: 'Phone' },
   { key: 'company_email',        value: '',                                 type: 'string',  group_name: 'company', label: 'Email' },
   { key: 'company_website',      value: '',                                 type: 'string',  group_name: 'company', label: 'Website' },
+  { key: 'company_logo',         value: '',                                 type: 'string',  group_name: 'company', label: 'Company Logo (base64)' },
   { key: 'currency_symbol',      value: '₨',                               type: 'string',  group_name: 'billing', label: 'Currency Symbol' },
   { key: 'default_tax_rate',     value: '0',                               type: 'number',  group_name: 'billing', label: 'Default Tax Rate (%)' },
   { key: 'allow_negative_stock', value: 'false',                           type: 'boolean', group_name: 'billing', label: 'Allow Negative Stock' },
@@ -88,8 +89,10 @@ exports.updateBulk = async (req, res, next) => {
 
     for (const [key, val] of Object.entries(updates)) {
       await query(
-        'UPDATE settings SET value=$1, updated_at=NOW() WHERE company_id=$2 AND key=$3',
-        [String(val ?? ''), cid, key]
+        `INSERT INTO settings (company_id, key, value, type, group_name)
+         VALUES ($1, $2, $3, 'string', 'company')
+         ON CONFLICT (company_id, key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
+        [cid, key, String(val ?? '')]
       );
     }
     res.json({ success: true, message: 'Settings saved.' });
