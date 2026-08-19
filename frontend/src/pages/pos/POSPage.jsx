@@ -12,8 +12,10 @@ import { productsApi }   from '@api/products.api';
 import { customersApi }  from '@api/customers.api';
 import { salesApi }      from '@api/sales.api';
 import { holdsApi }      from '@api/holds.api';
+import { settingsApi }   from '@api/settings.api';
 import { formatCurrency } from '@utils/format';
 import { formatQty } from '@utils/formatQty';
+import { printReceipt } from '@utils/printReceipt';
 import { cn } from '@utils/cn';
 import CustomerFormModal from '@pages/customers/components/CustomerFormModal';
 
@@ -736,91 +738,123 @@ function PaymentModal({ open, onClose, total, customer, loading, onComplete }) {
 // ─── Receipt Modal ────────────────────────────────────────────────────────────
 
 function ReceiptModal({ receipt, onClose }) {
-  function print() { window.print(); }
+  const { data: settingsRes } = useQuery({
+    queryKey: ['settings'],
+    queryFn:  settingsApi.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const co  = settingsRes?.data?.company  ?? {};
+  const rc  = settingsRes?.data?.receipt  ?? {};
+  const bil = settingsRes?.data?.billing  ?? {};
+
+  const companyName    = co.company_name?.value    || 'ProBusinessCloud';
+  const companyTagline = co.company_tagline?.value || '';
+  const companyPhone   = co.company_phone?.value   || '';
+  const companyAddress = co.company_address?.value || '';
+  const companyLogo    = co.company_logo?.value    || '';
+  const receiptFooter  = rc.receipt_footer?.value  || 'Thank you for shopping!';
+  const currency       = bil.currency_symbol?.value || '₨';
 
   const items = receipt.items ?? [];
   const date  = new Date(receipt.sale_date || receipt.created_at);
+  const fmt   = (v) => `${currency}${Math.abs(Number(v)).toFixed(0)}`;
+
+  function handlePrint() {
+    printReceipt(receipt, items, settingsRes?.data ?? {});
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-white text-gray-900 rounded-2xl w-full max-w-sm mx-4 shadow-2xl overflow-hidden print:shadow-none print:rounded-none print:max-w-full" id="receipt">
+      <div className="bg-white text-gray-900 rounded-2xl w-full max-w-sm mx-4 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
 
-        {/* Header */}
-        <div className="text-center p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold">Online Store</h2>
-          <p className="text-xs text-gray-500 mt-1">Point of Sale Receipt</p>
-          <p className="text-xs text-gray-500">{date.toLocaleString('en-PK')}</p>
+        {/* Header — company branding */}
+        <div className="text-center px-6 pt-6 pb-4 border-b border-gray-200">
+          {companyLogo && (
+            <div className="flex justify-center mb-2">
+              <img src={companyLogo} alt={companyName}
+                className="max-h-12 max-w-[160px] object-contain" />
+            </div>
+          )}
+          <h2 className="text-lg font-bold text-gray-900">{companyName}</h2>
+          {companyTagline && <p className="text-xs text-gray-400 mt-0.5">{companyTagline}</p>}
+          {companyAddress && <p className="text-xs text-gray-400">{companyAddress}</p>}
+          {companyPhone   && <p className="text-xs text-gray-400">Tel: {companyPhone}</p>}
+          <p className="text-xs text-gray-400 mt-1">{date.toLocaleString('en-PK')}</p>
         </div>
 
-        {/* Info */}
-        <div className="px-5 py-3 text-xs border-b border-gray-200 grid grid-cols-2 gap-1">
-          <span className="text-gray-500">Reference:</span>
-          <span className="font-mono font-bold text-right">{receipt.reference}</span>
-          {receipt.customer_name && <>
-            <span className="text-gray-500">Customer:</span>
-            <span className="text-right">{receipt.customer_name}</span>
-          </>}
-          <span className="text-gray-500">Cashier:</span>
-          <span className="text-right">{receipt.cashier_name}</span>
-          <span className="text-gray-500">Payment:</span>
-          <span className="text-right capitalize">{receipt.payment_method}</span>
-        </div>
-
-        {/* Items */}
-        <div className="px-5 py-3 border-b border-gray-200">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-1 text-gray-500 font-medium">Item</th>
-                <th className="text-right py-1 text-gray-500 font-medium">Qty</th>
-                <th className="text-right py-1 text-gray-500 font-medium">Price</th>
-                <th className="text-right py-1 text-gray-500 font-medium">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {items.map((item, i) => (
-                <tr key={i}>
-                  <td className="py-1.5">
-                    <p className="font-medium">{item.product_name}</p>
-                    {(item.size || item.color) && (
-                      <p className="text-gray-400">{[item.size, item.color].filter(Boolean).join(' ')}</p>
-                    )}
-                  </td>
-                  <td className="py-1.5 text-right text-gray-600">{parseInt(item.quantity, 10)}</td>
-                  <td className="py-1.5 text-right text-gray-600">₨{Number(item.unit_price).toFixed(0)}</td>
-                  <td className="py-1.5 text-right font-medium">₨{Number(item.total ?? item.subtotal).toFixed(0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Totals */}
-        <div className="px-5 py-3 border-b border-gray-200 text-xs space-y-1">
-          <ReceiptRow label="Subtotal" value={receipt.subtotal} />
-          {receipt.discount_amount > 0 && <ReceiptRow label="Discount" value={-receipt.discount_amount} />}
-          {receipt.tax_amount > 0 && <ReceiptRow label="Tax" value={receipt.tax_amount} />}
-          <div className="flex justify-between font-bold text-sm pt-1.5 border-t border-gray-200">
-            <span>Total</span>
-            <span>₨{Number(receipt.total_amount).toFixed(0)}</span>
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1">
+          {/* Info */}
+          <div className="px-5 py-3 text-xs border-b border-gray-200 grid grid-cols-2 gap-1">
+            <span className="text-gray-500">Reference:</span>
+            <span className="font-mono font-bold text-right">{receipt.reference}</span>
+            {receipt.customer_name && <>
+              <span className="text-gray-500">Customer:</span>
+              <span className="text-right">{receipt.customer_name}</span>
+            </>}
+            <span className="text-gray-500">Cashier:</span>
+            <span className="text-right">{receipt.cashier_name ?? 'Staff'}</span>
+            <span className="text-gray-500">Payment:</span>
+            <span className="text-right capitalize">{(receipt.payment_method ?? 'cash').replace('_', ' ')}</span>
           </div>
-          <ReceiptRow label="Paid" value={receipt.paid_amount} />
-          {receipt.change_amount > 0 && <ReceiptRow label="Change" value={receipt.change_amount} />}
-          {receipt.due_amount   > 0 && <ReceiptRow label="Due" value={receipt.due_amount} className="text-red-600 font-semibold" />}
+
+          {/* Items */}
+          <div className="px-5 py-3 border-b border-gray-200">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-1 text-gray-500 font-medium">Item</th>
+                  <th className="text-right py-1 text-gray-500 font-medium">Qty</th>
+                  <th className="text-right py-1 text-gray-500 font-medium">Price</th>
+                  <th className="text-right py-1 text-gray-500 font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {items.map((item, i) => (
+                  <tr key={i}>
+                    <td className="py-1.5">
+                      <p className="font-medium">{item.product_name}</p>
+                      {(item.size || item.color) && (
+                        <p className="text-gray-400">{[item.size, item.color].filter(Boolean).join(' ')}</p>
+                      )}
+                    </td>
+                    <td className="py-1.5 text-right text-gray-600">{parseInt(item.quantity, 10)}</td>
+                    <td className="py-1.5 text-right text-gray-600">{fmt(item.unit_price)}</td>
+                    <td className="py-1.5 text-right font-medium">{fmt(item.total ?? item.subtotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Totals */}
+          <div className="px-5 py-3 border-b border-gray-200 text-xs space-y-1">
+            <ReceiptRow label="Subtotal" value={receipt.subtotal} currency={currency} />
+            {receipt.discount_amount > 0 && <ReceiptRow label="Discount" value={-receipt.discount_amount} currency={currency} />}
+            {receipt.tax_amount > 0 && <ReceiptRow label="Tax" value={receipt.tax_amount} currency={currency} />}
+            <div className="flex justify-between font-bold text-sm pt-1.5 border-t border-gray-200">
+              <span>Total</span>
+              <span>{fmt(receipt.total_amount)}</span>
+            </div>
+            <ReceiptRow label="Paid"   value={receipt.paid_amount}   currency={currency} />
+            {receipt.change_amount > 0 && <ReceiptRow label="Change" value={receipt.change_amount} currency={currency} />}
+            {receipt.due_amount    > 0 && <ReceiptRow label="Due"    value={receipt.due_amount}    currency={currency} className="text-red-600 font-semibold" />}
+          </div>
+
+          {/* Footer message */}
+          <div className="text-center px-5 py-3 text-xs text-gray-400">
+            {receiptFooter}
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="text-center px-5 py-4 text-2xs text-gray-400">
-          Thank you for shopping with us!
-        </div>
-
-        {/* Actions (hidden when printing) */}
-        <div className="flex gap-3 px-5 pb-5 print:hidden">
+        {/* Actions */}
+        <div className="flex gap-3 px-5 py-4 border-t border-gray-100 shrink-0">
           <button onClick={onClose}
             className="flex-1 h-10 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium transition-colors">
             Close
           </button>
-          <button onClick={print}
+          <button onClick={handlePrint}
             className="flex-1 h-10 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-sm font-medium flex items-center justify-center gap-2 transition-colors">
             <PrinterIcon className="h-4 w-4" /> Print
           </button>
@@ -830,11 +864,11 @@ function ReceiptModal({ receipt, onClose }) {
   );
 }
 
-function ReceiptRow({ label, value, className = '' }) {
+function ReceiptRow({ label, value, currency = '₨', className = '' }) {
   return (
     <div className={cn('flex justify-between', className)}>
       <span className="text-gray-500">{label}</span>
-      <span>₨{Math.abs(Number(value)).toFixed(0)}</span>
+      <span>{currency}{Math.abs(Number(value)).toFixed(0)}</span>
     </div>
   );
 }
