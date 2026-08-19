@@ -1,8 +1,5 @@
 'use strict';
 
-const path     = require('path');
-const os       = require('os');
-const fs       = require('fs');
 const { query, getClient } = require('../config/database');
 const { success, error }   = require('../utils/response');
 const logger               = require('../config/logger');
@@ -14,47 +11,48 @@ const ts  = v => v ?? now();
 const SQLITE_MAGIC = Buffer.from('SQLite format 3\0');
 const isSqlite = buf => buf.length >= 16 && buf.slice(0, 16).equals(SQLITE_MAGIC);
 
-// Read all tables from a SQLite .db buffer, return our d (data) shape
-function sqliteBufferToData(buf) {
-  let Database;
-  try { Database = require('better-sqlite3'); }
-  catch { throw new Error('Server cannot read SQLite files (better-sqlite3 not found).'); }
+// Read all tables from a SQLite .db buffer using sql.js (pure WASM, no native bindings)
+async function sqliteBufferToData(buf) {
+  let initSqlJs;
+  try { initSqlJs = require('sql.js'); }
+  catch { throw new Error('sql.js is not installed on the server.'); }
 
-  const tmpPath = path.join(os.tmpdir(), `restore-${Date.now()}.db`);
-  fs.writeFileSync(tmpPath, buf);
+  const SQL = await initSqlJs();
+  const db  = new SQL.Database(new Uint8Array(buf));
 
-  try {
-    const db = new Database(tmpPath, { readonly: true });
-    const tbl = name => {
-      try { return db.prepare(`SELECT * FROM "${name}"`).all(); }
-      catch { return []; }
-    };
-    const data = {
-      categories:             tbl('categories'),
-      brands:                 tbl('brands'),
-      suppliers:              tbl('suppliers'),
-      products:               tbl('products'),
-      product_variants:       tbl('product_variants'),
-      customers:              tbl('customers'),
-      sales:                  tbl('sales'),
-      sale_items:             tbl('sale_items'),
-      purchases:              tbl('purchases'),
-      purchase_items:         tbl('purchase_items'),
-      purchase_payments:      tbl('purchase_payments'),
-      returns:                tbl('returns'),
-      return_items:           tbl('return_items'),
-      exchange_items:         tbl('exchange_items'),
-      expense_categories:     tbl('expense_categories'),
-      expenses:               tbl('expenses'),
-      stock_adjustments:      tbl('stock_adjustments'),
-      stock_adjustment_items: tbl('stock_adjustment_items'),
-      settings:               tbl('settings'),
-    };
-    db.close();
-    return data;
-  } finally {
-    try { fs.unlinkSync(tmpPath); } catch {}
+  function tbl(name) {
+    try {
+      const res = db.exec(`SELECT * FROM "${name}"`);
+      if (!res.length) return [];
+      const { columns, values } = res[0];
+      return values.map(row => Object.fromEntries(columns.map((col, i) => [col, row[i]])));
+    } catch { return []; }
   }
+
+  const data = {
+    categories:             tbl('categories'),
+    brands:                 tbl('brands'),
+    suppliers:              tbl('suppliers'),
+    products:               tbl('products'),
+    product_variants:       tbl('product_variants'),
+    customers:              tbl('customers'),
+    sales:                  tbl('sales'),
+    sale_items:             tbl('sale_items'),
+    purchases:              tbl('purchases'),
+    purchase_items:         tbl('purchase_items'),
+    purchase_payments:      tbl('purchase_payments'),
+    returns:                tbl('returns'),
+    return_items:           tbl('return_items'),
+    exchange_items:         tbl('exchange_items'),
+    expense_categories:     tbl('expense_categories'),
+    expenses:               tbl('expenses'),
+    stock_adjustments:      tbl('stock_adjustments'),
+    stock_adjustment_items: tbl('stock_adjustment_items'),
+    settings:               tbl('settings'),
+  };
+
+  db.close();
+  return data;
 }
 
 // ── bulkInsert — ON CONFLICT DO UPDATE ensures zero rows skipped ──────────────
@@ -487,7 +485,7 @@ exports.restoreBackupFile = async (req, res, next) => {
   if (isSqlite(buf)) {
     source = 'sqlite';
     try {
-      d = sqliteBufferToData(buf);
+      d = await sqliteBufferToData(buf);
     } catch (err) {
       return error(res, `Could not read SQLite file: ${err.message}`, 422);
     }
