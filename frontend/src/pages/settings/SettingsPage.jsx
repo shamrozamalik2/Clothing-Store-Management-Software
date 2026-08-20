@@ -240,6 +240,7 @@ function BackupTab() {
   const [restoreError, setRestoreError] = useState('');
   const [autoInfo, setAutoInfo]       = useState(null);
   const [preview, setPreview]         = useState(null);   // parsed backup pending confirmation
+  const [restoreInput, setRestoreInput]   = useState('');  // user must type RESTORE
   const [restoreReport, setRestoreReport] = useState(null);
   const fileInputRef = useRef(null);
   const progressRef  = useRef(null);
@@ -306,6 +307,7 @@ function BackupTab() {
     );
 
     if (isSqlite) {
+      setRestoreInput('');
       setPreview({ _isSqlite: true, _fileName: file.name, _fileSize: file.size });
       return;
     }
@@ -356,6 +358,7 @@ function BackupTab() {
       return;
     }
 
+    setRestoreInput('');
     setPreview(parsed);
   }
 
@@ -417,13 +420,13 @@ function BackupTab() {
             style={{ background: '#111827' }}>
             <div className="p-6 space-y-4">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                  <ExclamationTriangleIcon className="h-5 w-5 text-amber-400" />
+                <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-slate-100">Confirm Restore</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    All current data will be replaced. This cannot be undone.
+                  <p className="text-xs text-red-400 mt-0.5 font-medium">
+                    ⚠ All current products, sales and data will be permanently replaced.
                   </p>
                 </div>
               </div>
@@ -444,7 +447,7 @@ function BackupTab() {
                       <span className="font-mono">{formatDate(preview.exported_at)}</span>
                     </div>
                   )}
-                  <div className="rounded-lg border border-slate-700 overflow-hidden max-h-56 overflow-y-auto">
+                  <div className="rounded-lg border border-slate-700 overflow-hidden max-h-40 overflow-y-auto">
                     <div className="bg-slate-800/60 px-3 py-1.5 border-b border-slate-700">
                       <p className="text-2xs font-semibold uppercase tracking-wider text-slate-500">Records to restore</p>
                     </div>
@@ -458,13 +461,27 @@ function BackupTab() {
                 </>
               )}
 
+              <div className="rounded-lg border border-red-900/30 bg-red-500/5 px-3 py-2 text-xs text-red-300">
+                Type <span className="font-mono font-bold text-white">RESTORE</span> below to confirm
+              </div>
+              <input
+                type="text"
+                value={restoreInput}
+                onChange={e => setRestoreInput(e.target.value)}
+                placeholder="Type RESTORE to confirm"
+                autoFocus
+                className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-slate-700 text-slate-100 placeholder-slate-600 outline-none focus:border-red-500/60 focus:ring-1 focus:ring-red-500/20 font-mono"
+              />
+
               <div className="flex gap-2 pt-1">
-                <button onClick={() => setPreview(null)}
+                <button onClick={() => { setPreview(null); setRestoreInput(''); }}
                   className="flex-1 px-4 py-2 rounded-lg text-sm text-slate-300 border border-slate-600 hover:bg-slate-800 transition-colors">
                   Cancel
                 </button>
-                <button onClick={doRestore}
-                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">
+                <button
+                  onClick={doRestore}
+                  disabled={restoreInput.trim().toUpperCase() !== 'RESTORE'}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                   Restore Now
                 </button>
               </div>
