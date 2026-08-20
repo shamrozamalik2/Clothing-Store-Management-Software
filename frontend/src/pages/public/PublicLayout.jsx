@@ -22,7 +22,6 @@ const NAV_LINKS = [
   { label: 'Home',     to: '/',        end: true },
   { label: 'About',    to: '/about',   end: false },
   { label: 'Features', to: '/features',end: false },
-  { label: 'Pricing',  to: '/pricing', end: false },
   { label: 'FAQ',      to: '/faq',     end: false },
   { label: 'Contact',  to: '/contact', end: false },
 ];
@@ -369,7 +368,6 @@ function Footer() {
 
           <FooterCol title="Product" links={[
             { label: 'Features', to: '/features' },
-            { label: 'Pricing',  to: '/pricing' },
             { label: 'FAQ',      to: '/faq' },
           ]} />
           <FooterCol title="Company" links={[

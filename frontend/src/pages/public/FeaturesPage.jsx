@@ -106,9 +106,6 @@ export default function FeaturesPage() {
             <Link to="/login" className="pub-gradient-btn pub-btn-solid" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.875rem 2rem', borderRadius: 14, fontWeight: 700, fontSize: '1rem', textDecoration: 'none', boxShadow: '0 8px 32px rgba(37,99,235,0.35)' }}>
               Get Started <ArrowRightIcon style={{ width: 18, height: 18 }} />
             </Link>
-            <Link to="/pricing" className="pub-btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.875rem 2rem', borderRadius: 14, fontWeight: 600, fontSize: '1rem', textDecoration: 'none', color: c.accentLink, border: `1px solid ${c.border}`, background: 'rgba(59,130,246,0.06)', transition: 'all 0.2s' }}>
-              View Pricing
-            </Link>
           </div>
         </Fade>
       </section>

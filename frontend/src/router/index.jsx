@@ -6,7 +6,6 @@ import PublicLayout from '@pages/public/PublicLayout';
 import HomePage from '@pages/public/HomePage';
 import AboutPage from '@pages/public/AboutPage';
 import FeaturesPage from '@pages/public/FeaturesPage';
-import PricingPage from '@pages/public/PricingPage';
 import FAQPage from '@pages/public/FAQPage';
 import ContactPage from '@pages/public/ContactPage';
 import PublicLoginPage from '@pages/public/PublicLoginPage';
@@ -66,7 +65,6 @@ export const router = createHashRouter([
       { path: '/',         element: <HomePage /> },
       { path: '/about',    element: <AboutPage /> },
       { path: '/features', element: <FeaturesPage /> },
-      { path: '/pricing',  element: <PricingPage /> },
       { path: '/faq',      element: <FAQPage /> },
       { path: '/contact',  element: <ContactPage /> },
     ],
