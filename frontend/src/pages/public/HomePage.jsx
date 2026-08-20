@@ -633,7 +633,7 @@ export default function HomePage() {
       </section>
 
       {/* ═══ STATS / SOCIAL PROOF ═══════════════════════════════════════════ */}
-      <section style={{ padding: '5rem 1.5rem', background: isDark ? 'linear-gradient(135deg,#0c1427,#0e1635)' : 'linear-gradient(135deg,#4f46e5,#7c3aed)', position: 'relative', overflow: 'hidden' }}>
+      <section style={{ padding: '5rem 1.5rem', background: 'linear-gradient(351deg, #8380b4 0%, #14122d 55%, #332c3f 100%)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255,255,255,0.05) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative' }}>
           <Fade style={{ textAlign: 'center', marginBottom: '3rem' }}>
@@ -690,7 +690,7 @@ export default function HomePage() {
       </section>
 
       {/* ═══ FINAL CTA ══════════════════════════════════════════════════════ */}
-      <section style={{ padding: '7rem 1.5rem', background: isDark ? '#050912' : '#1e1b4b', position: 'relative', overflow: 'hidden' }}>
+      <section style={{ padding: '7rem 1.5rem', background: 'linear-gradient(351deg, #8380b4 0%, #14122d 55%, #332c3f 100%)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '-30%', left: '50%', transform: 'translateX(-50%)', width: 800, height: 800, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 60%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: '-20%', left: '-10%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 65%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: '-20%', right: '-10%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 65%)', pointerEvents: 'none' }} />

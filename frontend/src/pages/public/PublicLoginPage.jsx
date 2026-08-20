@@ -66,49 +66,49 @@ export default function PublicLoginPage() {
   });
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#06091a' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', background: 'linear-gradient(351deg, #8380b4 0%, #14122d 55%, #332c3f 100%)' }}>
       <style>{`
         .pub-login-input {
           width: 100%; padding: 0.8rem 1rem 0.8rem 2.75rem;
           border-radius: 12px; font-size: 0.9rem;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.11);
           color: #e0eaff; outline: none;
           transition: all 0.2s;
           font-family: inherit;
         }
         .pub-login-input:focus {
-          border-color: rgba(59,130,246,0.5);
-          background: rgba(59,130,246,0.05);
-          box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+          border-color: rgba(129,140,248,0.65);
+          background: rgba(99,102,241,0.07);
+          box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
         }
-        .pub-login-input::placeholder { color: #2a3a55; }
-        .pub-login-input.error { border-color: rgba(239,68,68,0.5); }
+        .pub-login-input::placeholder { color: rgba(255,255,255,0.2); }
+        .pub-login-input.error { border-color: rgba(239,68,68,0.55); }
         .pub-login-btn {
           width: 100%; padding: 0.875rem; border-radius: 14px;
           font-size: 1rem; font-weight: 700; cursor: pointer;
           border: none; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-          background: linear-gradient(135deg, #2563eb, #0891b2);
+          background: linear-gradient(135deg, #4f46e5, #7c3aed);
           color: white; transition: all 0.25s;
-          box-shadow: 0 6px 24px rgba(37,99,235,0.35);
+          box-shadow: 0 8px 28px rgba(79,70,229,0.45);
           font-family: inherit;
         }
-        .pub-login-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); box-shadow: 0 10px 32px rgba(37,99,235,0.45); }
+        .pub-login-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 12px 36px rgba(139,92,246,0.55); }
         .pub-login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         @keyframes loginFadeUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
         .login-form-anim { animation: loginFadeUp 0.55s ease both; }
+        @keyframes plGlow { 0%,100% { opacity:0.5; transform:scale(1) } 50% { opacity:0.85; transform:scale(1.12) } }
       `}</style>
 
       {/* Left panel — brand (hidden on mobile, flex on lg+) */}
       <div className="hidden lg:flex" style={{
         flex: '0 0 46%', maxWidth: 560, flexDirection: 'column',
         justifyContent: 'space-between', padding: '3rem',
-        background: 'linear-gradient(160deg, #080f22 0%, #061529 50%, #070d1d 100%)',
         borderRight: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden',
       }}>
         {/* Glow blobs */}
-        <div style={{ position: 'absolute', top: -80, right: -80, width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,99,235,0.15) 0%, transparent 65%)', pointerEvents: 'none', animation: 'pub-glow 14s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', bottom: -100, left: -60, width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(6,182,212,0.1) 0%, transparent 65%)', pointerEvents: 'none', animation: 'pub-glow 18s ease-in-out infinite 5s' }} />
+        <div style={{ position: 'absolute', top: -80, right: -80, width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(131,128,180,0.20) 0%, transparent 65%)', pointerEvents: 'none', animation: 'plGlow 12s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', bottom: -100, left: -60, width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.14) 0%, transparent 65%)', pointerEvents: 'none', animation: 'plGlow 16s ease-in-out infinite 4s' }} />
 
         {/* Logo */}
         <div style={{ position: 'relative', zIndex: 2 }}>
@@ -119,7 +119,7 @@ export default function PublicLoginPage() {
         <div style={{ position: 'relative', zIndex: 2 }}>
           <h2 style={{ fontSize: 'clamp(1.75rem, 3vw, 2.5rem)', fontWeight: 900, color: '#f0f5ff', lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: '1rem' }}>
             Run your business<br />
-            <span style={{ background: 'linear-gradient(135deg, #60a5fa, #06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+            <span style={{ background: 'linear-gradient(135deg, #a78bfa, #60a5fa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
               smarter, faster.
             </span>
           </h2>
@@ -128,9 +128,9 @@ export default function PublicLoginPage() {
           </p>
           <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {FEATURES.map(f => (
-              <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.875rem', color: 'rgba(160,185,220,0.8)' }}>
-                <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', display: 'block' }} />
+              <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.875rem', color: 'rgba(187,210,255,0.80)' }}>
+                <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#818cf8', display: 'block' }} />
                 </span>
                 {f}
               </li>
@@ -144,9 +144,13 @@ export default function PublicLoginPage() {
         </div>
       </div>
 
-      {/* Right panel — form */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1.5rem' }}>
-        <div style={{ width: '100%', maxWidth: 420 }} className="login-form-anim">
+      {/* Right panel — form, inherits gradient from wrapper */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1.5rem', position: 'relative', overflow: 'hidden' }}>
+        {/* Right-side glow blobs */}
+        <div style={{ position: 'absolute', top: -50, left: -40, width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, rgba(131,128,180,0.14) 0%, transparent 65%)', pointerEvents: 'none', animation: 'plGlow 10s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', bottom: -60, right: -40, width: 260, height: 260, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 65%)', pointerEvents: 'none', animation: 'plGlow 14s ease-in-out infinite reverse' }} />
+
+        <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 2 }} className="login-form-anim">
 
           {/* Mobile logo (hidden on lg+) */}
           <div className="flex lg:hidden" style={{ marginBottom: '2.5rem' }}>
@@ -158,7 +162,7 @@ export default function PublicLoginPage() {
             <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#f0f5ff', letterSpacing: '-0.03em', marginBottom: '0.5rem' }}>
               Welcome back
             </h1>
-            <p style={{ fontSize: '0.9rem', color: '#3d5070' }}>
+            <p style={{ fontSize: '0.9rem', color: 'rgba(187,210,255,0.60)' }}>
               Sign in to your ProBusinessCloud account
             </p>
           </div>
@@ -170,11 +174,12 @@ export default function PublicLoginPage() {
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit(d => loginMutation.mutate(d))} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Frosted glass form card */}
+          <form onSubmit={handleSubmit(d => loginMutation.mutate(d))}
+            style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 20, padding: '1.75rem', backdropFilter: 'blur(20px)' }}>
 
             <LabeledInput label="Company Code" error={errors.company_slug?.message}>
-              <BuildingOffice2Icon style={{ width: 16, height: 16, color: '#3b82f6', position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+              <BuildingOffice2Icon style={{ width: 16, height: 16, color: '#818cf8', position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               <input
                 type="text"
                 autoComplete="organization"
@@ -185,7 +190,7 @@ export default function PublicLoginPage() {
             </LabeledInput>
 
             <LabeledInput label="Email Address" error={errors.email?.message}>
-              <EnvelopeIcon style={{ width: 16, height: 16, color: '#3b82f6', position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+              <EnvelopeIcon style={{ width: 16, height: 16, color: '#818cf8', position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               <input
                 type="email"
                 autoComplete="email"
@@ -200,7 +205,7 @@ export default function PublicLoginPage() {
             </LabeledInput>
 
             <LabeledInput label="Password" error={errors.password?.message}>
-              <LockClosedIcon style={{ width: 16, height: 16, color: '#3b82f6', position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+              <LockClosedIcon style={{ width: 16, height: 16, color: '#818cf8', position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               <input
                 type={showPwd ? 'text' : 'password'}
                 autoComplete="current-password"
@@ -236,12 +241,12 @@ export default function PublicLoginPage() {
 
           {/* Footer links */}
           <div style={{ marginTop: '2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <Link to="/" style={{ fontSize: '0.875rem', color: '#3d5070', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.375rem', justifyContent: 'center' }}
-              onMouseEnter={e => e.currentTarget.style.color = '#60a5fa'}
-              onMouseLeave={e => e.currentTarget.style.color = '#3d5070'}>
+            <Link to="/" style={{ fontSize: '0.875rem', color: 'rgba(187,210,255,0.55)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.375rem', justifyContent: 'center', transition: 'color 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#93c5fd'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(187,210,255,0.55)'}>
               ← Back to ProBusinessCloud
             </Link>
-            <p style={{ fontSize: '0.78rem', color: '#1e2e45' }}>
+            <p style={{ fontSize: '0.78rem', color: 'rgba(147,196,255,0.28)' }}>
               Secure business platform · Your data is encrypted
             </p>
           </div>
@@ -254,7 +259,7 @@ export default function PublicLoginPage() {
 function LabeledInput({ label, error, children }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#4a6080', marginBottom: '0.5rem' }}>
+      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(187,210,255,0.60)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {label}
       </label>
       <div style={{ position: 'relative' }}>

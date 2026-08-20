@@ -202,12 +202,12 @@ export default function PricingPage() {
       </section>
 
       {/* Contact CTA */}
-      <section style={{ padding: '5rem 1.5rem', background: c.bgDeep, textAlign: 'center' }}>
+      <section style={{ padding: '5rem 1.5rem', background: 'linear-gradient(351deg, #8380b4 0%, #14122d 55%, #332c3f 100%)', textAlign: 'center' }}>
         <Fade style={{ maxWidth: 520, margin: '0 auto' }}>
-          <h2 style={{ fontSize: 'clamp(1.5rem, 3.5vw, 2rem)', fontWeight: 800, color: c.heading, letterSpacing: '-0.03em', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: 'clamp(1.5rem, 3.5vw, 2rem)', fontWeight: 800, color: '#f0f5ff', letterSpacing: '-0.03em', marginBottom: '1rem' }}>
             Need a custom plan?
           </h2>
-          <p style={{ fontSize: '1rem', color: c.textDim, marginBottom: '2rem' }}>
+          <p style={{ fontSize: '1rem', color: 'rgba(187,210,255,0.70)', marginBottom: '2rem' }}>
             Contact our team for volume discounts, custom integrations, or enterprise requirements.
           </p>
           <Link to="/contact" className="pub-gradient-btn pub-btn-solid" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.875rem 2rem', borderRadius: 14, fontWeight: 700, fontSize: '1rem', textDecoration: 'none', boxShadow: '0 8px 32px rgba(37,99,235,0.35)' }}>

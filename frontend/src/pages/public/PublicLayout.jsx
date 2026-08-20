@@ -341,7 +341,7 @@ function Footer() {
   const { c, isDark } = usePublicTheme();
   const year = new Date().getFullYear();
   return (
-    <footer style={{ background: isDark ? '#050912' : '#1e1b4b', borderTop: `1px solid rgba(255,255,255,0.08)`, padding: '4rem 1.5rem 2rem' }}>
+    <footer style={{ background: 'linear-gradient(351deg, #8380b4 0%, #14122d 55%, #332c3f 100%)', borderTop: `1px solid rgba(255,255,255,0.08)`, padding: '4rem 1.5rem 2rem' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '3rem', marginBottom: '3rem' }}>
 
