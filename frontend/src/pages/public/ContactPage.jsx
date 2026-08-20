@@ -19,8 +19,8 @@ function Fade({ children, delay = 0, style = {} }) {
 
 const SUBJECTS = ['General Inquiry', 'Sales & Pricing', 'Technical Support', 'Feature Request', 'Partnership', 'Other'];
 const CONTACT_INFO = [
-  { icon: EnvelopeIcon, label: 'Email',         value: 'support@probusinesscloud.com', sub: 'We reply within 24 hours' },
-  { icon: PhoneIcon,    label: 'Phone',         value: '+92 300 0000000',              sub: 'Mon–Sat, 9am–6pm' },
+  { icon: EnvelopeIcon, label: 'Email',         value: 'support@whitelabelyourcrm.com', sub: 'We reply within 24 hours' },
+  { icon: PhoneIcon,    label: 'Phone',         value: '+92 323 6641191',              sub: 'Mon–Sat, 9am–6pm' },
   { icon: MapPinIcon,   label: 'Location',      value: 'Pakistan',                     sub: 'Serving businesses globally' },
   { icon: ClockIcon,    label: 'Support Hours', value: 'Mon–Sat',                      sub: '9:00 AM – 6:00 PM PKT' },
 ];

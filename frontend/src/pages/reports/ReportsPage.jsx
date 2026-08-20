@@ -33,6 +33,23 @@ const TABS = ['Overview', 'Sales', 'Inventory', 'Purchases'];
 
 const CHART_COLORS = ['#6366f1', '#22d3ee', '#f59e0b', '#10b981', '#f43f5e', '#a78bfa'];
 
+function getChartTheme() {
+  const dark = document.documentElement.classList.contains('dark');
+  return {
+    grid: dark ? '#334155' : '#e2e8f0',
+    tick: dark ? '#64748b' : '#94a3b8',
+    tooltipContent: {
+      background: dark ? '#1e293b' : '#ffffff',
+      border:     `1px solid ${dark ? '#334155' : '#e2e8f0'}`,
+      borderRadius: 8,
+      fontSize: 12,
+      boxShadow: dark ? 'none' : '0 4px 14px rgba(15,23,42,0.10)',
+    },
+    tooltipLabel: { color: dark ? '#94a3b8' : '#64748b' },
+    legend: { fontSize: 12, color: dark ? '#94a3b8' : '#64748b' },
+  };
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
@@ -117,6 +134,7 @@ export default function ReportsPage() {
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ params }) {
+  const ct = getChartTheme();
   const { data: ov, isLoading: loadingOv } = useQuery({
     queryKey: ['reports-overview', params],
     queryFn:  () => reportsApi.overview(params),
@@ -181,16 +199,16 @@ function OverviewTab({ params }) {
                   <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false}
+              <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 11, fill: ct.tick }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: ct.tick }} axisLine={false} tickLine={false}
                 tickFormatter={v => `₨${(v/1000).toFixed(0)}k`} />
               <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#94a3b8' }}
+                contentStyle={ct.tooltipContent}
+                labelStyle={ct.tooltipLabel}
                 formatter={(v, name) => [formatCurrency(v), name]}
               />
-              <Legend wrapperStyle={{ fontSize: 12, color: '#94a3b8' }} />
+              <Legend wrapperStyle={ct.legend} />
               <Area type="monotone" dataKey="Revenue"   stroke="#6366f1" strokeWidth={2} fill="url(#gRevenue)" />
               <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={2} fill="url(#gCollected)" />
             </AreaChart>
@@ -212,7 +230,7 @@ function OverviewTab({ params }) {
                     {pmData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                    contentStyle={ct.tooltipContent}
                     formatter={(v) => formatCurrency(v)}
                   />
                 </PieChart>
@@ -273,6 +291,7 @@ function OverviewTab({ params }) {
 // ─── Sales Tab ────────────────────────────────────────────────────────────────
 
 function SalesTab({ params }) {
+  const ct = getChartTheme();
   const { data: ov }  = useQuery({ queryKey: ['reports-overview', params],       queryFn: () => reportsApi.overview(params) });
   const { data: ds }  = useQuery({ queryKey: ['reports-daily', params],           queryFn: () => reportsApi.dailySales(params) });
   const { data: tp }  = useQuery({ queryKey: ['reports-top-products', params],    queryFn: () => reportsApi.topProducts({ ...params, limit: 10 }) });
@@ -307,15 +326,15 @@ function SalesTab({ params }) {
           <h2 className="text-sm font-semibold text-surface-200 mb-4">Revenue vs Cost — Top Products</h2>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={barData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false}
+              <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: ct.tick }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: ct.tick }} axisLine={false} tickLine={false}
                 tickFormatter={v => `₨${(v/1000).toFixed(0)}k`} />
               <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                contentStyle={ct.tooltipContent}
                 formatter={(v, name) => [formatCurrency(v), name]}
               />
-              <Legend wrapperStyle={{ fontSize: 12, color: '#94a3b8' }} />
+              <Legend wrapperStyle={ct.legend} />
               <Bar dataKey="Revenue" fill="#6366f1" radius={[4,4,0,0]} />
               <Bar dataKey="Cost"    fill="#f59e0b" radius={[4,4,0,0]} />
             </BarChart>
@@ -407,6 +426,7 @@ function SalesTab({ params }) {
 // ─── Inventory Tab ────────────────────────────────────────────────────────────
 
 function InventoryTab() {
+  const ct = getChartTheme();
   const { data, isLoading } = useQuery({
     queryKey: ['reports-stock'],
     queryFn:  () => reportsApi.stockValuation(),
@@ -445,7 +465,7 @@ function InventoryTab() {
                     {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                    contentStyle={ct.tooltipContent}
                     formatter={(v) => formatCurrency(v)}
                   />
                 </PieChart>
@@ -544,6 +564,7 @@ function InventoryTab() {
 // ─── Purchases Tab ────────────────────────────────────────────────────────────
 
 function PurchasesTab({ params }) {
+  const ct = getChartTheme();
   const { data, isLoading } = useQuery({
     queryKey: ['reports-purchases', params],
     queryFn:  () => reportsApi.purchasesSummary(params),
@@ -575,12 +596,12 @@ function PurchasesTab({ params }) {
           <h2 className="text-sm font-semibold text-surface-200 mb-4">Daily Purchases</h2>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false}
+              <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 11, fill: ct.tick }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: ct.tick }} axisLine={false} tickLine={false}
                 tickFormatter={v => `₨${(v/1000).toFixed(0)}k`} />
               <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                contentStyle={ct.tooltipContent}
                 formatter={(v) => [formatCurrency(v), 'Amount']}
               />
               <Bar dataKey="Amount" fill="#22d3ee" radius={[4,4,0,0]} />

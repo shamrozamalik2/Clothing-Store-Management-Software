@@ -14,7 +14,7 @@ html.light {
   /* Toast */
   --toast-bg:     255 255 255;
   --toast-text:   15 23 42;
-  --toast-border: 226 232 240;
+  --toast-border: 215 224 235;
 
   --s-50:  15 23 42;
   --s-100: 30 41 59;
@@ -22,9 +22,9 @@ html.light {
   --s-300: 71 85 105;
   --s-400: 100 116 139;
   --s-500: 148 163 184;
-  --s-600: 203 213 225;
-  --s-700: 226 232 240;
-  --s-800: 241 245 249;
+  --s-600: 196 208 222;
+  --s-700: 213 222 234;
+  --s-800: 235 241 248;
   --s-900: 248 250 252;
   --s-950: 255 255 255;
 
@@ -162,6 +162,9 @@ html.dark {
     border: 1px solid rgb(var(--s-700));
     @apply rounded-xl shadow-card;
   }
+  html.light .pbc-card {
+    box-shadow: 0 1px 4px 0 rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.05);
+  }
 
   /* ── Table ── */
   .table-container {
@@ -250,12 +253,19 @@ html.dark {
     box-shadow: 0 2px 8px rgba(79,70,229,0.22);
   }
 
-  /* Active sidebar nav gradient */
+  /* Active sidebar nav gradient — dark mode */
   .nav-gradient-active {
     background: linear-gradient(135deg, rgba(59,130,246,0.20) 0%, rgba(139,92,246,0.18) 100%);
     border: 1px solid rgba(139,92,246,0.30);
     box-shadow: 0 2px 12px rgba(139,92,246,0.20), inset 0 1px 0 rgba(255,255,255,0.04);
     color: #c4b5fd;
+  }
+
+  /* Active sidebar nav — light mode */
+  .nav-light-active {
+    background: rgba(79,70,229,0.08);
+    border: 1px solid rgba(79,70,229,0.14);
+    color: #4f46e5;
   }
 
   /* KPI icon gradient backgrounds — light + dark modes */
@@ -333,19 +343,18 @@ html.dark {
     animation: glowPulseAnimAlt 14s ease-in-out infinite;
   }
 
-  /* Animated login left panel gradient */
+  /* Animated login left panel gradient — matches website hero palette */
   .login-gradient-bg {
     background: linear-gradient(
-      135deg,
-      #0c1427 0%,
-      #0f2147 20%,
-      #1a1a4e 38%,
-      #1e0e40 55%,
-      #0f1e47 72%,
-      #0c1427 100%
+      351deg,
+      #8380b4 0%,
+      #14122d 35%,
+      #1e0e3a 55%,
+      #332c3f 78%,
+      #14122d 100%
     );
-    background-size: 400% 400%;
-    animation: gradientShift 12s ease infinite;
+    background-size: 300% 300%;
+    animation: gradientShift 14s ease infinite;
   }
 
   /* Gradient text — blue to violet */

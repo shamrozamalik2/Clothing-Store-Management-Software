@@ -410,10 +410,10 @@ function BackupTab() {
   return (
     <div className="flex flex-col gap-4 max-w-2xl">
 
-      {/* Preview / Confirm modal */}
+      {/* Preview / Confirm modal — always dark regardless of app theme */}
       {preview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-surface-600 shadow-2xl"
+          <div className="w-full max-w-md rounded-2xl border border-slate-700 shadow-2xl"
             style={{ background: '#111827' }}>
             <div className="p-6 space-y-4">
               <div className="flex items-start gap-3">
@@ -421,8 +421,8 @@ function BackupTab() {
                   <ExclamationTriangleIcon className="h-5 w-5 text-amber-400" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-surface-100">Confirm Restore</h3>
-                  <p className="text-xs text-surface-400 mt-0.5">
+                  <h3 className="text-sm font-semibold text-slate-100">Confirm Restore</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
                     All current data will be replaced. This cannot be undone.
                   </p>
                 </div>
@@ -439,19 +439,19 @@ function BackupTab() {
               ) : (
                 <>
                   {preview.exported_at && (
-                    <div className="flex justify-between text-xs text-surface-400 px-1">
+                    <div className="flex justify-between text-xs text-slate-400 px-1">
                       <span>Backup date</span>
                       <span className="font-mono">{formatDate(preview.exported_at)}</span>
                     </div>
                   )}
-                  <div className="rounded-lg border border-surface-700 overflow-hidden max-h-56 overflow-y-auto">
-                    <div className="bg-surface-800/50 px-3 py-1.5 border-b border-surface-700">
-                      <p className="text-2xs font-semibold uppercase tracking-wider text-surface-500">Records to restore</p>
+                  <div className="rounded-lg border border-slate-700 overflow-hidden max-h-56 overflow-y-auto">
+                    <div className="bg-slate-800/60 px-3 py-1.5 border-b border-slate-700">
+                      <p className="text-2xs font-semibold uppercase tracking-wider text-slate-500">Records to restore</p>
                     </div>
                     {getPreviewCounts(preview).map(row => (
-                      <div key={row.key} className="flex justify-between px-3 py-1.5 text-xs border-b border-surface-700/40 last:border-0">
-                        <span className="text-surface-400">{row.label}</span>
-                        <span className="font-mono text-surface-200">{row.count.toLocaleString()}</span>
+                      <div key={row.key} className="flex justify-between px-3 py-1.5 text-xs border-b border-slate-700/40 last:border-0">
+                        <span className="text-slate-400">{row.label}</span>
+                        <span className="font-mono text-slate-200">{row.count.toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
@@ -460,7 +460,7 @@ function BackupTab() {
 
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setPreview(null)}
-                  className="flex-1 px-4 py-2 rounded-lg text-sm text-surface-300 border border-surface-600 hover:bg-surface-700 transition-colors">
+                  className="flex-1 px-4 py-2 rounded-lg text-sm text-slate-300 border border-slate-600 hover:bg-slate-800 transition-colors">
                   Cancel
                 </button>
                 <button onClick={doRestore}

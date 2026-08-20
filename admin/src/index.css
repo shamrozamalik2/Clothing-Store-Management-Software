@@ -25,16 +25,15 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
 
 .login-gradient-bg {
   background: linear-gradient(
-    135deg,
-    #0c1427 0%,
-    #0f2147 20%,
-    #1a1a4e 38%,
-    #1e0e40 55%,
-    #0f1e47 72%,
-    #0c1427 100%
+    351deg,
+    #8380b4 0%,
+    #14122d 35%,
+    #1e0e3a 55%,
+    #332c3f 78%,
+    #14122d 100%
   );
-  background-size: 400% 400%;
-  animation: gradientShift 12s ease infinite;
+  background-size: 300% 300%;
+  animation: gradientShift 14s ease infinite;
 }
 
 .animate-glow-pulse      { animation: glowPulseAnim 8s  ease-in-out infinite; }

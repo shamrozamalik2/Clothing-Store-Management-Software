@@ -21,10 +21,11 @@ class SplashScreen extends ConsumerWidget {
             begin: Alignment.topLeft,
             end:   Alignment.bottomRight,
             colors: [
-              Color(0xFF0C1427), // deep navy
-              Color(0xFF0F2147), // mid navy
-              Color(0xFF1A3A6E), // accent navy-blue
+              Color(0xFF14122D), // dark navy-purple — matches website hero
+              Color(0xFF1E0E3A), // deep purple-navy
+              Color(0xFF332C3F), // dark purple-gray
             ],
+            stops: [0.0, 0.55, 1.0],
           ),
         ),
         child: SafeArea(
@@ -35,7 +36,7 @@ class SplashScreen extends ConsumerWidget {
                 top:   -60,
                 right: -60,
                 child: _Blob(
-                  color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
+                  color: const Color(0xFF8380B4).withValues(alpha: 0.12),
                   size:  260,
                 ),
               ),
@@ -43,7 +44,7 @@ class SplashScreen extends ConsumerWidget {
                 bottom: -80,
                 left:   -60,
                 child: _Blob(
-                  color: const Color(0xFF4F46E5).withValues(alpha: 0.08),
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.10),
                   size:  300,
                 ),
               ),

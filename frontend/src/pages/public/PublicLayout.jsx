@@ -5,6 +5,19 @@ import { selectIsAuth } from '@store/slices/authSlice';
 import { Bars3Icon, XMarkIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { ThemeProvider, usePublicTheme } from './ThemeContext';
 
+/* Load Inter font once for all public pages */
+function FontLoader() {
+  useEffect(() => {
+    if (document.getElementById('pub-inter-font')) return;
+    const link = document.createElement('link');
+    link.id   = 'pub-inter-font';
+    link.rel  = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap';
+    document.head.appendChild(link);
+  }, []);
+  return null;
+}
+
 const NAV_LINKS = [
   { label: 'Home',     to: '/',        end: true },
   { label: 'About',    to: '/about',   end: false },
@@ -74,7 +87,7 @@ function Navbar() {
       <style>{`
         /* ── Hero: always blue-purple gradient ──────────────────── */
         .pub-hero-bg {
-          background: linear-gradient(135deg, #3730a3 0%, #4f46e5 55%, #7c3aed 100%);
+          background: linear-gradient(351deg, #8380b4 0%, #14122d 55%, #332c3f 100%);
           position: relative;
         }
 
@@ -115,6 +128,16 @@ function Navbar() {
 
         @keyframes pub-glow { 0%,100% { opacity:0.4; transform:scale(1) } 50% { opacity:0.75; transform:scale(1.15) } }
         @keyframes pub-fade-up { from { opacity:0; transform:translateY(22px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes pub-float { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-10px) } }
+
+        /* Hero floating stat cards */
+        .pub-hero-float { animation: pub-float 6s ease-in-out infinite; }
+        @media (max-width: 860px) {
+          .pub-hero-float { display: none !important; }
+        }
+        @media (max-width: 640px) {
+          .pub-hero-bg h1 { font-size: 2.25rem !important; }
+        }
 
         .pub-gradient-text {
           background: linear-gradient(135deg, #818cf8, #c4b5fd);
@@ -154,6 +177,42 @@ function Navbar() {
         .pub-input::placeholder { color: var(--pub-input-placeholder); }
         .pub-input option { background: var(--pub-bg-card); color: var(--pub-text); }
         .faq-item { border-bottom: 1px solid var(--pub-border); }
+
+        /* ── Mobile responsive ─────────────────────────────────── */
+        @media (max-width: 767px) {
+          /* Hero */
+          .pub-hero-bg { min-height: auto !important; padding-bottom: 3rem !important; }
+          .pub-hero-bg h1 { font-size: 2rem !important; }
+          .pub-hero-mockup { display: none !important; }
+
+          /* Showcase sections (POS, Analytics) */
+          .pub-showcase-mockup { display: none !important; }
+          .pub-showcase-text {
+            flex-basis: 100% !important;
+            max-width: 100% !important;
+          }
+
+          /* Section padding */
+          .pub-section,
+          .pub-section-alt { padding-top: 3.5rem !important; padding-bottom: 3.5rem !important; }
+
+          /* Roles 2-col grid → 1 col */
+          .pub-roles-grid { grid-template-columns: 1fr !important; }
+
+          /* Device cards — stack vertically */
+          .pub-device-cards { flex-direction: column !important; align-items: center !important; }
+          .pub-device-cards > * { width: 100% !important; max-width: 280px !important; }
+
+          /* Footer brand — full width */
+          .pub-footer-brand { grid-column: span 1 !important; }
+        }
+
+        @media (min-width: 768px) and (max-width: 1023px) {
+          /* Tablet: keep mockups but shrink */
+          .pub-hero-mockup { max-width: 100% !important; }
+          .pub-showcase-text { flex-basis: 300px !important; }
+          .pub-showcase-mockup { flex-basis: 400px !important; }
+        }
       `}</style>
 
       <nav
@@ -287,7 +346,7 @@ function Footer() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '3rem', marginBottom: '3rem' }}>
 
           {/* Brand */}
-          <div style={{ gridColumn: 'span 2' }} className="md:col-span-1">
+          <div style={{ gridColumn: 'span 2' }} className="pub-footer-brand md:col-span-1">
             <div style={{ marginBottom: '1rem' }}>
               <img src="/newlogo.png" alt="ProBusinessCloud"
                 style={{ height: 32, width: 'auto', objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }} />
@@ -359,8 +418,9 @@ function PublicLayoutInner() {
   return (
     <div
       data-pub-theme={isDark ? 'dark' : 'light'}
-      style={{ minHeight: '100vh', background: c.bg, color: c.text, transition: 'background-color 0.25s ease, color 0.25s ease' }}
+      style={{ minHeight: '100vh', background: c.bg, color: c.text, transition: 'background-color 0.25s ease, color 0.25s ease', fontFamily: "'Inter', system-ui, sans-serif" }}
     >
+      <FontLoader />
       <Navbar />
       <main>
         <Outlet />
