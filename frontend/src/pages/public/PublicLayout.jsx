@@ -143,7 +143,7 @@ function Navbar() {
           -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
         .pub-gradient-btn {
-          background: linear-gradient(135deg, #4f46e5, #7c3aed);
+          background: linear-gradient(135deg, #bdb4fe, #7c3aed);
           color: white; transition: all 0.25s;
           box-shadow: 0 6px 20px rgba(79,70,229,0.35);
         }
