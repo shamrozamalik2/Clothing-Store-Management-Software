@@ -88,7 +88,7 @@ export default function PublicLoginPage() {
           width: 100%; padding: 0.875rem; border-radius: 14px;
           font-size: 1rem; font-weight: 700; cursor: pointer;
           border: none; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-          background: linear-gradient(135deg, #bdb4fe, #7c3aed);
+          background: linear-gradient(135deg, #7c72c2, #1c0b3a);
           color: white; transition: all 0.25s;
           box-shadow: 0 8px 28px rgba(79,70,229,0.45);
           font-family: inherit;
