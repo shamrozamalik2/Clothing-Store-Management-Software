@@ -139,10 +139,40 @@ async function bulkInsert(client, table, cols, rows, mapper) {
 
 // ── Core restore — shared by both endpoints ────────────────────────────────────
 async function performRestore(client, cid, d) {
-  // Safety guard: never delete existing data if the backup contains nothing
+  // Safety guard: never proceed if the backup contains nothing at all
   const totalRows = Object.values(d).reduce((s, rows) => s + (Array.isArray(rows) ? rows.length : 0), 0);
   if (totalRows === 0) {
     throw new Error('Backup file contains no data rows. Restore aborted — your existing data has not been changed.');
+  }
+
+  // Per-table row counts from backup
+  const has = key => Array.isArray(d[key]) && d[key].length > 0;
+
+  // Extra safety: if backup claims 0 products but company has products, abort to prevent wipeout.
+  // This catches truncated/corrupted backups where only the beginning of the JSON was received.
+  if (!has('products')) {
+    const { rows: [existingProducts] } = await client.query(
+      `SELECT COUNT(*) AS cnt FROM products WHERE company_id=$1`, [cid]
+    );
+    if (Number(existingProducts.cnt) > 0) {
+      throw new Error(
+        `Backup contains no products, but your account has ${existingProducts.cnt} existing product(s). ` +
+        'Restore aborted to prevent data loss — please use a complete backup file that includes your products.'
+      );
+    }
+  }
+
+  // Extra safety: same check for sales
+  if (!has('sales')) {
+    const { rows: [existingSales] } = await client.query(
+      `SELECT COUNT(*) AS cnt FROM sales WHERE company_id=$1`, [cid]
+    );
+    if (Number(existingSales.cnt) > 0) {
+      throw new Error(
+        `Backup contains no sales, but your account has ${existingSales.cnt} existing sale(s). ` +
+        'Restore aborted to prevent data loss — please use a complete backup file that includes your sales.'
+      );
+    }
   }
 
   const report = {};
@@ -154,25 +184,51 @@ async function performRestore(client, cid, d) {
     return inserted;
   };
 
-  // Delete in FK-safe order (children first)
-  await client.query(`DELETE FROM exchange_items          WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM return_items            WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM returns                 WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM stock_adjustment_items  WHERE adjustment_id IN (SELECT id FROM stock_adjustments WHERE company_id=$1)`, [cid]);
-  await client.query(`DELETE FROM stock_adjustments       WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM sale_items              WHERE sale_id IN (SELECT id FROM sales WHERE company_id=$1)`, [cid]);
-  await client.query(`DELETE FROM sales                   WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM purchase_payments       WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM purchase_items          WHERE purchase_id IN (SELECT id FROM purchases WHERE company_id=$1)`, [cid]);
-  await client.query(`DELETE FROM purchases               WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM expenses                WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM expense_categories      WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM product_variants        WHERE product_id IN (SELECT id FROM products WHERE company_id=$1)`, [cid]);
-  await client.query(`DELETE FROM products                WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM customers               WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM suppliers               WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM brands                  WHERE company_id=$1`, [cid]);
-  await client.query(`DELETE FROM categories              WHERE company_id=$1`, [cid]);
+  // Delete in FK-safe order (children first).
+  // CRITICAL: only delete a table when the backup actually provides rows for it.
+  // If the backup has 0 rows for a table, skip deletion — this protects against
+  // truncated/incomplete backup files silently wiping live data.
+
+  if (has('returns') || has('return_items') || has('exchange_items')) {
+    await client.query(`DELETE FROM exchange_items WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM return_items   WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM returns        WHERE company_id=$1`, [cid]);
+  }
+  if (has('stock_adjustments') || has('stock_adjustment_items')) {
+    await client.query(`DELETE FROM stock_adjustment_items WHERE adjustment_id IN (SELECT id FROM stock_adjustments WHERE company_id=$1)`, [cid]);
+    await client.query(`DELETE FROM stock_adjustments      WHERE company_id=$1`, [cid]);
+  }
+  if (has('sales') || has('sale_items')) {
+    await client.query(`DELETE FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE company_id=$1)`, [cid]);
+    await client.query(`DELETE FROM sales       WHERE company_id=$1`, [cid]);
+  }
+  if (has('purchases') || has('purchase_items') || has('purchase_payments')) {
+    await client.query(`DELETE FROM purchase_payments WHERE company_id=$1`, [cid]);
+    await client.query(`DELETE FROM purchase_items    WHERE purchase_id IN (SELECT id FROM purchases WHERE company_id=$1)`, [cid]);
+    await client.query(`DELETE FROM purchases         WHERE company_id=$1`, [cid]);
+  }
+  if (has('expenses')) {
+    await client.query(`DELETE FROM expenses WHERE company_id=$1`, [cid]);
+  }
+  if (has('expense_categories')) {
+    await client.query(`DELETE FROM expense_categories WHERE company_id=$1`, [cid]);
+  }
+  if (has('products') || has('product_variants')) {
+    await client.query(`DELETE FROM product_variants WHERE product_id IN (SELECT id FROM products WHERE company_id=$1)`, [cid]);
+    await client.query(`DELETE FROM products         WHERE company_id=$1`, [cid]);
+  }
+  if (has('customers')) {
+    await client.query(`DELETE FROM customers WHERE company_id=$1`, [cid]);
+  }
+  if (has('suppliers')) {
+    await client.query(`DELETE FROM suppliers WHERE company_id=$1`, [cid]);
+  }
+  if (has('brands')) {
+    await client.query(`DELETE FROM brands WHERE company_id=$1`, [cid]);
+  }
+  if (has('categories')) {
+    await client.query(`DELETE FROM categories WHERE company_id=$1`, [cid]);
+  }
 
   // Insert in FK-safe order (parents first)
   await ins('categories',
