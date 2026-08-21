@@ -20,9 +20,9 @@ const env = {
   DB_POOL_MAX:  parseInt(opt('DB_POOL_MAX', '20'), 10),
   DB_SSL:       opt('DB_SSL', 'true') === 'true',
 
-  // ── JWT access token (short-lived, 15 minutes) ─────────────
+  // ── JWT access token ────────────────────────────────────────
   JWT_SECRET:     req('JWT_SECRET'),
-  JWT_EXPIRES_IN: opt('JWT_EXPIRES_IN', '15m'),
+  JWT_EXPIRES_IN: opt('JWT_EXPIRES_IN', '8h'),
 
   // ── Refresh token (long-lived, HttpOnly cookie) ────────────
   REFRESH_SECRET:      req('REFRESH_SECRET'),

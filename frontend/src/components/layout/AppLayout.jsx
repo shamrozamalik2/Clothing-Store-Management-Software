@@ -3,8 +3,11 @@ import { Outlet } from 'react-router-dom';
 import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 
 export default function AppLayout() {
+  useTokenRefresh();
+
   const [updateState, setUpdateState] = useState(null); // null | 'available' | 'downloaded'
   const [updateInfo,  setUpdateInfo]  = useState(null);
   const [dismissed,   setDismissed]   = useState(false);
