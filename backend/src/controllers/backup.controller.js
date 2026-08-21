@@ -2,6 +2,7 @@
 
 const { query, getClient } = require('../config/database');
 const { success, error }   = require('../utils/response');
+const { logAudit }         = require('../utils/audit');
 const logger               = require('../config/logger');
 
 const now = () => new Date().toISOString();
@@ -138,7 +139,7 @@ async function bulkInsert(client, table, cols, rows, mapper) {
 }
 
 // ── Core restore — shared by both endpoints ────────────────────────────────────
-async function performRestore(client, cid, d) {
+async function performRestore(client, cid, d, userId) {
   // Safety guard: never proceed if the backup contains nothing at all
   const totalRows = Object.values(d).reduce((s, rows) => s + (Array.isArray(rows) ? rows.length : 0), 0);
   if (totalRows === 0) {
@@ -578,13 +579,15 @@ exports.restoreBackup = async (req, res, next) => {
   const client = await getClient();
   try {
     await client.query('BEGIN');
-    const report = await performRestore(client, cid, d);
+    const report = await performRestore(client, cid, d, req.user?.id);
     await client.query('COMMIT');
     logger.info(`[Backup] JSON restore done for company ${cid}`);
+    await logAudit(cid, req.user?.id, 'RESTORE', 'backup', null, { source: 'json', report });
     return success(res, { report }, 'Backup restored successfully.');
   } catch (err) {
     await client.query('ROLLBACK');
     logger.error(`[Backup] Restore failed for company ${cid}: ${err.message}`);
+    try { await logAudit(cid, req.user?.id, 'RESTORE_FAILED', 'backup', null, { source: 'json', reason: err.message }); } catch (_) {}
     next(err);
   } finally {
     client.release();
@@ -640,13 +643,15 @@ exports.restoreBackupFile = async (req, res, next) => {
   const client = await getClient();
   try {
     await client.query('BEGIN');
-    const report = await performRestore(client, cid, d);
+    const report = await performRestore(client, cid, d, req.user?.id);
     await client.query('COMMIT');
     logger.info(`[Backup] File restore (${source}) done for company ${cid}`);
+    await logAudit(cid, req.user?.id, 'RESTORE', 'backup', null, { source, report });
     return success(res, { report, source }, 'Backup restored successfully.');
   } catch (err) {
     await client.query('ROLLBACK');
     logger.error(`[Backup] File restore failed for company ${cid}: ${err.message}`);
+    try { await logAudit(cid, req.user?.id, 'RESTORE_FAILED', 'backup', null, { source, reason: err.message }); } catch (_) {}
     next(err);
   } finally {
     client.release();
