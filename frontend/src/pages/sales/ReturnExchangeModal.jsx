@@ -220,9 +220,7 @@ export default function ReturnExchangeModal({ sale, onClose, onSuccess }) {
                         <p className="text-xs text-surface-500">{row.variant_label}</p>
                       )}
                     </div>
-                    <div className="text-xs text-surface-400 shrink-0">
-                      {formatCurrency(row.unit_price)} × max {row.max_qty}
-                    </div>
+                    <span className="text-xs text-surface-500 shrink-0">max {row.max_qty}</span>
                     <input
                       type="number"
                       min="0"
