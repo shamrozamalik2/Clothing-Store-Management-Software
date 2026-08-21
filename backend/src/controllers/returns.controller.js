@@ -93,7 +93,7 @@ const create = async (req, res, next) => {
             }
           }
 
-          const lineTotal = qty * parseFloat(saleItem.unit_price);
+          const lineTotal = qty * (parseFloat(saleItem.total) / parseFloat(saleItem.quantity)); // use price actually paid (after discount)
           returnTotal += lineTotal;
           resolvedReturn.push({ ...saleItem, returnQty: qty, lineTotal });
         }

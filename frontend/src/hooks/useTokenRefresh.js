@@ -1,11 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import axios from 'axios';
-import { selectToken, setToken, clearCredentials } from '@store/slices/authSlice';
-
-const BASE_URL = window.electronAPI?.backendUrl
-  ? `${window.electronAPI.backendUrl}/api`
-  : (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api');
+import { useSelector } from 'react-redux';
+import { selectToken } from '@store/slices/authSlice';
+import { callRefresh } from '@api/client';
 
 function getExp(token) {
   try {
@@ -15,28 +11,12 @@ function getExp(token) {
   }
 }
 
-async function doRefresh(dispatch) {
-  try {
-    const resp = await axios.post(
-      `${BASE_URL}/auth/refresh`,
-      {},
-      { withCredentials: true }
-    );
-    const newToken = resp.data?.data?.token ?? resp.data?.token;
-    if (newToken) dispatch(setToken(newToken));
-  } catch {
-    // Proactive refresh failed — the reactive 401 interceptor in client.js
-    // will handle it when the token actually expires and a request fails.
-    // Only clear session if we get a definitive "token invalid" from server.
-  }
-}
-
 // Silently refreshes the access token ~2 minutes before it expires.
-// Mounts at the app layout level so the user is never kicked out mid-session.
+// Uses the shared callRefresh() from client.js so it shares the refresh lock
+// with the reactive 401 interceptor — no duplicate refresh flights.
 export function useTokenRefresh() {
-  const dispatch  = useDispatch();
-  const token     = useSelector(selectToken);
-  const timerRef  = useRef(null);
+  const token    = useSelector(selectToken);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -48,12 +28,13 @@ export function useTokenRefresh() {
     // Refresh 2 minutes before expiry; if already within that window, refresh now
     const msLeft = exp * 1000 - Date.now() - 2 * 60 * 1000;
 
-    if (msLeft <= 0) {
-      doRefresh(dispatch);
-      return;
-    }
+    const doRefresh = () => callRefresh().catch(() => {
+      // Proactive refresh failed — reactive 401 interceptor is the backstop.
+    });
 
-    timerRef.current = setTimeout(() => doRefresh(dispatch), msLeft);
+    if (msLeft <= 0) { doRefresh(); return; }
+
+    timerRef.current = setTimeout(doRefresh, msLeft);
     return () => clearTimeout(timerRef.current);
-  }, [token, dispatch]);
+  }, [token]);
 }

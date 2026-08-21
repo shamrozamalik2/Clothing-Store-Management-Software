@@ -29,6 +29,30 @@ function drainQueue(err, token) {
   queue = [];
 }
 
+// Shared refresh logic — used by both the reactive interceptor and the proactive hook.
+// The `refreshing` flag ensures only one refresh flight is in progress at a time.
+export async function callRefresh() {
+  if (refreshing) {
+    return new Promise((resolve, reject) => {
+      queue.push((e, token) => (e ? reject(e) : resolve(token)));
+    });
+  }
+  refreshing = true;
+  try {
+    const data = await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+    const newToken = data.data?.data?.token ?? data.data?.token;
+    if (!newToken) throw new Error('No token in refresh response');
+    store.dispatch(setToken(newToken));
+    drainQueue(null, newToken);
+    return newToken;
+  } catch (err) {
+    drainQueue(err, null);
+    throw err;
+  } finally {
+    refreshing = false;
+  }
+}
+
 // Transparent token refresh on 401 TOKEN_EXPIRED
 client.interceptors.response.use(
   (response) => response.data,
@@ -39,32 +63,14 @@ client.interceptors.response.use(
 
     if (status === 401 && code === 'TOKEN_EXPIRED' && !original._retry) {
       original._retry = true;
-
-      if (refreshing) {
-        return new Promise((resolve, reject) => {
-          queue.push((e, token) => {
-            if (e) return reject(e);
-            original.headers.Authorization = `Bearer ${token}`;
-            resolve(client(original));
-          });
-        });
-      }
-
-      refreshing = true;
       try {
-        const data = await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
-        const newToken = data.data?.data?.token ?? data.data?.token;
-        store.dispatch(setToken(newToken));
-        drainQueue(null, newToken);
+        const newToken = await callRefresh();
         original.headers.Authorization = `Bearer ${newToken}`;
         return client(original);
       } catch (refreshErr) {
-        drainQueue(refreshErr, null);
         store.dispatch(clearCredentials());
         window.location.hash = '/login';
         return Promise.reject(refreshErr);
-      } finally {
-        refreshing = false;
       }
     }
 

@@ -89,7 +89,7 @@ export default function ReturnExchangeModal({ sale, onClose, onSuccess }) {
       variant_label: [item.size, item.color].filter(Boolean).join(' · '),
       max_qty:       parseFloat(item.quantity),
       qty:           0,
-      unit_price:    parseFloat(item.unit_price),
+      unit_price:    parseFloat(item.total) / parseFloat(item.quantity), // effective price paid (after discount)
     }))
   );
 
