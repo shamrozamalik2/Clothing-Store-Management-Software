@@ -10,8 +10,10 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500
 
 router.use(authenticate);
 
-router.get('/export',       ctrl.exportBackup);
-router.post('/restore',     authorize('admin'), ctrl.restoreBackup);
-router.post('/restore-file', authorize('admin'), upload.single('file'), ctrl.restoreBackupFile);
+router.get('/export',                    ctrl.exportBackup);
+router.get('/history',                   ctrl.listBackups);
+router.post('/restore',                  authorize('admin'), ctrl.restoreBackup);
+router.post('/restore-file',             authorize('admin'), upload.single('file'), ctrl.restoreBackupFile);
+router.post('/restore-snapshot/:id',     authorize('admin'), ctrl.restoreSnapshot);
 
 module.exports = router;

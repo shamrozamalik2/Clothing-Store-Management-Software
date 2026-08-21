@@ -146,36 +146,6 @@ async function performRestore(client, cid, d, userId) {
     throw new Error('Backup file contains no data rows. Restore aborted — your existing data has not been changed.');
   }
 
-  // Per-table row counts from backup
-  const has = key => Array.isArray(d[key]) && d[key].length > 0;
-
-  // Extra safety: if backup claims 0 products but company has products, abort to prevent wipeout.
-  // This catches truncated/corrupted backups where only the beginning of the JSON was received.
-  if (!has('products')) {
-    const { rows: [existingProducts] } = await client.query(
-      `SELECT COUNT(*) AS cnt FROM products WHERE company_id=$1`, [cid]
-    );
-    if (Number(existingProducts.cnt) > 0) {
-      throw new Error(
-        `Backup contains no products, but your account has ${existingProducts.cnt} existing product(s). ` +
-        'Restore aborted to prevent data loss — please use a complete backup file that includes your products.'
-      );
-    }
-  }
-
-  // Extra safety: same check for sales
-  if (!has('sales')) {
-    const { rows: [existingSales] } = await client.query(
-      `SELECT COUNT(*) AS cnt FROM sales WHERE company_id=$1`, [cid]
-    );
-    if (Number(existingSales.cnt) > 0) {
-      throw new Error(
-        `Backup contains no sales, but your account has ${existingSales.cnt} existing sale(s). ` +
-        'Restore aborted to prevent data loss — please use a complete backup file that includes your sales.'
-      );
-    }
-  }
-
   const report = {};
 
   const ins = async (table, cols, rows, mapper) => {
@@ -185,51 +155,8 @@ async function performRestore(client, cid, d, userId) {
     return inserted;
   };
 
-  // Delete in FK-safe order (children first).
-  // CRITICAL: only delete a table when the backup actually provides rows for it.
-  // If the backup has 0 rows for a table, skip deletion — this protects against
-  // truncated/incomplete backup files silently wiping live data.
-
-  if (has('returns') || has('return_items') || has('exchange_items')) {
-    await client.query(`DELETE FROM exchange_items WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM return_items   WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM returns        WHERE company_id=$1`, [cid]);
-  }
-  if (has('stock_adjustments') || has('stock_adjustment_items')) {
-    await client.query(`DELETE FROM stock_adjustment_items WHERE adjustment_id IN (SELECT id FROM stock_adjustments WHERE company_id=$1)`, [cid]);
-    await client.query(`DELETE FROM stock_adjustments      WHERE company_id=$1`, [cid]);
-  }
-  if (has('sales') || has('sale_items')) {
-    await client.query(`DELETE FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE company_id=$1)`, [cid]);
-    await client.query(`DELETE FROM sales       WHERE company_id=$1`, [cid]);
-  }
-  if (has('purchases') || has('purchase_items') || has('purchase_payments')) {
-    await client.query(`DELETE FROM purchase_payments WHERE company_id=$1`, [cid]);
-    await client.query(`DELETE FROM purchase_items    WHERE purchase_id IN (SELECT id FROM purchases WHERE company_id=$1)`, [cid]);
-    await client.query(`DELETE FROM purchases         WHERE company_id=$1`, [cid]);
-  }
-  if (has('expenses')) {
-    await client.query(`DELETE FROM expenses WHERE company_id=$1`, [cid]);
-  }
-  if (has('expense_categories')) {
-    await client.query(`DELETE FROM expense_categories WHERE company_id=$1`, [cid]);
-  }
-  if (has('products') || has('product_variants')) {
-    await client.query(`DELETE FROM product_variants WHERE product_id IN (SELECT id FROM products WHERE company_id=$1)`, [cid]);
-    await client.query(`DELETE FROM products         WHERE company_id=$1`, [cid]);
-  }
-  if (has('customers')) {
-    await client.query(`DELETE FROM customers WHERE company_id=$1`, [cid]);
-  }
-  if (has('suppliers')) {
-    await client.query(`DELETE FROM suppliers WHERE company_id=$1`, [cid]);
-  }
-  if (has('brands')) {
-    await client.query(`DELETE FROM brands WHERE company_id=$1`, [cid]);
-  }
-  if (has('categories')) {
-    await client.query(`DELETE FROM categories WHERE company_id=$1`, [cid]);
-  }
+  // Restore is upsert-only — existing records are updated, new ones inserted.
+  // Nothing is ever deleted, so data already in the database is always preserved.
 
   // Insert in FK-safe order (parents first)
   await ins('categories',
@@ -553,6 +480,29 @@ exports.exportBackup = async (req, res, next) => {
     };
 
     const filename = `backup-${company[0]?.slug || cid}-${now().slice(0, 10)}.json`;
+
+    // Save a server-side snapshot so backup data is always in the database
+    try {
+      await query(
+        `INSERT INTO company_backups (company_id, created_by, file_name, version, row_counts, data)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)`,
+        [cid, req.user?.id ?? null, filename, backup.version,
+         JSON.stringify(backup.counts), JSON.stringify(backup.data)]
+      );
+      // Keep only the 10 most recent snapshots per company to limit storage
+      await query(
+        `DELETE FROM company_backups
+         WHERE company_id=$1
+           AND id NOT IN (
+             SELECT id FROM company_backups WHERE company_id=$1 ORDER BY created_at DESC LIMIT 10
+           )`,
+        [cid]
+      );
+    } catch (saveErr) {
+      logger.error(`[Backup] Failed to save server snapshot: ${saveErr.message}`);
+      // Never block the file download because of a snapshot save failure
+    }
+
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.end(JSON.stringify(backup, null, 2), 'utf8');
@@ -652,6 +602,50 @@ exports.restoreBackupFile = async (req, res, next) => {
     await client.query('ROLLBACK');
     logger.error(`[Backup] File restore failed for company ${cid}: ${err.message}`);
     try { await logAudit(cid, req.user?.id, 'RESTORE_FAILED', 'backup', null, { source, reason: err.message }); } catch (_) {}
+    next(err);
+  } finally {
+    client.release();
+  }
+};
+
+// ── List stored server-side backup snapshots ──────────────────────────────────
+exports.listBackups = async (req, res, next) => {
+  const cid = req.companyId;
+  try {
+    const { rows } = await query(
+      `SELECT id, file_name, version, row_counts, created_at, created_by
+       FROM company_backups WHERE company_id=$1 ORDER BY created_at DESC LIMIT 10`,
+      [cid]
+    );
+    return success(res, rows, 'Backup history retrieved.');
+  } catch (err) { next(err); }
+};
+
+// ── Restore from a stored server-side snapshot ────────────────────────────────
+exports.restoreSnapshot = async (req, res, next) => {
+  const cid = req.companyId;
+  const id  = Number(req.params.id);
+
+  const { rows: [snap] } = await query(
+    `SELECT data FROM company_backups WHERE id=$1 AND company_id=$2`,
+    [id, cid]
+  );
+  if (!snap) return error(res, 'Backup snapshot not found.', 404);
+
+  const d = snap.data;
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const report = await performRestore(client, cid, d, req.user?.id);
+    await client.query('COMMIT');
+    logger.info(`[Backup] Snapshot #${id} restore done for company ${cid}`);
+    await logAudit(cid, req.user?.id, 'RESTORE', 'backup', id, { source: 'snapshot', report });
+    return success(res, { report }, 'Backup restored successfully.');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    logger.error(`[Backup] Snapshot restore failed for company ${cid}: ${err.message}`);
+    try { await logAudit(cid, req.user?.id, 'RESTORE_FAILED', 'backup', id, { source: 'snapshot', reason: err.message }); } catch (_) {}
     next(err);
   } finally {
     client.release();
