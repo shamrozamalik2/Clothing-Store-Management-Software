@@ -161,7 +161,7 @@ export default function AppDownload() {
             transition={{ duration: reduce ? 0.2 : 0.55, ease: EASE, delay: 0.22 }}
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: 'var(--s5)' }}
           >
-            <StoreButtons variant="ghost" className="pbc-dl-store" />} caption="Get it on" name="Google Play" />
+            <StoreButtons variant="ghost" className="pbc-dl-store" />
           </motion.div>
         </div>
 
