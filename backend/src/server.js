@@ -7,6 +7,7 @@ const path = require('path');
 const { env }          = require('./config/env');
 const { initDb }       = require('./config/database');
 const { runMigrations } = require('./database/migrate');
+const { startAutoBackupScheduler } = require('./utils/backup.scheduler');
 const app              = require('./app');
 
 async function main() {
@@ -19,6 +20,9 @@ async function main() {
 
   // Run pending migrations
   await runMigrations();
+
+  // Start automatic daily backup scheduler
+  startAutoBackupScheduler();
 
   // Bind server
   const host = env.IS_DEV ? '127.0.0.1' : '0.0.0.0';
