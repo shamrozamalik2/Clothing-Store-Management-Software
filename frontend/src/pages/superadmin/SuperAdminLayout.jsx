@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import {
   HomeIcon, BuildingOffice2Icon, UsersIcon,
   ShieldCheckIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon,
@@ -13,10 +14,7 @@ export function useSuperAdmin() {
 
 export function SuperAdminGuard({ children }) {
   const { isAuth } = useSuperAdmin();
-  if (!isAuth) {
-    window.location.hash = '/admin/login';
-    return null;
-  }
+  if (!isAuth) return <Navigate to="/admin/login" replace />;
   return children;
 }
 
@@ -33,7 +31,7 @@ export default function SuperAdminLayout({ children, page }) {
   const logout = () => {
     sessionStorage.removeItem('sa_token');
     sessionStorage.removeItem('sa_admin');
-    window.location.hash = '/admin/login';
+    window.location.replace('/#/admin/login');
   };
 
   const initials = (admin?.name || 'SA').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
