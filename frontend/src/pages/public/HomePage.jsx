@@ -4,7 +4,9 @@ import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import Hero from './components/Hero';
 import WorkflowStory from './components/WorkflowStory';
 import PlatformSwitcher from './components/PlatformSwitcher';
-import SecurityPanel from './components/SecurityPanel';
+import SecurityOrbit from './components/SecurityOrbit';
+import CapabilityBento from './components/CapabilityBento';
+import AppDownload from './components/AppDownload';
 import { AppChrome, ReportsPreview } from './components/ProductPreview';
 import { Reveal, StaggerGroup, StaggerItem } from './components/motion';
 import { CTA, Eyebrow, SectionHeading } from './components/ui';
@@ -55,44 +57,41 @@ export default function HomePage() {
       {/* ═══ CAPABILITIES BY OUTCOME ═══════════════════════════════════════ */}
       <section className="pbc-paper pbc-section">
         <div className="pbc-shell">
-          <SectionHeading
-            eyebrow="What it covers"
-            tone="paper"
-            title="Twenty-four modules, organised around what you are trying to get done."
-            lede="Not a checklist of features — a set of outcomes, each backed by the parts of the system that deliver it."
-          />
-
-          <StaggerGroup
-            className="pbc-grid-3"
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--s3)', marginTop: 'var(--s8)' }}
-            stagger={0.05}
+          {/* Heading sits beside a summary block so the right half of the row
+              carries weight instead of running out into white space. */}
+          <div
+            className="pbc-split"
+            style={{ display: 'grid', gridTemplateColumns: '1.25fr 0.75fr', gap: 'var(--s6)', alignItems: 'end', marginBottom: 'var(--s8)' }}
           >
-            {GROUPS.map((g) => (
-              <StaggerItem key={g.id}>
-                <Link
-                  to={`/platform#${g.id}`}
-                  className="pbc-card pbc-lift"
-                  style={{ display: 'block', padding: 'var(--s4)', height: '100%', textDecoration: 'none' }}
-                >
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      width: 38, height: 38, borderRadius: 'var(--r)', display: 'grid', placeItems: 'center',
-                      background: 'var(--accent-wash)', border: '1px solid var(--accent-line)',
-                    }}
-                  >
-                    <g.icon style={{ width: 18, height: 18, color: 'var(--accent)' }} />
+            <SectionHeading
+              eyebrow="What it covers"
+              tone="paper"
+              max={640}
+              title="Twenty-four modules, organised around what you are trying to get done."
+              lede="Not a checklist of features — a set of outcomes, each backed by the parts of the system that deliver it."
+            />
+
+            <Reveal delay={0.1}>
+              <div
+                className="pbc-metrics"
+                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s3)', paddingTop: 'var(--s3)', borderTop: '1px solid var(--on-paper-line)' }}
+              >
+                {[
+                  ['24', 'Modules'],
+                  ['200+', 'Capabilities'],
+                  ['4', 'Surfaces — web, desktop, Android, iOS'],
+                  ['1', 'Record behind all of it'],
+                ].map(([v, l]) => (
+                  <div key={l}>
+                    <div className="pbc-display pbc-tabular" style={{ fontSize: '1.75rem', lineHeight: 1, color: 'var(--accent)' }}>{v}</div>
+                    <div className="pbc-meta" style={{ color: 'var(--on-paper-soft)', marginTop: 4 }}>{l}</div>
                   </div>
-                  <h3 style={{ margin: 'var(--s3) 0 0', fontSize: '1.0625rem', fontWeight: 600, color: 'var(--on-paper)' }}>
-                    {g.title}
-                  </h3>
-                  <p className="pbc-body" style={{ color: 'var(--on-paper-mute)', marginTop: '0.5rem', marginBottom: 0 }}>
-                    {g.lede}
-                  </p>
-                </Link>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
+                ))}
+              </div>
+            </Reveal>
+          </div>
+
+          <CapabilityBento groups={GROUPS} />
 
           <Reveal delay={0.1}>
             <div style={{ marginTop: 'var(--s6)' }}>
@@ -151,8 +150,13 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ═══ APP DOWNLOAD ══════════════════════════════════════════════════ */}
+      <section className="pbc-paper" style={{ paddingTop: 'var(--s10)', paddingBottom: 'var(--s10)' }}>
+        <AppDownload />
+      </section>
+
       {/* ═══ SECURITY ══════════════════════════════════════════════════════ */}
-      <section className="pbc-navy pbc-section">
+      <section className="pbc-warm pbc-section">
         <div className="pbc-shell">
           <SectionHeading
             eyebrow="Security and control"
@@ -161,7 +165,7 @@ export default function HomePage() {
             lede="Operational and financial records need more than a password. Access, history and recovery are part of the product, not an afterthought."
           />
           <div style={{ marginTop: 'var(--s6)' }}>
-            <SecurityPanel items={SECURITY.slice(0, 6)} tone="ink" />
+            <SecurityOrbit items={SECURITY.slice(0, 6)} />
           </div>
           <Reveal delay={0.1}>
             <div style={{ marginTop: 'var(--s5)' }}>
@@ -182,13 +186,13 @@ export default function HomePage() {
 /* ── Shared closing call to action ────────────────────────────────────────── */
 export function FinalCta() {
   return (
-    <section className="pbc-ink pbc-grain" style={{ position: 'relative', overflow: 'hidden' }}>
+    <section className="pbc-navy" style={{ position: 'relative', overflow: 'hidden' }}>
       <div
         aria-hidden="true"
         style={{
           position: 'absolute', bottom: '-40%', left: '50%', transform: 'translateX(-50%)',
           width: 'min(900px, 120%)', height: 560,
-          background: 'radial-gradient(ellipse at center, rgba(47,91,245,0.20) 0%, transparent 68%)',
+          background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.18) 0%, transparent 68%)',
           pointerEvents: 'none',
         }}
       />

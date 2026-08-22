@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import Logo from '@components/ui/Logo';
+import { StoreButtons } from './StoreButtons';
 
 const COLUMNS = [
   {
@@ -26,6 +27,7 @@ const COLUMNS = [
   {
     heading: 'Get started',
     links: [
+      { to: '/pricing', label: 'Pricing' },
       { to: '/demo',  label: 'Book a demo' },
       { to: '/login', label: 'Sign in' },
     ],
@@ -39,7 +41,7 @@ export default function Footer() {
     <footer className="pbc-ink" style={{ borderTop: '1px solid var(--on-ink-line)' }}>
       <div className="pbc-shell" style={{ paddingTop: 'var(--s10)', paddingBottom: 'var(--s6)' }}>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 1.4fr) repeat(3, minmax(140px, 1fr))', gap: 'var(--s6) var(--s4)' }} className="pbc-footer-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(230px, 1.5fr) repeat(4, minmax(120px, 1fr))', gap: 'var(--s6) var(--s4)' }} className="pbc-footer-grid">
 
           {/* Brand */}
           <div>
@@ -51,6 +53,7 @@ export default function Footer() {
             <p className="pbc-meta" style={{ color: 'var(--on-ink-soft)', marginTop: 'var(--s2)' }}>
               Available on web, desktop, Android and iOS.
             </p>
+
           </div>
 
           {/* Link columns */}
@@ -74,6 +77,14 @@ export default function Footer() {
               </ul>
             </nav>
           ))}
+
+          {/* Download — its own column, heading aligned with the others */}
+          <div>
+            <h2 className="pbc-eyebrow" style={{ color: 'var(--on-ink-soft)', marginBottom: 'var(--s2)' }}>
+              Download
+            </h2>
+            <StoreButtons variant="solid" direction="column" />
+          </div>
         </div>
 
         <div

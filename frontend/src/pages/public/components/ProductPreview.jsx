@@ -11,6 +11,30 @@ import { StatusChip } from './ui';
    Rendered light-on-ink so the interface reads clearly against dark sections.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+const UI_SCOPE = {
+  '--paper': '#FFFFFF',
+  '--surface': '#F7F8FB',
+  '--surface-2': '#EFF1F6',
+  '--on-paper': '#0A0A12',
+  '--on-paper-mute': '#5F6070',
+  '--on-paper-soft': '#8E90A0',
+  '--on-paper-line': 'rgba(10,10,18,0.10)',
+  '--on-ink': '#0A0A12',
+  '--on-ink-mute': '#5F6070',
+  '--on-ink-soft': '#8E90A0',
+  '--on-ink-line': 'rgba(10,10,18,0.10)',
+  '--ink': '#0A0A12',
+  '--navy': '#1E293B',
+  '--accent': '#2C6BF5',
+  '--accent-hi': '#2C6BF5',
+  '--accent-wash': 'rgba(44,107,245,0.08)',
+  '--accent-line': 'rgba(44,107,245,0.22)',
+  '--sage': '#0F9C6C',
+  '--amber': '#B4791F',
+  '--signal': '#D2453A',
+  '--slate': '#6C6C78',
+};
+
 const RAIL = [
   { icon: Squares2X2Icon,   label: 'Dashboard' },
   { icon: ShoppingCartIcon, label: 'Point of Sale' },
@@ -32,6 +56,7 @@ export function AppChrome({ children, active = 0, title = 'Dashboard', style }) 
         boxShadow: '0 40px 90px -40px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.20)',
         display: 'flex',
         minHeight: 400,
+        ...UI_SCOPE,
         ...style,
       }}
       role="img"
@@ -400,7 +425,8 @@ export function MobilePreview({ style }) {
         width: 208, borderRadius: 26, padding: 7,
         background: 'var(--ink)',
         border: '1px solid rgba(252,251,248,0.16)',
-        boxShadow: '0 30px 70px -30px rgba(0,0,0,0.7)',
+        boxShadow: 'var(--shadow-xl)',
+        ...UI_SCOPE,
         ...style,
       }}
     >
@@ -433,6 +459,69 @@ export function MobilePreview({ style }) {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Mobile screen (frameless) ────────────────────────────────────────────────
+   The same app content as MobilePreview but without its own bezel, so it can
+   be dropped inside a real PhoneFrame. */
+export function MobileScreen() {
+  const quick = [['Sales', '86'], ['Returns', '3'], ['Avg. basket', 'Rs 1,493']];
+  const recent = [
+    ['INV-4821', 'Walk-in', 'Rs 4,250', 'paid'],
+    ['INV-4820', 'Zainab Traders', 'Rs 18,900', 'pending'],
+    ['INV-4819', 'Hassan M.', 'Rs 2,150', 'exchanged'],
+    ['INV-4818', 'Walk-in', 'Rs 1,480', 'refunded'],
+  ];
+
+  return (
+    <div style={{ ...UI_SCOPE, height: '100%', background: 'var(--surface)', display: 'flex', flexDirection: 'column' }}>
+      {/* Status + hero */}
+      <div style={{ background: '#0A0A12', color: '#fff', padding: '38px 16px 18px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, opacity: 0.65, marginBottom: 12 }}>
+          <span>9:41</span>
+          <span>▮▮▮</span>
+        </div>
+        <div style={{ fontSize: 10.5, opacity: 0.6 }}>Today</div>
+        <div className="pbc-tabular" style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 2 }}>Rs 128,400</div>
+        <div style={{ fontSize: 10, color: '#4FD59E', fontWeight: 600, marginTop: 3 }}>↑ 12.4% vs yesterday</div>
+      </div>
+
+      <div style={{ padding: 12, display: 'grid', gap: 9, flex: 1, minHeight: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
+          {quick.map(([k, v]) => (
+            <div key={k} style={{ background: '#fff', borderRadius: 10, padding: '8px 9px', border: '1px solid rgba(10,10,18,0.07)' }}>
+              <div style={{ fontSize: 7.5, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--on-paper-soft)', fontWeight: 700 }}>{k}</div>
+              <div className="pbc-tabular" style={{ fontSize: 14, fontWeight: 700, color: 'var(--on-paper)', marginTop: 1 }}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: 10, padding: 10, border: '1px solid rgba(10,10,18,0.07)', flex: 1, minHeight: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 7, color: 'var(--on-paper)' }}>Recent sales</div>
+          {recent.map(([id, who, amt, st], i) => (
+            <div
+              key={id}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0',
+                borderTop: i ? '1px solid rgba(10,10,18,0.05)' : 'none',
+              }}
+            >
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="pbc-mono" style={{ display: 'block', fontSize: 7.5, color: 'var(--on-paper-soft)' }}>{id}</span>
+                <span style={{ display: 'block', fontSize: 9.5, color: 'var(--on-paper)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who}</span>
+              </span>
+              <span className="pbc-tabular" style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--on-paper)' }}>{amt}</span>
+              <StatusChip kind={st} />
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: 'var(--accent)', color: '#fff', borderRadius: 999, padding: '9px 0', textAlign: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
+          New sale
         </div>
       </div>
     </div>

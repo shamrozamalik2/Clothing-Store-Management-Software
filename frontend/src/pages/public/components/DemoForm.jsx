@@ -81,7 +81,7 @@ function Field({ label, name, error, hint, required, children }) {
 
 const controlStyle = (invalid) => ({
   width: '100%',
-  background: 'rgba(252,251,248,0.05)',
+  background: 'var(--accent-wash)',
   border: `1px solid ${invalid ? 'rgba(240,131,121,0.65)' : 'var(--on-ink-line)'}`,
   borderRadius: 'var(--r)',
   padding: '0.6875rem 0.875rem',

@@ -91,15 +91,15 @@ const STATUS_INK = {
   paid:      { label: 'Paid',      fg: 'var(--sage-hi)'  },
   pending:   { label: 'Pending',   fg: 'var(--amber-hi)' },
   low:       { label: 'Low stock', fg: 'var(--signal-hi)'},
-  refunded:  { label: 'Refunded',  fg: 'rgba(252,251,248,0.62)' },
+  refunded:  { label: 'Refunded',  fg: 'var(--on-ink-soft)' },
   exchanged: { label: 'Exchanged', fg: 'var(--accent-hi)'},
 };
 
 export function StatusChip({ kind = 'paid', tone = 'paper', children }) {
   const base = STATUS[kind] || STATUS.paid;
   const fg = tone === 'ink' ? (STATUS_INK[kind]?.fg || base.fg) : base.fg;
-  const bg = tone === 'ink' ? 'rgba(252,251,248,0.06)' : base.bg;
-  const br = tone === 'ink' ? 'rgba(252,251,248,0.14)' : base.br;
+  const bg = tone === 'ink' ? 'var(--accent-wash)' : base.bg;
+  const br = tone === 'ink' ? 'var(--on-ink-line)' : base.br;
 
   return (
     <span

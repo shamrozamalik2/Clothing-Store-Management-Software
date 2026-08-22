@@ -27,6 +27,7 @@ export const GROUPS = [
     icon: ShoppingCartIcon,
     title: 'Sell faster at the counter',
     lede: 'A point of sale built for a real shop floor — barcode in, receipt out, without hunting through menus.',
+    chips: ['Barcode checkout', 'Split payments', 'Cart holds', 'Permission-controlled voids'],
     points: [
       'Barcode and product search with size and colour variants',
       'Discounts, tax, multiple payment methods and split tender',
@@ -42,6 +43,7 @@ export const GROUPS = [
     icon: CubeIcon,
     title: 'Keep every variant and movement visible',
     lede: 'Apparel lives and dies by variants. Track each size and colour as its own stock line, not a guess.',
+    chips: ['Size × colour matrix', 'Low-stock alerts', 'CSV import', 'Wholesale pricing'],
     points: [
       'SKU, barcode and images per product',
       'Cost, sale and wholesale pricing',
@@ -140,26 +142,38 @@ export const GROUPS = [
 export const STEPS = [
   {
     n: '01',
+    icon: Square3Stack3DIcon,
     title: 'Configure the business',
+    summary: 'Load the catalogue, set the rules, invite the team.',
     desc: 'Load your catalogue with variants and pricing, set categories and brands, add your team, and define what each role can reach. CSV import handles an existing catalogue in bulk.',
+    points: ['CSV catalogue import', 'Variants, SKUs and barcodes', 'Roles and permissions'],
     preview: 'inventory',
   },
   {
     n: '02',
+    icon: ShoppingCartIcon,
     title: 'Sell and receive stock',
+    summary: 'The counter and the stock room write to the same ledger.',
     desc: 'Staff ring up sales at the counter while purchase orders bring new stock in. Both sides adjust inventory as they happen, so the number on screen is the number on the shelf.',
+    points: ['Barcode checkout with variants', 'Purchase orders and receiving', 'Live stock on every sale'],
     preview: 'pos',
   },
   {
     n: '03',
+    icon: BanknotesIcon,
     title: 'Monitor performance',
+    summary: 'See what sold, what stuck, and where the margin went.',
     desc: 'Dashboard KPIs, sales charts, payment breakdowns and stock valuation show what is selling, what is stuck, and where the margin actually sits.',
+    points: ['Revenue and profit KPIs', 'Payment mix and top products', 'Stock valuation'],
     preview: 'dashboard',
   },
   {
     n: '04',
+    icon: ShieldCheckIcon,
     title: 'Grow with control',
+    summary: 'Add people and locations without losing the thread.',
     desc: 'Add locations and staff behind role-based permissions, keep an audit trail of administrative activity, and protect the record with backup and restore.',
+    points: ['Per-module permissions', 'Audit trail', 'Backup and restore'],
     preview: 'reports',
   },
 ];

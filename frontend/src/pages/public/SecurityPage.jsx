@@ -1,4 +1,4 @@
-import SecurityPanel from './components/SecurityPanel';
+import SecurityOrbit from './components/SecurityOrbit';
 import { SectionHeading } from './components/ui';
 import { Reveal } from './components/motion';
 import { SECURITY } from './content';
@@ -26,9 +26,9 @@ export default function SecurityPage() {
         </div>
       </section>
 
-      <section className="pbc-navy pbc-section">
+      <section className="pbc-warm pbc-section">
         <div className="pbc-shell">
-          <SecurityPanel items={SECURITY} tone="ink" />
+          <SecurityOrbit items={SECURITY} />
         </div>
       </section>
 

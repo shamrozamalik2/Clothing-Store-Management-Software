@@ -38,7 +38,7 @@ const FAQS = [
   },
   {
     q: 'How much does it cost?',
-    a: 'Pricing depends on the size of the business and how many people need access. We will give you a straight figure during the demo rather than publish a number that may not fit your situation.',
+    a: 'Standard is $25 per month, or $250 per year — two months free. Enterprise, for businesses running more than one location, is $40 per month. Every module is included on both plans; the difference is how many locations you operate. Full detail is on the pricing page.',
   },
 ];
 

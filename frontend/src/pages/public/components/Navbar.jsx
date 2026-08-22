@@ -12,6 +12,7 @@ const LINKS = [
   { to: '/platform',     label: 'Platform' },
   { to: '/how-it-works', label: 'How it works' },
   { to: '/solutions',    label: 'Solutions' },
+  { to: '/pricing',      label: 'Pricing' },
   { to: '/security',     label: 'Security' },
 ];
 
@@ -53,8 +54,8 @@ function NavItem({ to, label, reduce }) {
                 position: 'absolute',
                 inset: 0,
                 borderRadius: 8,
-                background: 'rgba(252,251,248,0.09)',
-                border: '1px solid rgba(252,251,248,0.10)',
+                background: 'var(--accent-wash)',
+                border: '1px solid var(--accent-line)',
               }}
               transition={{ duration: reduce ? 0 : 0.32, ease: EASE }}
             />
@@ -62,7 +63,7 @@ function NavItem({ to, label, reduce }) {
           {!isActive && hover && (
             <span
               aria-hidden="true"
-              style={{ position: 'absolute', inset: 0, borderRadius: 8, background: 'rgba(252,251,248,0.05)' }}
+              style={{ position: 'absolute', inset: 0, borderRadius: 8, background: 'rgba(10,10,18,0.04)' }}
             />
           )}
           <span style={{ position: 'relative' }}>{label}</span>
@@ -106,11 +107,11 @@ export default function Navbar() {
         position: 'sticky',
         top: 0,
         zIndex: 90,
-        background: lifted ? 'rgba(11,16,32,0.82)' : 'transparent',
+        background: lifted ? 'rgba(255,255,255,0.86)' : 'transparent',
         backdropFilter: lifted ? 'saturate(150%) blur(16px)' : 'none',
         WebkitBackdropFilter: lifted ? 'saturate(150%) blur(16px)' : 'none',
         borderBottom: '1px solid',
-        borderColor: lifted ? 'rgba(252,251,248,0.09)' : 'transparent',
+        borderColor: lifted ? 'var(--on-ink-line)' : 'transparent',
         transition: 'background 0.28s, border-color 0.28s',
       }}
     >
@@ -124,7 +125,7 @@ export default function Navbar() {
           display: 'grid',
           gridTemplateColumns: '1fr auto 1fr',
           alignItems: 'center',
-          height: 64,
+          height: 76,
           gap: 'var(--s3)',
         }}
       >
@@ -134,7 +135,7 @@ export default function Navbar() {
           aria-label="ProBusinessCloud — home"
           style={{ display: 'inline-flex', alignItems: 'center', justifySelf: 'start' }}
         >
-          <Logo variant="lockup" mono height={30} style={{ color: 'var(--on-ink)' }} />
+          <Logo variant="lockup" height={32} />
         </Link>
 
         {/* Navigation */}
@@ -170,7 +171,7 @@ export default function Navbar() {
           <Link
             to="/demo"
             className="pbc-btn pbc-btn-primary"
-            style={{ height: 36, padding: '0 0.9375rem', fontSize: '0.875rem', borderRadius: 8, gap: '0.375rem' }}
+            style={{ height: 42, padding: '0 1.375rem', fontSize: '0.9375rem', gap: '0.375rem' }}
           >
             Book a demo
             <ArrowRightIcon aria-hidden="true" style={{ width: 14, height: 14 }} />
@@ -192,8 +193,8 @@ export default function Navbar() {
             justifyContent: 'center',
             width: 38,
             height: 38,
-            background: 'rgba(252,251,248,0.06)',
-            border: '1px solid rgba(252,251,248,0.12)',
+            background: 'var(--accent-wash)',
+            border: '1px solid var(--on-ink-line)',
             borderRadius: 8,
             color: 'var(--on-ink)',
             cursor: 'pointer',
@@ -214,9 +215,9 @@ export default function Navbar() {
             transition={{ duration: reduce ? 0 : 0.28, ease: EASE }}
             style={{
               overflow: 'hidden',
-              background: 'rgba(11,16,32,0.98)',
+              background: 'var(--white)',
               backdropFilter: 'blur(16px)',
-              borderBottom: '1px solid rgba(252,251,248,0.09)',
+              borderBottom: '1px solid var(--on-ink-line)',
             }}
           >
             <div className="pbc-shell" style={{ paddingTop: 'var(--s2)', paddingBottom: 'var(--s3)' }}>
@@ -231,7 +232,7 @@ export default function Navbar() {
                     fontWeight: isActive ? 600 : 500,
                     textDecoration: 'none',
                     color: isActive ? 'var(--accent-hi)' : 'var(--on-ink)',
-                    borderBottom: '1px solid rgba(252,251,248,0.08)',
+                    borderBottom: '1px solid var(--on-ink-line)',
                   })}
                 >
                   {l.label}

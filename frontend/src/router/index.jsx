@@ -16,6 +16,7 @@ const AppsPage       = lazy(() => import('@pages/public/AppsPage'));
 const SecurityPage   = lazy(() => import('@pages/public/SecurityPage'));
 const DemoPage       = lazy(() => import('@pages/public/DemoPage'));
 const FAQPage        = lazy(() => import('@pages/public/FAQPage'));
+const PricingPage    = lazy(() => import('@pages/public/PricingPage'));
 
 /* Minimal, non-flashing fallback on the site's own ink ground. */
 function SiteFallback() {
@@ -101,11 +102,11 @@ export const router = createRouter([
       { path: '/security',     element: <SecurityPage /> },
       { path: '/demo',         element: <DemoPage /> },
       { path: '/faq',          element: <FAQPage /> },
+      { path: '/pricing',      element: <PricingPage /> },
       // Legacy public paths — keep old links working
       { path: '/features', element: <Navigate to="/platform" replace /> },
       { path: '/about',    element: <Navigate to="/solutions" replace /> },
       { path: '/contact',  element: <Navigate to="/demo" replace /> },
-      { path: '/pricing',  element: <Navigate to="/demo" replace /> },
     ],
   },
 

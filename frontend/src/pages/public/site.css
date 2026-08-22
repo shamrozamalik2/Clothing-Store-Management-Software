@@ -1,82 +1,117 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    ProBusinessCloud — public site design system
-   Ink/navy foundation, warm paper surfaces, ONE accent (cobalt).
+
+   Light, airy and rounded: white grounds, soft tinted bands, generous air,
+   pill actions and low-contrast shadows. One saturated brand colour carries
+   the calls to action, with a green used sparingly for positive states.
+
+   Ground classes keep their names, but their SEMANTICS are token-driven:
+   `.pbc-navy` (the one saturated band) re-declares the on-ground tokens, so
+   any component written against `--on-ink-*` flips automatically without the
+   page needing to know which ground it is sitting on.
+
    Everything is scoped to .pbc so it cannot collide with the app shell theme.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .pbc {
-  /* ── Foundation ─────────────────────────────────────────────── */
-  --ink:        #0B1020;
-  --navy:       #111A32;
-  --navy-lift:  #16223E;
-  --paper:      #FCFBF8;
-  --surface:    #F6F4EF;
-  --surface-2:  #EFEDE6;
+  /* ── Grounds ────────────────────────────────────────────────── */
+  --white:     #FFFFFF;
+  --paper:     #FFFFFF;
+  --surface:   #F7F8FB;   /* faint grey wash */
+  --surface-2: #EFF1F6;
+  --tint-cool: #EEF2FE;   /* soft blue band */
+  --tint-mint: #EAF7F1;   /* soft green band */
 
-  /* ── Accent — cobalt, used deliberately and sparingly ───────── */
-  --accent:      #2F5BF5;
-  --accent-hi:   #6E92FF;  /* on ink: meets contrast for text/icons */
-  --accent-deep: #1D3BC4;
-  --accent-wash: rgba(47, 91, 245, 0.10);
-  --accent-line: rgba(47, 91, 245, 0.28);
+  /* ── Brand ──────────────────────────────────────────────────── */
+  --accent:      #2C6BF5;
+  --accent-deep: #1B4FD1;
+  --accent-soft: #7EA4FA;
+  --accent-wash: rgba(44, 107, 245, 0.08);
+  --accent-line: rgba(44, 107, 245, 0.22);
+
+  --green:      #12B981;
+  --green-wash: rgba(18, 185, 129, 0.10);
 
   /* ── Supporting / status ────────────────────────────────────── */
-  --slate:  #64748B;
-  --sage:   #4F7A5C;
-  --sage-hi:#7FBF93;
-  --amber:  #B4791F;
-  --amber-hi:#E0A94A;
-  --signal: #C0392F;
-  --signal-hi:#F08379;
+  --slate:   #6C6C78;
+  --sage:    #0F9C6C;
+  --sage-hi: #12B981;
+  --amber:   #B4791F;
+  --amber-hi:#D9A040;
+  --signal:  #D2453A;
+  --signal-hi:#E8695E;
 
-  /* ── Ink-ground text ────────────────────────────────────────── */
-  --on-ink:      #FCFBF8;
-  --on-ink-mute: rgba(252, 251, 248, 0.68);
-  --on-ink-soft: rgba(252, 251, 248, 0.46);
-  --on-ink-line: rgba(252, 251, 248, 0.13);
+  /* ── Text on a light ground (the default everywhere) ─────────
+     `ink` here means "the ink you write with", not a dark background. */
+  --on-ink:      #0A0A12;
+  --on-ink-mute: #5F6070;
+  --on-ink-soft: #8E90A0;
+  --on-ink-line: rgba(10, 10, 18, 0.10);
 
-  /* ── Paper-ground text ──────────────────────────────────────── */
-  --on-paper:      #0B1020;
-  --on-paper-mute: #4A5468;
-  --on-paper-soft: #6B7488;
-  --on-paper-line: rgba(11, 16, 32, 0.11);
+  --on-paper:      #0A0A12;
+  --on-paper-mute: #5F6070;
+  --on-paper-soft: #8E90A0;
+  --on-paper-line: rgba(10, 10, 18, 0.10);
 
-  /* ── 8-point spacing scale ──────────────────────────────────── */
+  /* ── 8-point spacing ────────────────────────────────────────── */
   --s1: 0.5rem;  --s2: 1rem;    --s3: 1.5rem;  --s4: 2rem;
   --s5: 2.5rem;  --s6: 3rem;    --s8: 4rem;    --s10: 5rem;
-  --s12: 6rem;   --s16: 8rem;
+  --s12: 6rem;   --s16: 7.5rem;
 
-  /* ── Restrained radii ───────────────────────────────────────── */
-  --r-sm: 6px;  --r: 10px;  --r-lg: 14px;  --r-xl: 20px;
+  /* ── Generous, friendly radii ───────────────────────────────── */
+  --r-sm: 10px;  --r: 14px;  --r-lg: 20px;  --r-xl: 28px;  --r-pill: 999px;
+
+  /* ── Soft, low-contrast elevation ───────────────────────────── */
+  --shadow-sm: 0 2px 8px rgba(16, 24, 40, 0.05);
+  --shadow:    0 4px 16px rgba(16, 24, 40, 0.07);
+  --shadow-lg: 0 18px 48px -18px rgba(16, 24, 40, 0.20);
+  --shadow-xl: 0 32px 80px -28px rgba(16, 24, 40, 0.26);
 
   --shell: 1200px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Display face — swap this one line to change every headline on the site. */
-  --font-display: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body:    'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
 
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   color: var(--on-paper);
-  background: var(--ink);
+  background: var(--white);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* ── Grounds ──────────────────────────────────────────────────── */
-.pbc-ink    { background: var(--ink);    color: var(--on-ink); }
-.pbc-navy   { background: var(--navy);   color: var(--on-ink); }
-.pbc-paper  { background: var(--paper);  color: var(--on-paper); }
-.pbc-warm   { background: var(--surface);color: var(--on-paper); }
+.pbc-ink   { background: var(--white);     color: var(--on-ink); }
+.pbc-paper { background: var(--white);     color: var(--on-paper); }
+.pbc-warm  { background: var(--surface);   color: var(--on-paper); }
 
-/* Subtle grain — texture without noise */
-.pbc-grain { position: relative; }
-.pbc-grain::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.22;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+/* The single saturated band. Re-declaring the on-ground tokens here flips
+   every nested component to light-on-colour without touching the markup. */
+.pbc-navy {
+  background: var(--accent);
+  color: #fff;
+
+  --on-ink:      #FFFFFF;
+  --on-ink-mute: rgba(255, 255, 255, 0.84);
+  --on-ink-soft: rgba(255, 255, 255, 0.62);
+  --on-ink-line: rgba(255, 255, 255, 0.22);
+
+  --on-paper:      #FFFFFF;
+  --on-paper-mute: rgba(255, 255, 255, 0.84);
+  --on-paper-soft: rgba(255, 255, 255, 0.62);
+  --on-paper-line: rgba(255, 255, 255, 0.22);
+
+  --accent-hi:   #FFFFFF;
+  --accent-wash: rgba(255, 255, 255, 0.12);
+  --accent-line: rgba(255, 255, 255, 0.26);
 }
+
+/* Accent used for eyebrows/icons on light grounds. */
+.pbc { --accent-hi: var(--accent); }
+
+/* Grain is wrong for a light, clean look — neutralised but kept so existing
+   markup does not need editing. */
+.pbc-grain { position: relative; }
 
 /* ── Shell ────────────────────────────────────────────────────── */
 .pbc-shell {
@@ -94,92 +129,115 @@
 /* ── Typography ───────────────────────────────────────────────── */
 .pbc-display {
   font-family: var(--font-display);
-  font-weight: 800;
-  letter-spacing: -0.035em;
-  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.18;
 }
-/* Sans sets larger on the body than a serif at the same size — pulled back. */
-.pbc-h1 { font-size: clamp(2.375rem, 5.2vw, 4rem); }
-.pbc-h2 { font-size: clamp(1.875rem, 3.8vw, 2.75rem); }
-.pbc-h3 { font-size: clamp(1.375rem, 2.3vw, 1.75rem); }
+.pbc-h1 { font-size: clamp(2.5rem, 5.2vw, 4.25rem); }
+.pbc-h2 { font-size: clamp(1.875rem, 3.6vw, 2.875rem); }
+.pbc-h3 { font-size: clamp(1.3rem, 2.1vw, 1.625rem); }
 
 .pbc-eyebrow {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.pbc-lede  { font-size: clamp(1.0625rem, 1.5vw, 1.1875rem); line-height: 1.65; }
-.pbc-body  { font-size: 0.9375rem; line-height: 1.7; }
-.pbc-meta  { font-size: 0.8125rem; line-height: 1.55; }
+.pbc-lede  { font-size: clamp(1.0625rem, 1.3vw, 1.1875rem); line-height: 1.7; font-weight: 300; }
+.pbc-body  { font-size: 1rem; line-height: 1.7; font-weight: 300; }
+.pbc-meta  { font-size: 0.875rem; line-height: 1.6; }
 .pbc-mono  { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 
 /* ── Rules ────────────────────────────────────────────────────── */
 .pbc-rule-ink   { border-top: 1px solid var(--on-ink-line); }
 .pbc-rule-paper { border-top: 1px solid var(--on-paper-line); }
 
-/* ── Buttons ──────────────────────────────────────────────────── */
+/* ── Buttons — pill, soft, confident ──────────────────────────── */
 .pbc-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.8125rem 1.375rem;
-  border-radius: var(--r);
-  font-size: 0.9375rem;
-  font-weight: 600;
+  padding: 0.875rem 1.75rem;
+  border-radius: var(--r-pill);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 500;
   text-decoration: none;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: transform 0.18s var(--ease), background-color 0.18s var(--ease),
-              border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+  transition: transform 0.2s var(--ease), background-color 0.2s var(--ease),
+              border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), color 0.2s var(--ease);
 }
 .pbc-btn-primary {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 1px 2px rgba(11,16,32,0.24), 0 8px 22px -10px rgba(47,91,245,0.75);
+  box-shadow: 0 6px 18px -8px rgba(44, 107, 245, 0.75);
 }
-.pbc-btn-primary:hover { background: var(--accent-deep); transform: translateY(-1px); }
+.pbc-btn-primary:hover { background: var(--accent-deep); transform: translateY(-2px); box-shadow: 0 12px 26px -10px rgba(44,107,245,0.7); }
 .pbc-btn-primary:active { transform: translateY(0); }
 
-.pbc-btn-ghost-ink {
-  background: rgba(252,251,248,0.05);
+/* Ghost buttons read against whichever ground they sit on. */
+.pbc-btn-ghost-ink,
+.pbc-btn-ghost-paper {
+  background: transparent;
   border-color: var(--on-ink-line);
   color: var(--on-ink);
 }
-.pbc-btn-ghost-ink:hover { background: rgba(252,251,248,0.10); border-color: rgba(252,251,248,0.26); }
-
-.pbc-btn-ghost-paper {
-  background: transparent;
-  border-color: var(--on-paper-line);
-  color: var(--on-paper);
+.pbc-btn-ghost-ink:hover,
+.pbc-btn-ghost-paper:hover {
+  border-color: currentColor;
+  transform: translateY(-2px);
 }
-.pbc-btn-ghost-paper:hover { background: rgba(11,16,32,0.04); border-color: rgba(11,16,32,0.22); }
+
+/* On the saturated band a ghost button becomes solid white. */
+.pbc-navy .pbc-btn-primary {
+  background: #fff;
+  color: var(--accent);
+  box-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.4);
+}
+.pbc-navy .pbc-btn-primary:hover { background: rgba(255,255,255,0.92); }
 
 /* ── Cards ────────────────────────────────────────────────────── */
 .pbc-card {
   border-radius: var(--r-lg);
   border: 1px solid var(--on-paper-line);
-  background: var(--paper);
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
 }
 .pbc-card-ink {
   border-radius: var(--r-lg);
   border: 1px solid var(--on-ink-line);
-  background: rgba(252,251,248,0.035);
+  background: var(--white);
+  box-shadow: var(--shadow);
 }
-.pbc-lift { transition: transform 0.22s var(--ease), box-shadow 0.22s var(--ease), border-color 0.22s var(--ease); }
+.pbc-navy .pbc-card-ink {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: none;
+}
+.pbc-lift { transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), border-color 0.25s var(--ease); }
 .pbc-lift:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 18px 44px -26px rgba(11,16,32,0.45);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
   border-color: var(--accent-line);
 }
 
-/* ── Focus — always visible, never colour-only ────────────────── */
-.pbc :focus-visible {
-  outline: 2px solid var(--accent-hi);
-  outline-offset: 2px;
-  border-radius: 4px;
+/* ── Decorative shapes ────────────────────────────────────────── */
+.pbc-blob {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(6px);
 }
+
+/* ── Focus — always visible ───────────────────────────────────── */
+.pbc :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.pbc-navy :focus-visible { outline-color: #fff; }
 
 /* ── Skip link ────────────────────────────────────────────────── */
 .pbc-skip {
@@ -195,7 +253,6 @@
 }
 .pbc-skip:focus { left: 0; }
 
-/* ── Chart / mockup helpers ───────────────────────────────────── */
 .pbc-tabular { font-variant-numeric: tabular-nums; }
 
 /* ── Motion: honour user preference ───────────────────────────── */
@@ -211,13 +268,12 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Responsive — mobile-first adjustments
+   Responsive
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Navigation collapses below the tablet breakpoint.
-   The bar is a 3-column grid (brand | links | actions); once the middle and
-   right columns are hidden the grid drops to 2 columns so the menu button
-   lands hard right instead of being auto-placed into the centre slot. */
+/* Navigation collapses below the tablet breakpoint. The bar is a 3-column
+   grid (brand | links | actions); once the middle and right columns are
+   hidden the grid drops to 2 columns so the menu button lands hard right. */
 @media (max-width: 1000px) {
   .pbc-nav { grid-template-columns: 1fr auto !important; }
   .pbc-nav-links,
@@ -225,36 +281,37 @@
   .pbc-nav-toggle  { display: inline-flex !important; }
 }
 
-/* Footer stacks */
+/* Footer: brand + three link columns + Download. Sheds columns as it narrows
+   rather than letting any of them crush. */
+@media (max-width: 1120px) {
+  .pbc-footer-grid { grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(110px, 1fr)) !important; }
+  .pbc-footer-grid > :last-child { grid-column: 2 / -1; }
+}
 @media (max-width: 860px) {
   .pbc-footer-grid { grid-template-columns: 1fr 1fr !important; }
+  .pbc-footer-grid > :last-child { grid-column: auto; }
 }
 @media (max-width: 520px) {
   .pbc-footer-grid { grid-template-columns: 1fr !important; }
 }
 
-/* Two-column editorial splits collapse to one */
 @media (max-width: 940px) {
-  .pbc-split       { grid-template-columns: 1fr !important; }
-  .pbc-split-wide  { grid-template-columns: 1fr !important; }
-  .pbc-reverse     { direction: ltr !important; }
-}
-
-/* Card grids */
-@media (max-width: 940px) {
-  .pbc-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .pbc-split      { grid-template-columns: 1fr !important; }
+  .pbc-split-wide { grid-template-columns: 1fr !important; }
+  .pbc-grid-3     { grid-template-columns: repeat(2, 1fr) !important; }
 }
 @media (max-width: 620px) {
   .pbc-grid-3,
   .pbc-grid-2 { grid-template-columns: 1fr !important; }
 }
 
-/* Product mockups need a minimum width to stay legible — let them scroll
-   horizontally inside their own container on small screens rather than
-   squashing the interface into unreadability. */
+/* Product mockups keep a minimum legible width and scroll inside their own
+   container rather than stretching the page. */
 .pbc-preview-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  min-width: 0;
+  max-width: 100%;
 }
 .pbc-preview-scroll > * { min-width: 680px; }
 
@@ -263,34 +320,96 @@
   .pbc-preview-scroll > * { min-width: 0; }
 }
 
-/* Metric rows */
 @media (max-width: 760px) {
   .pbc-metrics { grid-template-columns: repeat(2, 1fr) !important; }
 }
 
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   Overflow containment
-   Grid and flex children default to min-width:auto, so a wide product mockup
-   would stretch the page rather than scroll within its own box. These rules
-   keep every horizontal scroll local to the element that needs it.
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* Grid and flex children default to min-width:auto, which would let a wide
+   mockup stretch the page instead of scrolling within its own box. */
 .pbc-split > *,
 .pbc-split-wide > *,
 .pbc-grid-2 > *,
 .pbc-grid-3 > *,
 .pbc-metrics > * { min-width: 0; }
 
-.pbc-preview-scroll {
-  min-width: 0;
-  max-width: 100%;
-}
-
 .pbc,
 .pbc main { overflow-x: clip; }
 
-/* Stacked calls to action should share one width rather than stagger. */
+/* Stacked calls to action share one width rather than stagger. */
 @media (max-width: 520px) {
   .pbc-cta-row { flex-direction: column; align-items: stretch; }
   .pbc-cta-row > .pbc-btn { width: 100%; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Hero composition
+   The visual cluster deliberately overhangs its column on wide screens. Below
+   the split breakpoint it stacks, and the floating cards pull back inside the
+   viewport so nothing is clipped or pushed off-screen.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1180px) {
+  .pbc-hero-visual .pbc-hero-chrome { width: 560px !important; }
+  .pbc-hero-card { transform: scale(0.9); }
+}
+
+@media (max-width: 1024px) {
+  .pbc-hero { grid-template-columns: 1fr !important; gap: var(--s8) !important; }
+  .pbc-hero-visual { min-height: 0 !important; margin-top: var(--s4); }
+  .pbc-hero-visual .pbc-hero-chrome { width: 100% !important; }
+  /* Bring the overhanging cards back inside the page. */
+  .pbc-hero-visual .pbc-float-a { top: -22px !important; left: -8px !important; }
+  .pbc-hero-visual .pbc-float-b { bottom: -30px !important; right: -8px !important; }
+}
+
+@media (max-width: 720px) {
+  /* At phone width the cards would cover the interface they are meant to
+     illustrate, so only the trend card stays. */
+  .pbc-hero-visual .pbc-float-a { display: none; }
+  .pbc-hero-visual .pbc-float-b { position: static !important; margin-top: var(--s3); }
+  .pbc-hero-card { transform: none; }
+  .pbc-hero-visual svg[viewBox="0 0 100 100"] { display: none; }
+}
+
+/* Workflow story — heading and counter stack on narrow screens. */
+@media (max-width: 760px) {
+  .pbc-story-head { flex-direction: column; align-items: flex-start !important; }
+  .pbc-story-counter { text-align: left !important; }
+  .pbc-story-counter > div:last-child { margin-left: 0 !important; }
+}
+
+/* Capability bento — the two lead cells carry an interface vignette. */
+@media (max-width: 1080px) {
+  .pbc-bento-leads { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 640px) {
+  .pbc-bento-lead { grid-template-columns: 1fr !important; }
+  .pbc-bento-vignette { order: -1; }
+}
+
+/* Security orbit — a radial diagram needs width; below the breakpoint the
+   same content is shown as a plain stacked list instead. */
+@media (max-width: 860px) {
+  .pbc-orbit,
+  .pbc-orbit-legend { display: none !important; }
+  .pbc-orbit-list   { display: grid !important; }
+}
+
+/* Pricing — two plans side by side, stacking on narrow screens. */
+@media (max-width: 780px) {
+  .pbc-pricing-grid { grid-template-columns: 1fr !important; }
+}
+
+/* App download banner — stacks below the split breakpoint, and the subject
+   sits under the copy rather than beside it. */
+@media (max-width: 900px) {
+  .pbc-dl-card {
+    grid-template-columns: 1fr !important;
+    padding: var(--s6) var(--s5) 0 !important;
+    text-align: left;
+  }
+  .pbc-dl-squiggle { display: none; }
+  .pbc-dl-stage    { justify-content: center; margin-top: var(--s2); }
+}
+@media (max-width: 520px) {
+  .pbc-dl-bubble { left: 50% !important; transform: translateX(-50%); top: -6px !important; }
 }
