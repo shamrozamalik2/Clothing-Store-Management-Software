@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 import { saLogin } from '@api/superAdminClient';
+import Logo from '@components/ui/Logo';
 
 /* ─── Security note ───────────────────────────────────────────────────────── */
 function SecurityNote({ icon: Icon, title, detail }) {
@@ -84,18 +85,7 @@ export default function SuperAdminLoginPage() {
 
         {/* ── Brand header ── */}
         <div className="flex flex-col items-center text-center mb-7">
-          <img
-            src="/newlogo.png"
-            alt="ProBusinessCloud"
-            className="select-none mb-6"
-            style={{
-              height: 48,
-              width: 'auto',
-              objectFit: 'contain',
-              display: 'block',
-              filter: 'brightness(0) invert(1)',
-            }}
-          />
+          <Logo variant="lockup" mono height={30} style={{ color: '#FCFBF8' }} />
 
           <div
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 mb-4"

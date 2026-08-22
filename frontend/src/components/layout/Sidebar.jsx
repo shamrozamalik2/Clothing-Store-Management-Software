@@ -29,6 +29,7 @@ import { selectSidebarCollapsed, selectTheme, toggleSidebar } from '@store/slice
 import { selectCurrentUser } from '@store/slices/authSlice';
 import { settingsApi } from '@api/settings.api';
 import { cn } from '@utils/cn';
+import Logo from '@components/ui/Logo';
 
 /* ─── Navigation structure ─────────────────────────────────────────────── */
 const NAV_GROUPS = [
@@ -90,13 +91,7 @@ const NAV_GROUPS = [
 
 /* ─── PBC mark (for collapsed state) ────────────────────────────────────── */
 function PBCMark({ size = 32 }) {
-  return (
-    <img
-      src="/newlogo.png"
-      alt="ProBusinessCloud"
-      style={{ width: size, height: size, objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }}
-    />
-  );
+  return <Logo variant="mark" mono height={size} style={{ color: '#FCFBF8' }} />;
 }
 
 /* ─── Sidebar ────────────────────────────────────────────────────────────── */
@@ -163,8 +158,7 @@ export default function Sidebar() {
                 style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', display: 'block', border: '2px solid #743dab2e' }} />
             ) : (
               <div style={{ background: 'white', borderRadius: '50%', width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #743dab2e', overflow: 'hidden', flexShrink: 0 }}>
-                <img src="/newlogo.png" alt="ProBusinessCloud"
-                  style={{ width: 40, height: 40, objectFit: 'contain', display: 'block' }} />
+                <Logo variant="mark" height={40} />
               </div>
             )}
             <p className="text-xs font-semibold select-none truncate max-w-[180px]"

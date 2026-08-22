@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
+import Logo from '@components/ui/Logo';
 import { authApi } from '@api/auth.api';
 import { setCredentials, selectIsAuth } from '@store/slices/authSlice';
 import { setPageTitle } from '@store/slices/uiSlice';
@@ -124,9 +125,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <img src="/newlogo.png" alt="ProBusinessCloud" className="select-none"
-            style={{ height: 64, width: 'auto', objectFit: 'contain', display: 'block',
-              filter: 'brightness(0) invert(1)' }} />
+          <Logo variant="lockup" mono height={38} style={{ color: '#FCFBF8' }} />
         </div>
 
         {/* Hero text */}
@@ -178,9 +177,7 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="lg:hidden mb-8 flex justify-center">
-            <img src="/newlogo.png" alt="ProBusinessCloud"
-              style={{ height: 52, width: 'auto', objectFit: 'contain', display: 'block',
-                filter: 'brightness(0) invert(1)' }} />
+            <Logo variant="lockup" mono height={30} style={{ color: '#FCFBF8' }} />
           </div>
 
           {/* Heading */}

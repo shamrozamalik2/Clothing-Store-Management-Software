@@ -11,15 +11,10 @@ import toast from 'react-hot-toast';
 
 import { authApi } from '@api/auth.api';
 import { setCredentials, selectIsAuth } from '@store/slices/authSlice';
+import Logo from '@components/ui/Logo';
 
-function PBCLogo({ height = 36 }) {
-  return (
-    <img
-      src="/newlogo.png"
-      alt="ProBusinessCloud"
-      style={{ height, width: 'auto', objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }}
-    />
-  );
+function PBCLogo({ height = 26 }) {
+  return <Logo variant="lockup" mono height={height} style={{ color: '#FCFBF8' }} />;
 }
 
 const FEATURES = [
