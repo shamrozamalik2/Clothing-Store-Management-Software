@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { router } from '@/router';
+import { appRouter } from '@/router/appRouter';
 import { superAdminRouter } from '@/router/superAdminRouter';
 import LicenseGate from '@components/auth/LicenseGate';
 
-const ADMIN_HOSTS = ['admin.probusinesscloud.com'];
-const isAdminSubdomain = ADMIN_HOSTS.includes(window.location.hostname);
+const hostname = window.location.hostname;
+const isAdminSubdomain = hostname === 'admin.probusinesscloud.com';
+const isAppSubdomain   = hostname === 'app.probusinesscloud.com';
 
 export default function App() {
   const [licStatus, setLicStatus] = useState(null);
@@ -35,9 +37,8 @@ export default function App() {
     );
   }
 
-  if (isAdminSubdomain) {
-    return <RouterProvider router={superAdminRouter} />;
-  }
+  if (isAdminSubdomain) return <RouterProvider router={superAdminRouter} />;
+  if (isAppSubdomain)   return <RouterProvider router={appRouter} />;
 
   return <RouterProvider router={router} />;
 }
