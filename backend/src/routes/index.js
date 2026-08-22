@@ -42,4 +42,7 @@ router.use('/ledger',            require('./ledger.routes'));
 router.use('/audit',             require('./audit.routes'));
 router.use('/holds',             require('./holds.routes'));
 
+// ── Public marketing site: demo requests (rate limited, unauthenticated) ─────
+router.use('/leads',             require('./leads.routes'));
+
 module.exports = router;
