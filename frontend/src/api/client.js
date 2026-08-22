@@ -2,6 +2,17 @@ import axios from 'axios';
 import { store } from '@store/index';
 import { clearCredentials, setToken } from '@store/slices/authSlice';
 
+/* Navigate from outside the React tree. The packaged desktop build runs on
+   file:// and still uses hash routing, so honour whichever is in play. */
+function redirectTo(path) {
+  if (window.location.protocol === 'file:') {
+    window.location.hash = path;
+  } else {
+    window.location.assign(path);
+  }
+}
+
+
 // Priority: Electron preload URL → VITE env var → same-origin /api
 const BASE_URL = window.electronAPI?.backendUrl
   ? `${window.electronAPI.backendUrl}/api`
@@ -69,7 +80,7 @@ client.interceptors.response.use(
         return client(original);
       } catch (refreshErr) {
         store.dispatch(clearCredentials());
-        window.location.hash = '/login';
+        redirectTo('/login');
         return Promise.reject(refreshErr);
       }
     }
@@ -80,7 +91,7 @@ client.interceptors.response.use(
       if (['COMPANY_SUSPENDED', 'COMPANY_EXPIRED', 'TRIAL_EXPIRED'].includes(code)) {
         sessionStorage.setItem('login_error', msg);
       }
-      window.location.hash = '/login';
+      redirectTo('/login');
     }
 
     const message =

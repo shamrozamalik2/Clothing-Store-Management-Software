@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Sidebar from './Sidebar';
@@ -70,7 +70,9 @@ export default function AppLayout() {
         <Header />
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="p-6 max-w-[1600px] mx-auto animate-fade-in">
-            <Outlet />
+            <Suspense fallback={<div className="h-40" aria-busy="true" />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

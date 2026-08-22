@@ -1,0 +1,296 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ProBusinessCloud — public site design system
+   Ink/navy foundation, warm paper surfaces, ONE accent (cobalt).
+   Everything is scoped to .pbc so it cannot collide with the app shell theme.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pbc {
+  /* ── Foundation ─────────────────────────────────────────────── */
+  --ink:        #0B1020;
+  --navy:       #111A32;
+  --navy-lift:  #16223E;
+  --paper:      #FCFBF8;
+  --surface:    #F6F4EF;
+  --surface-2:  #EFEDE6;
+
+  /* ── Accent — cobalt, used deliberately and sparingly ───────── */
+  --accent:      #2F5BF5;
+  --accent-hi:   #6E92FF;  /* on ink: meets contrast for text/icons */
+  --accent-deep: #1D3BC4;
+  --accent-wash: rgba(47, 91, 245, 0.10);
+  --accent-line: rgba(47, 91, 245, 0.28);
+
+  /* ── Supporting / status ────────────────────────────────────── */
+  --slate:  #64748B;
+  --sage:   #4F7A5C;
+  --sage-hi:#7FBF93;
+  --amber:  #B4791F;
+  --amber-hi:#E0A94A;
+  --signal: #C0392F;
+  --signal-hi:#F08379;
+
+  /* ── Ink-ground text ────────────────────────────────────────── */
+  --on-ink:      #FCFBF8;
+  --on-ink-mute: rgba(252, 251, 248, 0.68);
+  --on-ink-soft: rgba(252, 251, 248, 0.46);
+  --on-ink-line: rgba(252, 251, 248, 0.13);
+
+  /* ── Paper-ground text ──────────────────────────────────────── */
+  --on-paper:      #0B1020;
+  --on-paper-mute: #4A5468;
+  --on-paper-soft: #6B7488;
+  --on-paper-line: rgba(11, 16, 32, 0.11);
+
+  /* ── 8-point spacing scale ──────────────────────────────────── */
+  --s1: 0.5rem;  --s2: 1rem;    --s3: 1.5rem;  --s4: 2rem;
+  --s5: 2.5rem;  --s6: 3rem;    --s8: 4rem;    --s10: 5rem;
+  --s12: 6rem;   --s16: 8rem;
+
+  /* ── Restrained radii ───────────────────────────────────────── */
+  --r-sm: 6px;  --r: 10px;  --r-lg: 14px;  --r-xl: 20px;
+
+  --shell: 1200px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Display face — swap this one line to change every headline on the site. */
+  --font-display: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--on-paper);
+  background: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Grounds ──────────────────────────────────────────────────── */
+.pbc-ink    { background: var(--ink);    color: var(--on-ink); }
+.pbc-navy   { background: var(--navy);   color: var(--on-ink); }
+.pbc-paper  { background: var(--paper);  color: var(--on-paper); }
+.pbc-warm   { background: var(--surface);color: var(--on-paper); }
+
+/* Subtle grain — texture without noise */
+.pbc-grain { position: relative; }
+.pbc-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+}
+
+/* ── Shell ────────────────────────────────────────────────────── */
+.pbc-shell {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding-left: var(--s3);
+  padding-right: var(--s3);
+  width: 100%;
+}
+.pbc-section { padding-top: var(--s16); padding-bottom: var(--s16); }
+@media (max-width: 768px) {
+  .pbc-section { padding-top: var(--s10); padding-bottom: var(--s10); }
+}
+
+/* ── Typography ───────────────────────────────────────────────── */
+.pbc-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+/* Sans sets larger on the body than a serif at the same size — pulled back. */
+.pbc-h1 { font-size: clamp(2.375rem, 5.2vw, 4rem); }
+.pbc-h2 { font-size: clamp(1.875rem, 3.8vw, 2.75rem); }
+.pbc-h3 { font-size: clamp(1.375rem, 2.3vw, 1.75rem); }
+
+.pbc-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pbc-lede  { font-size: clamp(1.0625rem, 1.5vw, 1.1875rem); line-height: 1.65; }
+.pbc-body  { font-size: 0.9375rem; line-height: 1.7; }
+.pbc-meta  { font-size: 0.8125rem; line-height: 1.55; }
+.pbc-mono  { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+/* ── Rules ────────────────────────────────────────────────────── */
+.pbc-rule-ink   { border-top: 1px solid var(--on-ink-line); }
+.pbc-rule-paper { border-top: 1px solid var(--on-paper-line); }
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.pbc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8125rem 1.375rem;
+  border-radius: var(--r);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.18s var(--ease), background-color 0.18s var(--ease),
+              border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+.pbc-btn-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(11,16,32,0.24), 0 8px 22px -10px rgba(47,91,245,0.75);
+}
+.pbc-btn-primary:hover { background: var(--accent-deep); transform: translateY(-1px); }
+.pbc-btn-primary:active { transform: translateY(0); }
+
+.pbc-btn-ghost-ink {
+  background: rgba(252,251,248,0.05);
+  border-color: var(--on-ink-line);
+  color: var(--on-ink);
+}
+.pbc-btn-ghost-ink:hover { background: rgba(252,251,248,0.10); border-color: rgba(252,251,248,0.26); }
+
+.pbc-btn-ghost-paper {
+  background: transparent;
+  border-color: var(--on-paper-line);
+  color: var(--on-paper);
+}
+.pbc-btn-ghost-paper:hover { background: rgba(11,16,32,0.04); border-color: rgba(11,16,32,0.22); }
+
+/* ── Cards ────────────────────────────────────────────────────── */
+.pbc-card {
+  border-radius: var(--r-lg);
+  border: 1px solid var(--on-paper-line);
+  background: var(--paper);
+}
+.pbc-card-ink {
+  border-radius: var(--r-lg);
+  border: 1px solid var(--on-ink-line);
+  background: rgba(252,251,248,0.035);
+}
+.pbc-lift { transition: transform 0.22s var(--ease), box-shadow 0.22s var(--ease), border-color 0.22s var(--ease); }
+.pbc-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 44px -26px rgba(11,16,32,0.45);
+  border-color: var(--accent-line);
+}
+
+/* ── Focus — always visible, never colour-only ────────────────── */
+.pbc :focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Skip link ────────────────────────────────────────────────── */
+.pbc-skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 200;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0 0 var(--r) 0;
+  font-weight: 600;
+}
+.pbc-skip:focus { left: 0; }
+
+/* ── Chart / mockup helpers ───────────────────────────────────── */
+.pbc-tabular { font-variant-numeric: tabular-nums; }
+
+/* ── Motion: honour user preference ───────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .pbc *,
+  .pbc *::before,
+  .pbc *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Responsive — mobile-first adjustments
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Navigation collapses below the tablet breakpoint.
+   The bar is a 3-column grid (brand | links | actions); once the middle and
+   right columns are hidden the grid drops to 2 columns so the menu button
+   lands hard right instead of being auto-placed into the centre slot. */
+@media (max-width: 1000px) {
+  .pbc-nav { grid-template-columns: 1fr auto !important; }
+  .pbc-nav-links,
+  .pbc-nav-actions { display: none !important; }
+  .pbc-nav-toggle  { display: inline-flex !important; }
+}
+
+/* Footer stacks */
+@media (max-width: 860px) {
+  .pbc-footer-grid { grid-template-columns: 1fr 1fr !important; }
+}
+@media (max-width: 520px) {
+  .pbc-footer-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Two-column editorial splits collapse to one */
+@media (max-width: 940px) {
+  .pbc-split       { grid-template-columns: 1fr !important; }
+  .pbc-split-wide  { grid-template-columns: 1fr !important; }
+  .pbc-reverse     { direction: ltr !important; }
+}
+
+/* Card grids */
+@media (max-width: 940px) {
+  .pbc-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 620px) {
+  .pbc-grid-3,
+  .pbc-grid-2 { grid-template-columns: 1fr !important; }
+}
+
+/* Product mockups need a minimum width to stay legible — let them scroll
+   horizontally inside their own container on small screens rather than
+   squashing the interface into unreadability. */
+.pbc-preview-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.pbc-preview-scroll > * { min-width: 680px; }
+
+@media (min-width: 861px) {
+  .pbc-preview-scroll { overflow-x: visible; }
+  .pbc-preview-scroll > * { min-width: 0; }
+}
+
+/* Metric rows */
+@media (max-width: 760px) {
+  .pbc-metrics { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Overflow containment
+   Grid and flex children default to min-width:auto, so a wide product mockup
+   would stretch the page rather than scroll within its own box. These rules
+   keep every horizontal scroll local to the element that needs it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.pbc-split > *,
+.pbc-split-wide > *,
+.pbc-grid-2 > *,
+.pbc-grid-3 > *,
+.pbc-metrics > * { min-width: 0; }
+
+.pbc-preview-scroll {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pbc,
+.pbc main { overflow-x: clip; }
+
+/* Stacked calls to action should share one width rather than stagger. */
+@media (max-width: 520px) {
+  .pbc-cta-row { flex-direction: column; align-items: stretch; }
+  .pbc-cta-row > .pbc-btn { width: 100%; }
+}

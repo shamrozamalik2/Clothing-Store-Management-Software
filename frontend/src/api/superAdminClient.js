@@ -1,5 +1,16 @@
 import axios from 'axios';
 
+/* Navigate from outside the React tree. The packaged desktop build runs on
+   file:// and still uses hash routing, so honour whichever is in play. */
+function redirectTo(path) {
+  if (window.location.protocol === 'file:') {
+    window.location.hash = path;
+  } else {
+    window.location.assign(path);
+  }
+}
+
+
 const BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : '/api';
@@ -22,7 +33,7 @@ sa.interceptors.response.use(
     if (err.response?.status === 401) {
       sessionStorage.removeItem('sa_token');
       sessionStorage.removeItem('sa_admin');
-      window.location.hash = '/admin/login';
+      redirectTo('/admin/login');
     }
     return Promise.reject(err);
   }

@@ -2,10 +2,14 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-export default defineConfig({
+// `vite build`                 -> web build, absolute base, real URLs
+// `vite build --mode electron`  -> desktop build, relative base for file://
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  // Relative base so built assets work under file:// (Electron packaged app)
-  base: './',
+  // Electron loads the app from file://, which needs relative asset paths.
+  // The web build must use an absolute base or assets 404 on nested routes
+  // such as /platform once hash routing is gone.
+  base: mode === 'electron' ? './' : '/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -39,6 +43,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
+          motion: ['framer-motion', 'gsap', '@gsap/react'],
           redux: ['@reduxjs/toolkit', 'react-redux'],
           query: ['@tanstack/react-query'],
           charts: ['recharts'],
@@ -47,4 +52,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

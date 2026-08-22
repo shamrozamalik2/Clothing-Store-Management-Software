@@ -1,19 +1,20 @@
 {
   "name": "sas-garments",
   "version": "1.0.0",
-  "description": "SAS Garments – Professional Clothing Store Management System",
+  "description": "SAS Garments \u2013 Professional Clothing Store Management System",
   "main": "electron/main.js",
   "private": true,
   "scripts": {
     "dev": "concurrently --kill-others-on-fail --names \"FRONTEND,ELECTRON\" --prefix-colors \"green,magenta\" \"npm run dev:frontend\" \"npm run dev:electron\"",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
-    "build:frontend": "npm --prefix frontend run build",
+    "build:frontend": "npm --prefix frontend run build:electron",
     "build": "npm run build:frontend && electron-builder install-app-deps && electron-builder",
     "postinstall": "node -e \"if(process.platform!=='linux')require('child_process').execSync('electron-builder install-app-deps',{stdio:'inherit'})\"",
     "dev:server": "cross-env NODE_ENV=development nodemon backend/src/server.js",
     "start:server": "node backend/src/server.js",
-    "migrate": "node backend/src/database/migrate.js"
+    "migrate": "node backend/src/database/migrate.js",
+    "build:web": "npm --prefix frontend run build:web"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -46,7 +47,7 @@
   "build": {
     "appId": "com.sasgarments.app",
     "productName": "SAS Garments",
-    "copyright": "Copyright © 2024 SAS Garments. All rights reserved.",
+    "copyright": "Copyright \u00a9 2024 SAS Garments. All rights reserved.",
     "npmRebuild": false,
     "asar": true,
     "asarUnpack": [
