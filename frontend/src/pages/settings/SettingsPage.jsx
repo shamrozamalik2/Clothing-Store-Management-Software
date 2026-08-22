@@ -242,9 +242,18 @@ function BackupTab() {
   const [preview, setPreview]         = useState(null);   // parsed backup pending confirmation
   const [restoreInput, setRestoreInput]   = useState('');  // user must type RESTORE
   const [restoreReport, setRestoreReport] = useState(null);
+  const [snapPreview, setSnapPreview] = useState(null);   // snapshot pending confirmation
   const fileInputRef = useRef(null);
   const progressRef  = useRef(null);
   const fileRef      = useRef(null);   // holds raw File for FormData upload
+
+  // Server-side snapshot history
+  const { data: snapshotsData, isLoading: snapshotsLoading, refetch: refetchSnapshots } = useQuery({
+    queryKey: ['backup-history'],
+    queryFn:  () => client.get('/backup/history'),
+    staleTime: 30_000,
+  });
+  const snapshots = snapshotsData?.data?.data ?? snapshotsData?.data ?? [];
 
   useEffect(() => {
     window.electronAPI?.backup?.getAutoInfo?.().then(setAutoInfo);
@@ -399,6 +408,38 @@ function BackupTab() {
     }
   }
 
+  async function doRestoreSnapshot() {
+    if (!snapPreview) return;
+    const snap = snapPreview;
+    setSnapPreview(null);
+    setRestoreState('running');
+    setRestoreProgress(0);
+    setRestoreError('');
+    setRestoreReport(null);
+
+    let pct = 0;
+    progressRef.current = setInterval(() => {
+      pct = Math.min(pct + (pct < 50 ? 3 : pct < 80 ? 1 : 0.3), 90);
+      setRestoreProgress(Math.round(pct));
+    }, 500);
+
+    try {
+      const res = await client.post(`/backup/restore-snapshot/${snap.id}`, {}, { timeout: 300_000 });
+      clearInterval(progressRef.current);
+      setRestoreProgress(100);
+      const report = res?.data?.report ?? res?.report ?? null;
+      setRestoreReport(report);
+      setTimeout(() => { setRestoreState('done'); setRestoreProgress(0); }, 400);
+      refetchSnapshots();
+      toast.success('Snapshot restored successfully. Please refresh the page.');
+    } catch (err) {
+      clearInterval(progressRef.current);
+      setRestoreProgress(0);
+      setRestoreError(err.response?.data?.message || err.message || 'Restore failed.');
+      setRestoreState('error');
+    }
+  }
+
   // Derive counts from backup for preview
   function getPreviewCounts(bk) {
     const src = bk.counts ?? {};
@@ -490,6 +531,51 @@ function BackupTab() {
         </div>
       )}
 
+      {/* Snapshot restore confirm modal */}
+      {snapPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-700 shadow-2xl" style={{ background: '#111827' }}>
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-100">Restore Snapshot</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    This will upsert all records from this snapshot — existing data is preserved, missing records are re-added.
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-700 bg-slate-800/40 px-4 py-3 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Snapshot date</span>
+                  <span className="text-slate-200 font-mono">{formatDate(snapPreview.created_at)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Products</span>
+                  <span className="text-slate-200 font-mono">{snapPreview.row_counts?.products ?? '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Sales</span>
+                  <span className="text-slate-200 font-mono">{snapPreview.row_counts?.sales ?? '—'}</span>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setSnapPreview(null)}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm text-slate-300 border border-slate-600 hover:bg-slate-800 transition-colors">
+                  Cancel
+                </button>
+                <button onClick={doRestoreSnapshot}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-500 text-white transition-colors">
+                  Restore This Snapshot
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Auto-backup status */}
       <div className="card p-5 space-y-3">
         <div className="flex items-start gap-3">
@@ -574,6 +660,56 @@ function BackupTab() {
           onClick={handleExport}>
           Export Backup
         </Button>
+      </div>
+
+      {/* Backup History (server snapshots) */}
+      <div className="card p-6 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-lg bg-surface-700 flex items-center justify-center shrink-0">
+            <ClockIcon className="h-5 w-5 text-surface-300" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold text-surface-100">Backup History</h2>
+            <p className="text-xs text-surface-500 mt-0.5">
+              Server-side snapshots saved automatically on each export. Restore any one to recover lost data.
+            </p>
+          </div>
+        </div>
+
+        {snapshotsLoading ? (
+          <div className="h-16 rounded-lg bg-surface-700/40 animate-pulse" />
+        ) : snapshots.length === 0 ? (
+          <p className="text-xs text-surface-500 italic">No snapshots yet — export a backup to create the first one.</p>
+        ) : (
+          <div className="rounded-lg border border-surface-700 overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-0 text-2xs font-semibold uppercase tracking-wider text-surface-500 bg-surface-800/60 px-3 py-1.5 border-b border-surface-700">
+              <span>Date</span>
+              <span className="text-right pr-4">Products</span>
+              <span className="text-right">Sales</span>
+            </div>
+            {snapshots.map((snap, i) => (
+              <div key={snap.id} className={cn(
+                'flex items-center gap-2 px-3 py-2.5 text-xs border-b border-surface-700/40 last:border-0',
+                i % 2 === 0 ? 'bg-surface-800/20' : ''
+              )}>
+                <div className="flex-1 min-w-0">
+                  <span className="text-surface-300 font-mono">{formatDate(snap.created_at)}</span>
+                  {i === 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 rounded text-2xs bg-primary-500/15 text-primary-400">latest</span>
+                  )}
+                </div>
+                <span className="text-surface-400 font-mono pr-4">{snap.row_counts?.products ?? '—'}</span>
+                <span className="text-surface-400 font-mono pr-4">{snap.row_counts?.sales ?? '—'}</span>
+                <button
+                  onClick={() => setSnapPreview(snap)}
+                  className="shrink-0 px-2.5 py-1 text-xs rounded-lg bg-surface-700 hover:bg-surface-600 text-surface-300 hover:text-surface-100 transition-colors border border-surface-600"
+                >
+                  Restore
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Restore */}
