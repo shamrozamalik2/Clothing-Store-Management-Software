@@ -54,6 +54,7 @@ export default function PlatformSwitcher({ surfaces }) {
       <div
         role="tablist"
         aria-label="Available platforms"
+        className="pbc-surface-tabs"
         style={{
           display: 'inline-flex', gap: 4, padding: 5,
           borderRadius: 999,
@@ -74,6 +75,7 @@ export default function PlatformSwitcher({ surfaces }) {
               aria-selected={on}
               aria-controls={`pbc-panel-${x.id}`}
               onClick={() => setActive(i)}
+              className="pbc-surface-tab"
               style={{
                 position: 'relative', border: 'none', background: 'transparent', cursor: 'pointer',
                 padding: '0.5625rem 1.25rem', borderRadius: 999,
@@ -94,7 +96,7 @@ export default function PlatformSwitcher({ surfaces }) {
                   transition={{ duration: reduce ? 0 : 0.34, ease: EASE }}
                 />
               )}
-              <Icon aria-hidden="true" style={{ width: 16, height: 16, position: 'relative' }} />
+              <Icon aria-hidden="true" className="pbc-surface-tab-icon" style={{ width: 16, height: 16, position: 'relative' }} />
               <span style={{ position: 'relative' }}>{x.label}</span>
             </button>
           );

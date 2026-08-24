@@ -354,20 +354,35 @@
 
 @media (max-width: 1024px) {
   .pbc-hero { grid-template-columns: 1fr !important; gap: var(--s8) !important; }
+  /* `1fr` is `minmax(auto, 1fr)`, and both rows now share the one track — so
+     without this the track takes its floor from the 680px min-content of the
+     mockup, the copy is dragged to 680px along with it, and the `overflow-x:
+     clip` further up amputates the headline instead of showing a scrollbar.
+     Scoped to the stacked layout: the two-column hero above this breakpoint
+     sizes its tracks from the same intrinsic minimum by design. */
+  .pbc-hero > * { min-width: 0; }
   .pbc-hero-visual { min-height: 0 !important; margin-top: var(--s4); }
   .pbc-hero-visual .pbc-hero-chrome { width: 100% !important; }
-  /* Bring the overhanging cards back inside the page. */
-  .pbc-hero-visual .pbc-float-a { top: -22px !important; left: -8px !important; }
-  .pbc-hero-visual .pbc-float-b { bottom: -30px !important; right: -8px !important; }
+  /* Bring the overhanging cards back inside the page. The offsets belong on
+     the `-slot` wrappers: Framer owns the wrapper and GSAP owns the card
+     inside it, so the wrapper is what actually carries the positioning. */
+  .pbc-hero-visual .pbc-float-a-slot { top: -22px !important; left: -8px !important; }
+  .pbc-hero-visual .pbc-float-b-slot { bottom: -30px !important; right: -8px !important; }
 }
 
 @media (max-width: 720px) {
   /* At phone width the cards would cover the interface they are meant to
-     illustrate, so only the trend card stays. */
-  .pbc-hero-visual .pbc-float-a { display: none; }
-  .pbc-hero-visual .pbc-float-b { position: static !important; margin-top: var(--s3); }
+     illustrate, so only the trend card stays — and it drops below the mockup
+     rather than hanging off the right edge into the clipped region. */
+  .pbc-hero-visual .pbc-float-a-slot { display: none; }
+  .pbc-hero-visual .pbc-float-b-slot {
+    position: static !important;
+    margin-top: var(--s3);
+  }
   .pbc-hero-card { transform: none; }
-  .pbc-hero-visual svg[viewBox="0 0 100 100"] { display: none; }
+  /* The quarter-circle is anchored off the top-right corner; there is no room
+     for that overhang on a phone. */
+  .pbc-hero-visual .pbc-hero-ring { display: none; }
 }
 
 /* Workflow story — heading and counter stack on narrow screens. */
@@ -394,13 +409,36 @@
   .pbc-orbit-list   { display: grid !important; }
 }
 
+/* Platform switcher — the tab strip is an inline pill sized by its content,
+   which overruns the shell on a small phone and loses "Mobile" to the clip.
+   It becomes a full-width segmented control instead, shedding the icons when
+   even that is not enough room for three labels. */
+@media (max-width: 560px) {
+  .pbc-surface-tabs { display: flex !important; width: 100%; }
+  .pbc-surface-tab {
+    flex: 1;
+    justify-content: center;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    min-height: 44px;
+  }
+}
+@media (max-width: 360px) {
+  .pbc-surface-tab-icon { display: none; }
+}
+
 /* Pricing — two plans side by side, stacking on narrow screens. */
 @media (max-width: 780px) {
   .pbc-pricing-grid { grid-template-columns: 1fr !important; }
 }
 
 /* App download banner — stacks below the split breakpoint, and the subject
-   sits under the copy rather than beside it. */
+   sits under the copy rather than beside it.
+
+   Once stacked, the subject is centred and her head reaches the top of the
+   stage, so the bubble is moved out of the portrait: the stage is given a
+   band of headroom and the bubble is parked in it, hard right, where its
+   tail still points back at her. */
 @media (max-width: 900px) {
   .pbc-dl-card {
     grid-template-columns: 1fr !important;
@@ -408,8 +446,37 @@
     text-align: left;
   }
   .pbc-dl-squiggle { display: none; }
-  .pbc-dl-stage    { justify-content: center; margin-top: var(--s2); }
+  .pbc-dl-stage    { justify-content: center; margin-top: var(--s2); padding-top: 3rem; }
+  .pbc-dl-bubble {
+    top: 0 !important;
+    left: auto !important;
+    right: 0;
+    transform: none;
+  }
 }
-@media (max-width: 520px) {
-  .pbc-dl-bubble { left: 50% !important; transform: translateX(-50%); top: -6px !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Touch
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* iOS Safari zooms the page in whenever a focused control's text is under
+   16px, and does not zoom back out afterwards. Controls carry their size
+   inline, so this has to win outright. */
+@media (max-width: 640px) {
+  .pbc input,
+  .pbc select,
+  .pbc textarea { font-size: 16px !important; }
 }
+
+/* Footer links are set in body copy, which leaves a 20px-tall hit area — half
+   what a fingertip needs. Once the footer stacks there is room to grow them
+   into a proper row without changing how they look. */
+@media (max-width: 860px) {
+  .pbc-footer-grid nav ul { gap: 0 !important; }
+  .pbc-footer-grid nav a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+

@@ -170,6 +170,7 @@ export default function Hero() {
             initial={{ opacity: 0, scale: reduce ? 1 : 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease: EASE, delay: reduce ? 0 : 0.85 }}
+            className="pbc-float-a-slot"
             style={{ position: 'absolute', top: -52, left: -34, zIndex: 2 }}
           >
             {/* Framer owns the entrance above; GSAP owns the float here.
@@ -185,6 +186,7 @@ export default function Hero() {
             initial={{ opacity: 0, scale: reduce ? 1 : 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease: EASE, delay: reduce ? 0 : 1.0 }}
+            className="pbc-float-b-slot"
             style={{ position: 'absolute', bottom: -40, right: -48, zIndex: 2 }}
           >
             <div className="pbc-float-b pbc-hero-card">

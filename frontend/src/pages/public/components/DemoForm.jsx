@@ -85,7 +85,9 @@ const controlStyle = (invalid) => ({
   border: `1px solid ${invalid ? 'rgba(240,131,121,0.65)' : 'var(--on-ink-line)'}`,
   borderRadius: 'var(--r)',
   padding: '0.6875rem 0.875rem',
-  fontSize: '0.9375rem',
+  /* Must not drop below 16px: iOS Safari zooms the whole page in when a
+     focused control's text is smaller, and never zooms back out. */
+  fontSize: '1rem',
   color: 'var(--on-ink)',
   fontFamily: 'inherit',
   outline: 'none',
@@ -292,7 +294,7 @@ export default function DemoForm() {
               type="checkbox"
               aria-invalid={!!errors.consent}
               aria-describedby={errors.consent ? 'consent-error' : undefined}
-              style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--accent)', flexShrink: 0 }}
+              style={{ marginTop: 2, width: 20, height: 20, accentColor: 'var(--accent)', flexShrink: 0 }}
               {...register('consent', { required: 'Please confirm before sending.' })}
             />
             <span className="pbc-meta" style={{ color: 'var(--on-ink-mute)' }}>
