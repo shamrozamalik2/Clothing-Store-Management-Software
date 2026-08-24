@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   EyeIcon, EyeSlashIcon, EnvelopeIcon,
   LockClosedIcon, BuildingOffice2Icon, ArrowRightIcon,
@@ -12,10 +13,18 @@ import toast from 'react-hot-toast';
 import { authApi } from '@api/auth.api';
 import { setCredentials, selectIsAuth } from '@store/slices/authSlice';
 import Logo from '@components/ui/Logo';
+import { gsap, useGSAP, prefersReducedMotion } from './components/gsapSetup';
 
-function PBCLogo({ height = 26 }) {
-  return <Logo variant="lockup" mono height={height} style={{ color: '#FCFBF8' }} />;
-}
+/* The public site's design system. Importing it — rather than re-typing the
+   palette — is what keeps this page on the site's colours: the grounds, the
+   one blue accent, the radii and the pill button all come from the same
+   tokens the marketing pages use, and follow them if they ever change.
+   Everything in that sheet is scoped to `.pbc`, so it cannot reach the
+   authenticated app shell rendered by the same bundle. */
+import './site.css';
+
+/* The site's shared easing curve. */
+const EASE = [0.22, 1, 0.36, 1];
 
 const FEATURES = [
   'Point of Sale & Billing',
@@ -32,6 +41,8 @@ export default function PublicLoginPage() {
   const isAuth     = useSelector(selectIsAuth);
   const [showPwd, setShowPwd]           = useState(false);
   const [suspendedMsg, setSuspendedMsg] = useState('');
+  const scope  = useRef(null);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (isAuth) navigate('/dashboard', { replace: true });
@@ -60,72 +71,170 @@ export default function PublicLoginPage() {
     },
   });
 
+  /* ── GSAP: the brand side and the ambient light ────────────────────────────
+     Written as `from` tweens, so the resting state is the plain DOM. If this
+     never runs — reduced motion, a script failure — the panel is already on
+     screen and readable rather than stuck at opacity zero. */
+  useGSAP(
+    () => {
+      if (prefersReducedMotion() || !scope.current) return;
+
+      gsap.timeline({ defaults: { ease: 'power3.out' } })
+        .from('.pl-logo', { opacity: 0, y: -12, duration: 0.6 })
+        /* Each headline line rises out of its own clipping band. */
+        .from('.pl-line > span', { yPercent: 115, duration: 0.85, stagger: 0.1 }, '-=0.35')
+        .from('.pl-lede', { opacity: 0, y: 14, duration: 0.6 }, '-=0.45')
+        .from('.pl-feat', { opacity: 0, x: -14, duration: 0.5, stagger: 0.07 }, '-=0.3')
+        .from('.pl-legal', { opacity: 0, duration: 0.5 }, '-=0.2');
+
+      /* The washes breathe on their own clocks. Matching durations would make
+         the whole background pulse in unison, which reads as a loading state
+         rather than as light. */
+      const drift = (target, scale, duration, delay) =>
+        gsap.to(target, { scale, duration, delay, ease: 'sine.inOut', repeat: -1, yoyo: true });
+
+      drift('.pl-wash-a', 1.14, 7.0, 0);
+      drift('.pl-wash-b', 1.09, 9.0, 1.2);
+      drift('.pl-wash-c', 1.12, 8.0, 0.6);
+    },
+    { scope }
+  );
+
+  /* ── Framer: the form side ──────────────────────────────────────────────── */
+  const stack = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.07, delayChildren: reduce ? 0 : 0.15 } },
+  };
+  const rise = {
+    hidden: reduce ? { opacity: 0 } : { opacity: 0, y: 16 },
+    show: { opacity: 1, y: 0, transition: { duration: reduce ? 0.25 : 0.5, ease: EASE } },
+  };
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: 'linear-gradient(351deg, #8380b4 0%, #14122d 55%, #332c3f 100%)' }}>
+    <div
+      ref={scope}
+      className="pbc"
+      style={{ minHeight: '100vh', display: 'flex', background: 'var(--white)' }}
+    >
       <style>{`
-        .pub-login-input {
-          width: 100%; padding: 0.8rem 1rem 0.8rem 2.75rem;
-          border-radius: 12px; font-size: 0.9rem;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.11);
-          color: #e0eaff; outline: none;
-          transition: all 0.2s;
+        .pl-field {
+          width: 100%;
+          padding: 0.8125rem 1rem 0.8125rem 2.75rem;
+          border-radius: var(--r);
+          /* Never below 16px: iOS Safari zooms the page in on a focused
+             control with smaller text, and does not zoom back out. */
+          font-size: 1rem;
           font-family: inherit;
+          font-weight: 300;
+          color: var(--on-paper);
+          background: var(--white);
+          border: 1px solid var(--on-paper-line);
+          outline: none;
+          transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), background-color 0.2s var(--ease);
         }
-        .pub-login-input:focus {
-          border-color: rgba(129,140,248,0.65);
-          background: rgba(99,102,241,0.07);
-          box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+        .pl-field::placeholder { color: var(--on-paper-soft); }
+        .pl-field:focus {
+          border-color: var(--accent);
+          background: var(--white);
+          box-shadow: 0 0 0 3px var(--accent-wash);
         }
-        .pub-login-input::placeholder { color: rgba(255,255,255,0.2); }
-        .pub-login-input.error { border-color: rgba(239,68,68,0.55); }
-        .pub-login-btn {
-          width: 100%; padding: 0.875rem; border-radius: 14px;
-          font-size: 1rem; font-weight: 700; cursor: pointer;
-          border: none; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-          background: linear-gradient(135deg, #7c72c2, #1c0b3a);
-          color: white; transition: all 0.25s;
-          box-shadow: 0 8px 28px rgba(79,70,229,0.45);
-          font-family: inherit;
+        .pl-field.error { border-color: var(--signal); }
+        .pl-field.error:focus { box-shadow: 0 0 0 3px rgba(210,69,58,0.10); }
+
+        /* A line of text rising out of a band. The band is grown and pulled
+           back so it does not shave the descenders off "g" and "y". */
+        .pl-line {
+          display: block; overflow: hidden;
+          padding-bottom: 0.14em; margin-bottom: -0.14em;
         }
-        .pub-login-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 12px 36px rgba(139,92,246,0.55); }
-        .pub-login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        @keyframes loginFadeUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
-        .login-form-anim { animation: loginFadeUp 0.55s ease both; }
-        @keyframes plGlow { 0%,100% { opacity:0.5; transform:scale(1) } 50% { opacity:0.85; transform:scale(1.12) } }
+        .pl-line > span { display: inline-block; }
+
+        .pl-eye {
+          position: absolute; right: 0.4375rem; top: 50%; transform: translateY(-50%);
+          background: none; border: none; cursor: pointer;
+          color: var(--on-paper-soft);
+          display: grid; place-items: center;
+          width: 38px; height: 38px; border-radius: var(--r-sm);
+          transition: color 0.2s var(--ease), background-color 0.2s var(--ease);
+        }
+        .pl-eye:hover { color: var(--accent); background: var(--accent-wash); }
+
+        .pl-back { color: var(--on-paper-mute); transition: color 0.2s var(--ease); }
+        .pl-back:hover { color: var(--accent); }
+
+        /* The brand panel is the site's tinted band; it collapses below the
+           two-column breakpoint, where the form takes the full width. */
+        .pl-brand { display: none; }
+        @media (min-width: 1024px) {
+          .pl-brand { display: flex; }
+          .pl-mobile-logo { display: none !important; }
+        }
       `}</style>
 
-      {/* Left panel — brand (hidden on mobile, flex on lg+) */}
-      <div className="hidden lg:flex" style={{
-        flex: '0 0 46%', maxWidth: 560, flexDirection: 'column',
-        justifyContent: 'space-between', padding: '3rem',
-        borderRight: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden',
-      }}>
-        {/* Glow blobs */}
-        <div style={{ position: 'absolute', top: -80, right: -80, width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(131,128,180,0.20) 0%, transparent 65%)', pointerEvents: 'none', animation: 'plGlow 12s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', bottom: -100, left: -60, width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.14) 0%, transparent 65%)', pointerEvents: 'none', animation: 'plGlow 16s ease-in-out infinite 4s' }} />
+      {/* ── Brand panel ── */}
+      <div
+        className="pl-brand"
+        style={{
+          flex: '0 0 46%', maxWidth: 560, flexDirection: 'column',
+          justifyContent: 'space-between', padding: 'var(--s6)',
+          background: 'var(--surface)',
+          borderRight: '1px solid var(--on-paper-line)',
+          position: 'relative', overflow: 'hidden',
+        }}
+      >
+        {/* Soft tinted washes — the same two the marketing hero uses. */}
+        <div
+          aria-hidden="true"
+          className="pl-wash-a"
+          style={{
+            position: 'absolute', top: '-22%', right: '-18%',
+            width: 460, height: 460, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(44,107,245,0.16) 0%, transparent 64%)',
+            pointerEvents: 'none',
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pl-wash-b"
+          style={{
+            position: 'absolute', bottom: '-20%', left: '-16%',
+            width: 420, height: 420, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(18,185,129,0.16) 0%, transparent 64%)',
+            pointerEvents: 'none',
+          }}
+        />
 
-        {/* Logo */}
-        <div style={{ position: 'relative', zIndex: 2 }}>
-          <PBCLogo height={40} />
+        <div className="pl-logo" style={{ position: 'relative', zIndex: 2 }}>
+          <Logo variant="lockup" height={36} />
         </div>
 
-        {/* Hero text */}
         <div style={{ position: 'relative', zIndex: 2 }}>
-          <h2 style={{ fontSize: 'clamp(1.75rem, 3vw, 2.5rem)', fontWeight: 900, color: '#f0f5ff', lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: '1rem' }}>
-            Run your business<br />
-            <span style={{ background: 'linear-gradient(135deg, #a78bfa, #60a5fa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-              smarter, faster.
-            </span>
+          <h2 className="pbc-display pbc-h2" style={{ margin: '0 0 var(--s2)', color: 'var(--on-paper)' }}>
+            <span className="pl-line"><span>Run your business</span></span>
+            <span className="pl-line"><span style={{ color: 'var(--accent)' }}>smarter, faster.</span></span>
           </h2>
-          <p style={{ fontSize: '0.9rem', lineHeight: 1.75, color: 'rgba(160,185,220,0.7)', marginBottom: '2rem', maxWidth: 380 }}>
-            Complete POS, inventory, sales, purchases, and business analytics — all in one professional cloud platform.
+
+          <p className="pbc-lede pl-lede" style={{ color: 'var(--on-paper-mute)', margin: '0 0 var(--s4)', maxWidth: 400 }}>
+            Complete POS, inventory, sales, purchases, and business analytics — all in one
+            professional cloud platform.
           </p>
-          <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {FEATURES.map(f => (
-              <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.875rem', color: 'rgba(187,210,255,0.80)' }}>
-                <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#818cf8', display: 'block' }} />
+
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '0.75rem' }}>
+            {FEATURES.map((f) => (
+              <li
+                key={f}
+                className="pl-feat pbc-body"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--on-paper-mute)' }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 20, height: 20, borderRadius: '50%',
+                    background: 'var(--accent-wash)', border: '1px solid var(--accent-line)',
+                    display: 'grid', placeItems: 'center', flexShrink: 0,
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'block' }} />
                 </span>
                 {f}
               </li>
@@ -133,65 +242,103 @@ export default function PublicLoginPage() {
           </ul>
         </div>
 
-        {/* Footer */}
-        <div style={{ position: 'relative', zIndex: 2 }}>
-          <p style={{ fontSize: '0.78rem', color: 'rgba(100,130,170,0.3)' }}>© 2025 ProBusinessCloud. All rights reserved.</p>
+        <div className="pl-legal" style={{ position: 'relative', zIndex: 2 }}>
+          <p className="pbc-meta" style={{ color: 'var(--on-paper-soft)', margin: 0 }}>
+            © {new Date().getFullYear()} ProBusinessCloud. All rights reserved.
+          </p>
         </div>
       </div>
 
-      {/* Right panel — form, inherits gradient from wrapper */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1.5rem', position: 'relative', overflow: 'hidden' }}>
-        {/* Right-side glow blobs */}
-        <div style={{ position: 'absolute', top: -50, left: -40, width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, rgba(131,128,180,0.14) 0%, transparent 65%)', pointerEvents: 'none', animation: 'plGlow 10s ease-in-out infinite' }} />
-        <div style={{ position: 'absolute', bottom: -60, right: -40, width: 260, height: 260, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 65%)', pointerEvents: 'none', animation: 'plGlow 14s ease-in-out infinite reverse' }} />
+      {/* ── Form panel ── */}
+      <div
+        style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          padding: 'var(--s4) var(--s3)', position: 'relative', overflow: 'hidden',
+        }}
+      >
+        <div
+          aria-hidden="true"
+          className="pl-wash-c"
+          style={{
+            position: 'absolute', top: '-14%', right: '-12%',
+            width: 380, height: 380, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(44,107,245,0.10) 0%, transparent 66%)',
+            pointerEvents: 'none',
+          }}
+        />
 
-        <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 2 }} className="login-form-anim">
+        <motion.div
+          style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 2 }}
+          variants={stack}
+          initial="hidden"
+          animate="show"
+        >
+          {/* Shown only where the brand panel is not. */}
+          <motion.div variants={rise} className="pl-mobile-logo" style={{ marginBottom: 'var(--s5)' }}>
+            <Logo variant="lockup" height={32} />
+          </motion.div>
 
-          {/* Mobile logo (hidden on lg+) */}
-          <div className="flex lg:hidden" style={{ marginBottom: '2.5rem' }}>
-            <PBCLogo height={34} />
-          </div>
-
-          {/* Heading */}
-          <div style={{ marginBottom: '2rem' }}>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#f0f5ff', letterSpacing: '-0.03em', marginBottom: '0.5rem' }}>
+          <motion.div variants={rise} style={{ marginBottom: 'var(--s4)' }}>
+            <h1 className="pbc-display" style={{ fontSize: '1.875rem', margin: '0 0 0.5rem', color: 'var(--on-paper)' }}>
               Welcome back
             </h1>
-            <p style={{ fontSize: '0.9rem', color: 'rgba(187,210,255,0.60)' }}>
+            <p className="pbc-body" style={{ color: 'var(--on-paper-mute)', margin: 0 }}>
               Sign in to your ProBusinessCloud account
             </p>
-          </div>
+          </motion.div>
 
-          {/* Error banner */}
-          {suspendedMsg && (
-            <div style={{ marginBottom: '1.25rem', padding: '0.875rem 1rem', borderRadius: 12, fontSize: '0.875rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5', lineHeight: 1.5 }}>
-              {suspendedMsg}
-            </div>
-          )}
+          {/* Error banner — arrives and leaves rather than popping */}
+          <AnimatePresence>
+            {suspendedMsg && (
+              <motion.div
+                key="suspended"
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: -8, height: 0, marginBottom: 0 }}
+                animate={{ opacity: 1, y: 0, height: 'auto', marginBottom: 'var(--s2)' }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, height: 0, marginBottom: 0 }}
+                transition={{ duration: reduce ? 0.2 : 0.35, ease: EASE }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div
+                  role="alert"
+                  className="pbc-meta"
+                  style={{
+                    padding: '0.875rem 1rem', borderRadius: 'var(--r)',
+                    background: 'rgba(210,69,58,0.06)', border: '1px solid rgba(210,69,58,0.22)',
+                    color: 'var(--signal)',
+                  }}
+                >
+                  {suspendedMsg}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Frosted glass form card */}
-          <form onSubmit={handleSubmit(d => loginMutation.mutate(d))}
-            style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 20, padding: '1.75rem', backdropFilter: 'blur(20px)' }}>
-
-            <LabeledInput label="Company Code" error={errors.company_slug?.message}>
-              <BuildingOffice2Icon style={{ width: 16, height: 16, color: '#818cf8', position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          <motion.form
+            variants={rise}
+            onSubmit={handleSubmit((d) => loginMutation.mutate(d))}
+            className="pbc-card"
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)', padding: 'var(--s4)', boxShadow: 'var(--shadow-lg)' }}
+          >
+            <LabeledInput label="Company code" error={errors.company_slug?.message} reduce={reduce}>
+              <FieldIcon Icon={BuildingOffice2Icon} />
               <input
                 type="text"
                 autoComplete="organization"
                 placeholder="your-company-code"
-                className={`pub-login-input${errors.company_slug ? ' error' : ''}`}
+                className={`pl-field${errors.company_slug ? ' error' : ''}`}
                 {...register('company_slug', { required: 'Company code is required.' })}
               />
             </LabeledInput>
 
-            <LabeledInput label="Email Address" error={errors.email?.message}>
-              <EnvelopeIcon style={{ width: 16, height: 16, color: '#818cf8', position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            <LabeledInput label="Email address" error={errors.email?.message} reduce={reduce}>
+              <FieldIcon Icon={EnvelopeIcon} />
               <input
                 type="email"
                 autoComplete="email"
                 autoFocus
                 placeholder="you@company.com"
-                className={`pub-login-input${errors.email ? ' error' : ''}`}
+                className={`pl-field${errors.email ? ' error' : ''}`}
                 {...register('email', {
                   required: 'Email is required.',
                   pattern: { value: /\S+@\S+\.\S+/, message: 'Invalid email address.' },
@@ -199,68 +346,133 @@ export default function PublicLoginPage() {
               />
             </LabeledInput>
 
-            <LabeledInput label="Password" error={errors.password?.message}>
-              <LockClosedIcon style={{ width: 16, height: 16, color: '#818cf8', position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            <LabeledInput label="Password" error={errors.password?.message} reduce={reduce}>
+              <FieldIcon Icon={LockClosedIcon} />
               <input
                 type={showPwd ? 'text' : 'password'}
                 autoComplete="current-password"
                 placeholder="Your password"
-                className={`pub-login-input${errors.password ? ' error' : ''}`}
+                className={`pl-field${errors.password ? ' error' : ''}`}
+                style={{ paddingRight: '3.25rem' }}
                 {...register('password', { required: 'Password is required.' })}
               />
               <button
                 type="button"
-                onClick={() => setShowPwd(v => !v)}
-                style={{ position: 'absolute', right: '0.875rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#3d5070', padding: 0 }}
+                onClick={() => setShowPwd((v) => !v)}
+                className="pl-eye"
+                aria-label={showPwd ? 'Hide password' : 'Show password'}
               >
-                {showPwd ? <EyeSlashIcon style={{ width: 16, height: 16 }} /> : <EyeIcon style={{ width: 16, height: 16 }} />}
+                {/* The two icons cross-fade in place instead of snapping. */}
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={showPwd ? 'hide' : 'show'}
+                    initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
+                    transition={{ duration: reduce ? 0.1 : 0.18, ease: EASE }}
+                    style={{ display: 'grid', placeItems: 'center' }}
+                  >
+                    {showPwd
+                      ? <EyeSlashIcon style={{ width: 18, height: 18 }} />
+                      : <EyeIcon style={{ width: 18, height: 18 }} />}
+                  </motion.span>
+                </AnimatePresence>
               </button>
             </LabeledInput>
 
-            <button
+            <motion.button
               type="submit"
               disabled={loginMutation.isPending}
-              className="pub-login-btn"
-              style={{ marginTop: '0.5rem' }}
+              className="pbc-btn pbc-btn-primary"
+              style={{ width: '100%', marginTop: '0.5rem' }}
+              whileHover={reduce || loginMutation.isPending ? undefined : { y: -2 }}
+              whileTap={reduce || loginMutation.isPending ? undefined : { y: 0, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: EASE }}
             >
-              {loginMutation.isPending ? (
-                <>
-                  <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
-                  Signing in…
-                </>
-              ) : (
-                <>Sign In <ArrowRightIcon style={{ width: 16, height: 16 }} /></>
-              )}
-            </button>
-          </form>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={loginMutation.isPending ? 'pending' : 'idle'}
+                  initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                  transition={{ duration: reduce ? 0.12 : 0.2, ease: EASE }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  {loginMutation.isPending ? (
+                    <>
+                      <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.45)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                      Signing in…
+                    </>
+                  ) : (
+                    <>Sign in <ArrowRightIcon style={{ width: 16, height: 16 }} /></>
+                  )}
+                </motion.span>
+              </AnimatePresence>
+            </motion.button>
+          </motion.form>
 
-          {/* Footer links */}
-          <div style={{ marginTop: '2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <Link to="/" style={{ fontSize: '0.875rem', color: 'rgba(187,210,255,0.55)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.375rem', justifyContent: 'center', transition: 'color 0.2s' }}
-              onMouseEnter={e => e.currentTarget.style.color = '#93c5fd'}
-              onMouseLeave={e => e.currentTarget.style.color = 'rgba(187,210,255,0.55)'}>
+          <motion.div
+            variants={rise}
+            style={{ marginTop: 'var(--s4)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+          >
+            <Link
+              to="/"
+              className="pbc-meta pl-back"
+              style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.375rem', justifyContent: 'center', minHeight: 40 }}
+            >
               ← Back to ProBusinessCloud
             </Link>
-            <p style={{ fontSize: '0.78rem', color: 'rgba(147,196,255,0.28)' }}>
+            <p className="pbc-meta" style={{ color: 'var(--on-paper-soft)', margin: 0 }}>
               Secure business platform · Your data is encrypted
             </p>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
     </div>
   );
 }
 
-function LabeledInput({ label, error, children }) {
+function FieldIcon({ Icon }) {
+  return (
+    <Icon
+      aria-hidden="true"
+      style={{
+        width: 17, height: 17, color: 'var(--accent)',
+        position: 'absolute', left: '0.875rem', top: '50%',
+        transform: 'translateY(-50%)', pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+function LabeledInput({ label, error, reduce, children }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'rgba(187,210,255,0.60)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+      <label
+        className="pbc-eyebrow"
+        style={{ display: 'block', color: 'var(--on-paper-soft)', marginBottom: '0.4375rem' }}
+      >
         {label}
       </label>
-      <div style={{ position: 'relative' }}>
-        {children}
-      </div>
-      {error && <p style={{ fontSize: '0.78rem', color: '#f87171', marginTop: '0.35rem' }}>{error}</p>}
+      <div style={{ position: 'relative' }}>{children}</div>
+
+      {/* Validation messages open the space they need rather than shunting the
+          rest of the form down in one frame. */}
+      <AnimatePresence initial={false}>
+        {error && (
+          <motion.p
+            role="alert"
+            className="pbc-meta"
+            initial={reduce ? { opacity: 0 } : { opacity: 0, height: 0, marginTop: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginTop: '0.375rem' }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0, marginTop: 0 }}
+            transition={{ duration: reduce ? 0.15 : 0.25, ease: EASE }}
+            style={{ color: 'var(--signal)', overflow: 'hidden', marginBottom: 0 }}
+          >
+            {error}
+          </motion.p>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
