@@ -1,4 +1,4 @@
-import { useReducer, useState, useRef, useEffect, useCallback } from 'react';
+import { useReducer, useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   MagnifyingGlassIcon, PlusIcon, MinusIcon, XMarkIcon,
@@ -85,11 +85,23 @@ export default function POSPage() {
   const [newCustOpen, setNewCustOpen]     = useState(false);
   const [receipt, setReceipt]             = useState(null);
   const [holdsOpen, setHoldsOpen]         = useState(false);
+  const [recentProds, setRecentProds]     = useState([]);
+  const [searchDropOpen, setSearchDropOpen] = useState(false);
 
   const searchRef = useRef(null);
+  const searchWrapRef = useRef(null);
 
   // Focus search on mount
   useEffect(() => { searchRef.current?.focus(); }, []);
+
+  // Close search dropdown on outside click
+  useEffect(() => {
+    function handler(e) {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) setSearchDropOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Keyboard shortcut: F2 = focus search, F9 = open payment
   useEffect(() => {
@@ -126,6 +138,7 @@ export default function POSPage() {
       return;
     }
     dispatch({ type: 'ADD', product });
+    setRecentProds(prev => [product, ...prev.filter(p => p.id !== product.id)].slice(0, 6));
   }
 
   const saleMutation = useMutation({
@@ -171,21 +184,71 @@ export default function POSPage() {
 
         {/* Search bar */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-700 bg-surface-850">
-          <div className="relative flex-1">
+          <div ref={searchWrapRef} className="relative flex-1">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400 pointer-events-none" />
             <input
               ref={searchRef}
               type="text"
               value={productSearch}
-              onChange={e => setProductSearch(e.target.value)}
+              onChange={e => { setProductSearch(e.target.value); setSearchDropOpen(true); }}
+              onFocus={() => productSearch.length >= 2 && setSearchDropOpen(true)}
               placeholder="Search products by name or SKU… (F2)"
               className="w-full h-9 pl-9 pr-3 rounded-lg bg-surface-800 border border-surface-600 text-sm text-surface-100 placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
             {productSearch && (
-              <button onClick={() => setProductSearch('')}
+              <button onClick={() => { setProductSearch(''); setSearchDropOpen(false); }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-200">
                 <XMarkIcon className="h-4 w-4" />
               </button>
+            )}
+
+            {/* Instant search dropdown with thumbnails */}
+            {searchDropOpen && productSearch.length >= 2 && products.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-surface-600 bg-surface-800 shadow-2xl z-30 overflow-hidden">
+                <div className="px-3 py-1.5 border-b border-surface-700/50">
+                  <p className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Quick Add</p>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {products.slice(0, 7).map(p => {
+                    const oos = p.track_inventory && !p.allow_negative && p.stock_quantity <= 0;
+                    return (
+                      <button key={p.id} type="button"
+                        disabled={oos}
+                        onClick={() => { addToCart(p); setProductSearch(''); setSearchDropOpen(false); }}
+                        className={cn(
+                          'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors border-b border-surface-700/30 last:border-0',
+                          oos ? 'opacity-40 cursor-not-allowed' : 'hover:bg-surface-700/50 active:bg-surface-700'
+                        )}>
+                        {p.image ? (
+                          <img src={`http://localhost:3001${p.image}`} alt={p.name}
+                            className="h-9 w-9 rounded-lg object-cover shrink-0 bg-surface-700" />
+                        ) : (
+                          <div className="h-9 w-9 rounded-lg bg-surface-700 flex items-center justify-center shrink-0">
+                            <ShoppingCartIcon className="h-4 w-4 text-surface-500" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-surface-100 truncate">{p.name}</p>
+                          {p.sku && <p className="text-2xs text-surface-500">SKU: {p.sku}</p>}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-bold text-primary-400">{formatCurrency(p.sale_price)}</p>
+                          {p.track_inventory && (
+                            <p className={cn('text-2xs', oos ? 'text-red-400' : 'text-surface-500')}>
+                              {oos ? 'Out of stock' : `${p.stock_quantity} left`}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {products.length > 7 && (
+                  <div className="px-3 py-1.5 border-t border-surface-700/50 text-center">
+                    <p className="text-[10px] text-surface-500">{products.length - 7} more below ↓</p>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -213,6 +276,28 @@ export default function POSPage() {
                     : 'bg-surface-700 text-surface-300 hover:bg-surface-600'
                 )}>
                 {c.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Recent items quick-add strip */}
+        {recentProds.length > 0 && !productSearch && (
+          <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto no-scrollbar border-b border-surface-700/50 bg-surface-900/50">
+            <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest shrink-0">Recent:</span>
+            {recentProds.map(p => (
+              <button key={p.id} onClick={() => addToCart(p)}
+                className="flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-lg bg-surface-800 hover:bg-surface-700 border border-surface-700 transition-colors shrink-0 group">
+                {p.image ? (
+                  <img src={`http://localhost:3001${p.image}`} alt={p.name}
+                    className="h-5 w-5 rounded object-cover" />
+                ) : (
+                  <div className="h-5 w-5 rounded bg-surface-700 flex items-center justify-center">
+                    <ShoppingCartIcon className="h-3 w-3 text-surface-500" />
+                  </div>
+                )}
+                <span className="text-xs text-surface-300 group-hover:text-surface-100 transition-colors max-w-[80px] truncate">{p.name}</span>
+                <PlusIcon className="h-3 w-3 text-surface-500 group-hover:text-primary-400 transition-colors shrink-0" />
               </button>
             ))}
           </div>
@@ -756,108 +841,145 @@ function ReceiptModal({ receipt, onClose }) {
   const receiptFooter  = rc.receipt_footer?.value  || 'Thank you for shopping!';
   const currency       = bil.currency_symbol?.value || '₨';
 
-  const items = receipt.items ?? [];
-  const date  = new Date(receipt.sale_date || receipt.created_at);
-  const fmt   = (v) => `${currency}${Math.abs(Number(v)).toFixed(0)}`;
+  const items   = receipt.items ?? [];
+  const date    = new Date(receipt.sale_date || receipt.created_at);
+  const fmt     = (v) => `${currency}${Math.abs(Number(v)).toFixed(0)}`;
+  const isPaid  = !receipt.due_amount || Number(receipt.due_amount) <= 0;
+  const isCredit = receipt.payment_method === 'credit';
 
   function handlePrint() {
     printReceipt(receipt, items, settingsRes?.data ?? {});
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-white text-gray-900 rounded-2xl w-full max-w-sm mx-4 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="relative w-full max-w-sm mx-auto flex flex-col max-h-[92vh]">
 
-        {/* Header — company branding */}
-        <div className="text-center px-6 pt-6 pb-4 border-b border-gray-200">
-          {companyLogo && (
-            <div className="flex justify-center mb-3">
-              <img src={companyLogo} alt={companyName}
-                className="w-16 h-16 rounded-full object-cover border-2 border-gray-100 shadow-sm" />
+        {/* Dark modal wrapper */}
+        <div className="bg-surface-800 rounded-2xl border border-surface-700 shadow-2xl overflow-hidden flex flex-col">
+
+          {/* Modal top bar with status badge */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-surface-700">
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-4 w-4 text-green-400" />
+              <span className="text-sm font-semibold text-surface-100">Sale Complete</span>
             </div>
-          )}
-          <h2 className="text-lg font-bold text-gray-900">{companyName}</h2>
-          {companyTagline && <p className="text-xs text-gray-400 mt-0.5">{companyTagline}</p>}
-          {companyAddress && <p className="text-xs text-gray-400">{companyAddress}</p>}
-          {companyPhone   && <p className="text-xs text-gray-400">Tel: {companyPhone}</p>}
-          <p className="text-xs text-gray-400 mt-1">{date.toLocaleString('en-PK')}</p>
-        </div>
-
-        {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1">
-          {/* Info */}
-          <div className="px-5 py-3 text-xs border-b border-gray-200 grid grid-cols-2 gap-1">
-            <span className="text-gray-500">Reference:</span>
-            <span className="font-mono font-bold text-right">{receipt.reference}</span>
-            {receipt.customer_name && <>
-              <span className="text-gray-500">Customer:</span>
-              <span className="text-right">{receipt.customer_name}</span>
-            </>}
-            <span className="text-gray-500">Cashier:</span>
-            <span className="text-right">{receipt.cashier_name ?? 'Staff'}</span>
-            <span className="text-gray-500">Payment:</span>
-            <span className="text-right capitalize">{(receipt.payment_method ?? 'cash').replace('_', ' ')}</span>
+            <span className={cn(
+              'text-xs font-bold px-2.5 py-1 rounded-full',
+              isPaid
+                ? 'bg-green-500/15 text-green-400'
+                : isCredit
+                  ? 'bg-yellow-500/15 text-yellow-400'
+                  : 'bg-red-500/15 text-red-400'
+            )}>
+              {isPaid ? '✓ PAID' : isCredit ? '● CREDIT' : `DUE ${fmt(receipt.due_amount)}`}
+            </span>
           </div>
 
-          {/* Items */}
-          <div className="px-5 py-3 border-b border-gray-200">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-1 text-gray-500 font-medium">Item</th>
-                  <th className="text-right py-1 text-gray-500 font-medium">Qty</th>
-                  <th className="text-right py-1 text-gray-500 font-medium">Price</th>
-                  <th className="text-right py-1 text-gray-500 font-medium">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {items.map((item, i) => (
-                  <tr key={i}>
-                    <td className="py-1.5">
-                      <p className="font-medium">{item.product_name}</p>
-                      {(item.size || item.color) && (
-                        <p className="text-gray-400">{[item.size, item.color].filter(Boolean).join(' ')}</p>
-                      )}
-                    </td>
-                    <td className="py-1.5 text-right text-gray-600">{parseInt(item.quantity, 10)}</td>
-                    <td className="py-1.5 text-right text-gray-600">{fmt(item.unit_price)}</td>
-                    <td className="py-1.5 text-right font-medium">{fmt(item.total ?? item.subtotal)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {/* Receipt paper — white, thermal-style */}
+          <div className="overflow-y-auto flex-1 bg-[#fafaf8]" style={{ fontFamily: "'Courier New', monospace" }}>
 
-          {/* Totals */}
-          <div className="px-5 py-3 border-b border-gray-200 text-xs space-y-1">
-            <ReceiptRow label="Subtotal" value={receipt.subtotal} currency={currency} />
-            {receipt.discount_amount > 0 && <ReceiptRow label="Discount" value={-receipt.discount_amount} currency={currency} />}
-            {receipt.tax_amount > 0 && <ReceiptRow label="Tax" value={receipt.tax_amount} currency={currency} />}
-            <div className="flex justify-between font-bold text-sm pt-1.5 border-t border-gray-200">
-              <span>Total</span>
-              <span>{fmt(receipt.total_amount)}</span>
+            {/* Company header */}
+            <div className="text-center px-6 pt-5 pb-4" style={{ borderBottom: '1px dashed #d1d5db' }}>
+              {companyLogo && (
+                <div className="flex justify-center mb-2.5">
+                  <img src={`${companyLogo}`} alt={companyName}
+                    className="w-14 h-14 rounded-full object-cover border-2 border-gray-200 shadow" />
+                </div>
+              )}
+              <h2 className="text-base font-bold text-gray-900 uppercase tracking-wide">{companyName}</h2>
+              {companyTagline && <p className="text-xs text-gray-500 mt-0.5">{companyTagline}</p>}
+              {companyAddress && <p className="text-xs text-gray-500">{companyAddress}</p>}
+              {companyPhone   && <p className="text-xs text-gray-500">Tel: {companyPhone}</p>}
+              <p className="text-xs text-gray-400 mt-1.5">{date.toLocaleString('en-PK')}</p>
             </div>
-            <ReceiptRow label="Paid"   value={receipt.paid_amount}   currency={currency} />
-            {receipt.change_amount > 0 && <ReceiptRow label="Change" value={receipt.change_amount} currency={currency} />}
-            {receipt.due_amount    > 0 && <ReceiptRow label="Due"    value={receipt.due_amount}    currency={currency} className="text-red-600 font-semibold" />}
+
+            {/* Reference & customer */}
+            <div className="px-5 py-2.5 text-xs" style={{ borderBottom: '1px dashed #d1d5db' }}>
+              <div className="flex justify-between py-0.5">
+                <span className="text-gray-500">Ref:</span>
+                <span className="font-bold text-gray-900 font-mono">{receipt.reference}</span>
+              </div>
+              {receipt.customer_name && (
+                <div className="flex justify-between py-0.5">
+                  <span className="text-gray-500">Customer:</span>
+                  <span className="text-gray-800">{receipt.customer_name}</span>
+                </div>
+              )}
+              <div className="flex justify-between py-0.5">
+                <span className="text-gray-500">Cashier:</span>
+                <span className="text-gray-800">{receipt.cashier_name ?? 'Staff'}</span>
+              </div>
+              <div className="flex justify-between py-0.5">
+                <span className="text-gray-500">Payment:</span>
+                <span className="text-gray-800 capitalize">{(receipt.payment_method ?? 'cash').replace('_', ' ')}</span>
+              </div>
+            </div>
+
+            {/* Items */}
+            <div className="px-5 py-2.5" style={{ borderBottom: '1px dashed #d1d5db' }}>
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 text-xs mb-1.5">
+                <span className="text-gray-500 font-medium">ITEM</span>
+                <span className="text-gray-500 font-medium text-right">QTY</span>
+                <span className="text-gray-500 font-medium text-right">RATE</span>
+                <span className="text-gray-500 font-medium text-right">AMT</span>
+              </div>
+              {items.map((item, i) => (
+                <div key={i} className={cn(
+                  'grid grid-cols-[1fr_auto_auto_auto] gap-x-2 py-1.5 text-xs',
+                  i < items.length - 1 && 'border-b border-dotted border-gray-200'
+                )}>
+                  <div>
+                    <p className="font-medium text-gray-900">{item.product_name}</p>
+                    {(item.size || item.color) && (
+                      <p className="text-gray-400 text-[10px]">{[item.size, item.color].filter(Boolean).join(' · ')}</p>
+                    )}
+                  </div>
+                  <span className="text-gray-600 text-right self-start pt-px">{parseInt(item.quantity, 10)}</span>
+                  <span className="text-gray-600 text-right self-start pt-px">{fmt(item.unit_price)}</span>
+                  <span className="font-semibold text-gray-900 text-right self-start pt-px">{fmt(item.total ?? item.subtotal)}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Totals */}
+            <div className="px-5 py-2.5 text-xs space-y-1" style={{ borderBottom: '1px dashed #d1d5db' }}>
+              <ReceiptRow label="Subtotal" value={receipt.subtotal} currency={currency} />
+              {receipt.discount_amount > 0 && <ReceiptRow label="Discount" value={-receipt.discount_amount} currency={currency} className="text-green-700" />}
+              {receipt.tax_amount > 0 && <ReceiptRow label="Tax" value={receipt.tax_amount} currency={currency} />}
+              <div className="flex justify-between font-bold text-sm pt-1.5" style={{ borderTop: '1px solid #e5e7eb', marginTop: '4px' }}>
+                <span className="text-gray-900">TOTAL</span>
+                <span className="text-gray-900">{fmt(receipt.total_amount)}</span>
+              </div>
+              <ReceiptRow label="Paid" value={receipt.paid_amount} currency={currency} />
+              {receipt.change_amount > 0 && <ReceiptRow label="Change" value={receipt.change_amount} currency={currency} className="text-blue-700" />}
+              {receipt.due_amount > 0 && <ReceiptRow label="Due" value={receipt.due_amount} currency={currency} className="text-red-600 font-bold" />}
+            </div>
+
+            {/* Items count summary */}
+            <div className="px-5 py-2 text-center text-xs text-gray-400">
+              {items.length} item{items.length !== 1 ? 's' : ''} · {items.reduce((s, i) => s + parseInt(i.quantity, 10), 0)} units
+            </div>
+
+            {/* Footer */}
+            <div className="text-center px-5 pb-5 pt-1 text-xs text-gray-500 space-y-0.5">
+              <p className="font-medium">{receiptFooter}</p>
+              <p className="text-gray-400 text-[10px]">Powered by ProBusinessCloud</p>
+            </div>
           </div>
 
-          {/* Footer message */}
-          <div className="text-center px-5 py-3 text-xs text-gray-400">
-            {receiptFooter}
+          {/* Action buttons */}
+          <div className="flex gap-2 px-4 py-3 border-t border-surface-700 shrink-0 bg-surface-800">
+            <button onClick={onClose}
+              className="flex-1 h-9 rounded-xl bg-surface-700 text-surface-300 hover:bg-surface-600 text-sm font-medium transition-colors">
+              Close
+            </button>
+            <button onClick={handlePrint}
+              className="flex-[2] h-9 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+              style={{ background: 'linear-gradient(135deg, #1e293b, #0f172a)', border: '1px solid #334155' }}>
+              <PrinterIcon className="h-4 w-4" /> Print Receipt
+            </button>
           </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3 px-5 py-4 border-t border-gray-100 shrink-0">
-          <button onClick={onClose}
-            className="flex-1 h-10 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium transition-colors">
-            Close
-          </button>
-          <button onClick={handlePrint}
-            className="flex-1 h-10 rounded-xl bg-gray-900 text-white hover:bg-gray-800 text-sm font-medium flex items-center justify-center gap-2 transition-colors">
-            <PrinterIcon className="h-4 w-4" /> Print
-          </button>
         </div>
       </div>
     </div>
