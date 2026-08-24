@@ -5,7 +5,8 @@ import {
   BuildingOfficeIcon, ArchiveBoxIcon, KeyIcon,
   ArrowDownTrayIcon, ArrowUpTrayIcon, ShieldCheckIcon,
   ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon,
-  ClockIcon, FolderOpenIcon,
+  ClockIcon, FolderOpenIcon, Cog6ToothIcon, DocumentTextIcon,
+  CubeIcon, CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -17,9 +18,10 @@ import client from '@api/client';
 import { cn } from '@utils/cn';
 
 const TABS = [
-  { id: 'company',  label: 'Company',         icon: BuildingOfficeIcon },
-  { id: 'backup',   label: 'Backup & Restore', icon: ArchiveBoxIcon },
-  { id: 'license',  label: 'License & Updates',icon: KeyIcon },
+  { id: 'company',     label: 'Company',          icon: BuildingOfficeIcon },
+  { id: 'preferences', label: 'Preferences',       icon: Cog6ToothIcon },
+  { id: 'backup',      label: 'Backup & Restore',  icon: ArchiveBoxIcon },
+  { id: 'license',     label: 'License & Updates', icon: KeyIcon },
 ];
 
 export default function SettingsPage() {
@@ -50,10 +52,113 @@ export default function SettingsPage() {
         })}
       </div>
 
-      {tab === 'company'  && <CompanyTab />}
-      {tab === 'backup'   && <BackupTab />}
-      {tab === 'license'  && <LicenseTab />}
+      {tab === 'company'     && <CompanyTab />}
+      {tab === 'preferences' && <PreferencesTab />}
+      {tab === 'backup'      && <BackupTab />}
+      {tab === 'license'     && <LicenseTab />}
     </div>
+  );
+}
+
+// ─── Preferences ──────────────────────────────────────────────────────────────
+
+function PreferencesTab() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ['settings'], queryFn: settingsApi.getAll });
+  const company = data?.data?.company     ?? {};
+  const prefs   = data?.data?.preferences ?? {};
+
+  const { register, handleSubmit, reset, formState: { isDirty } } = useForm();
+
+  useEffect(() => {
+    if (data) {
+      reset({
+        low_stock_threshold: prefs.low_stock_threshold?.value ?? company.low_stock_threshold?.value ?? '10',
+        default_tax_rate:    prefs.default_tax_rate?.value    ?? company.default_tax_rate?.value    ?? '0',
+        currency_symbol:     prefs.currency_symbol?.value     ?? company.currency_symbol?.value     ?? '₨',
+        receipt_footer:      prefs.receipt_footer?.value      ?? company.receipt_footer?.value      ?? 'Thank you for shopping with us!',
+      });
+    }
+  }, [data]);
+
+  const saveMutation = useMutation({
+    mutationFn: settingsApi.updateBulk,
+    onSuccess:  () => { toast.success('Preferences saved.'); qc.invalidateQueries({ queryKey: ['settings'] }); },
+    onError:    (err) => toast.error(err.message),
+  });
+
+  if (isLoading) return <div className="h-40 rounded-xl bg-surface-700/40 animate-pulse" />;
+
+  return (
+    <form onSubmit={handleSubmit(v => saveMutation.mutate(v))} className="flex flex-col gap-5 max-w-2xl">
+
+      {/* Inventory */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center gap-3 pb-1 border-b border-surface-700">
+          <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+            <CubeIcon className="h-4 w-4 text-amber-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-surface-200">Inventory</h2>
+            <p className="text-xs text-surface-400">Stock alert and product defaults</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Input label="Low Stock Alert Threshold" type="number" min="0" step="1"
+              {...register('low_stock_threshold')} placeholder="10" />
+            <p className="text-[11px] text-surface-500 mt-1.5">Products below this quantity trigger alerts.</p>
+          </div>
+          <div>
+            <Input label="Default Tax Rate (%)" type="number" min="0" max="100" step="0.1"
+              {...register('default_tax_rate')} placeholder="0" />
+            <p className="text-[11px] text-surface-500 mt-1.5">Pre-filled when creating new products.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Display */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center gap-3 pb-1 border-b border-surface-700">
+          <div className="h-8 w-8 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
+            <CurrencyDollarIcon className="h-4 w-4 text-primary-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-surface-200">Display</h2>
+            <p className="text-xs text-surface-400">Currency and formatting</p>
+          </div>
+        </div>
+        <div className="max-w-xs">
+          <Input label="Currency Symbol" {...register('currency_symbol')} placeholder="₨" />
+          <p className="text-[11px] text-surface-500 mt-1.5">Shown before all monetary values in the app.</p>
+        </div>
+      </div>
+
+      {/* Receipt */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center gap-3 pb-1 border-b border-surface-700">
+          <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
+            <DocumentTextIcon className="h-4 w-4 text-green-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-surface-200">Receipt</h2>
+            <p className="text-xs text-surface-400">Printed receipt customization</p>
+          </div>
+        </div>
+        <div>
+          <Textarea label="Receipt Footer Message" rows={2}
+            {...register('receipt_footer')}
+            placeholder="Thank you for shopping with us!" />
+          <p className="text-[11px] text-surface-500 mt-1.5">Printed at the bottom of every receipt.</p>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button type="submit" loading={saveMutation.isPending} disabled={!isDirty && !saveMutation.isPending}>
+          Save Preferences
+        </Button>
+      </div>
+    </form>
   );
 }
 

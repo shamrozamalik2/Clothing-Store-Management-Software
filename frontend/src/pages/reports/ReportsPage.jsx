@@ -7,14 +7,33 @@ import {
 import {
   ChartBarIcon, ShoppingBagIcon, CubeIcon,
   TruckIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon,
-  UserGroupIcon, ExclamationTriangleIcon,
+  UserGroupIcon, ExclamationTriangleIcon, DocumentArrowDownIcon,
 } from '@heroicons/react/24/outline';
 import { subDays, subMonths, format, parseISO, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
+import toast from 'react-hot-toast';
 
 import { reportsApi } from '@api/reports.api';
 import { formatCurrency, formatNumber } from '@utils/format';
 import { cn } from '@utils/cn';
 import Badge from '@components/common/Badge';
+
+// ─── CSV download helper ──────────────────────────────────────────────────────
+
+function downloadCsv(filename, rows) {
+  const escape = (v) => {
+    const s = String(v ?? '');
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv  = rows.map(r => (Array.isArray(r) ? r : [r]).map(escape).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 // ─── Preset date ranges ───────────────────────────────────────────────────────
 
@@ -57,6 +76,7 @@ export default function ReportsPage() {
   const [preset, setPreset]         = useState('This Month');
   const [from, setFrom]             = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [to, setTo]                 = useState(() => today());
+  const [exporting, setExporting]   = useState(false);
 
   const params = { from, to };
 
@@ -70,6 +90,61 @@ export default function ReportsPage() {
     setPreset('Custom');
     if (field === 'from') setFrom(value);
     else setTo(value);
+  }
+
+  async function handleExportCsv() {
+    setExporting(true);
+    try {
+      const [ovRes, dsRes, tpRes, tcRes, pmRes] = await Promise.all([
+        reportsApi.overview({ from, to }),
+        reportsApi.dailySales({ from, to }),
+        reportsApi.topProducts({ from, to, limit: 30 }),
+        reportsApi.topCustomers({ from, to, limit: 20 }),
+        reportsApi.paymentMethods({ from, to }),
+      ]);
+
+      const ov = ovRes?.data?.sales ?? {};
+      const ds = dsRes?.data ?? [];
+      const tp = tpRes?.data ?? [];
+      const tc = tcRes?.data ?? [];
+      const pm = pmRes?.data ?? [];
+
+      const rows = [
+        ['ProBusinessCloud — Report Export'],
+        ['Generated', new Date().toLocaleString('en-PK')],
+        ['Period', `${from}  →  ${to}`],
+        [],
+        ['=== SALES SUMMARY ==='],
+        ['Metric', 'Value'],
+        ['Revenue',         ov.revenue         ?? 0],
+        ['Total Orders',    ov.sale_count       ?? 0],
+        ['Avg Order Value', ov.avg_order_value  ?? 0],
+        ['Outstanding',     ov.outstanding      ?? 0],
+        [],
+        ['=== DAILY SALES ==='],
+        ['Date', 'Revenue', 'Collected', 'Orders'],
+        ...ds.map(d => [d.day, d.revenue ?? 0, d.collected ?? 0, d.sale_count ?? 0]),
+        [],
+        ['=== TOP PRODUCTS ==='],
+        ['Product', 'SKU', 'Revenue', 'Units Sold'],
+        ...tp.map(p => [p.name, p.sku ?? '', p.revenue ?? 0, p.total_qty ?? 0]),
+        [],
+        ['=== TOP CUSTOMERS ==='],
+        ['Customer', 'Total Revenue', 'Orders'],
+        ...tc.map(c => [c.customer_name ?? 'Walk-in', c.total_revenue ?? 0, c.order_count ?? 0]),
+        [],
+        ['=== PAYMENT METHODS ==='],
+        ['Method', 'Revenue', 'Orders'],
+        ...pm.map(p => [p.payment_method, p.revenue ?? 0, p.sale_count ?? 0]),
+      ];
+
+      downloadCsv(`report-${from}-to-${to}.csv`, rows);
+      toast.success('Report exported successfully.');
+    } catch (err) {
+      toast.error('Export failed: ' + (err.message ?? 'Unknown error'));
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -104,6 +179,18 @@ export default function ReportsPage() {
               min={from}
               className="h-8 px-2 rounded-lg bg-surface-700 border border-surface-600 text-xs text-surface-200 focus:outline-none focus:ring-1 focus:ring-primary-500" />
           </div>
+
+          {/* Export button */}
+          <button
+            onClick={handleExportCsv}
+            disabled={exporting}
+            className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50 shrink-0 hover:opacity-90"
+            style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)' }}
+            title="Export report as CSV"
+          >
+            <DocumentArrowDownIcon className="h-3.5 w-3.5 shrink-0" />
+            {exporting ? 'Exporting…' : 'Export CSV'}
+          </button>
         </div>
       </div>
 
