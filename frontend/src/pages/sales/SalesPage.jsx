@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import {
   ShoppingBagIcon, EyeIcon,
   BanknotesIcon, CreditCardIcon, ArrowsRightLeftIcon,
+  ShoppingCartIcon, CurrencyDollarIcon,
+  CheckCircleIcon, ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 
 import SearchInput from '@components/common/SearchInput';
@@ -48,13 +50,36 @@ export default function SalesPage() {
         <p className="text-sm text-surface-400 mt-0.5">Browse all completed and cancelled sales transactions.</p>
       </div>
 
-      {/* Summary cards */}
+      {/* ── Analytics bar ── */}
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <SummaryCard label="Today's Sales" value={summary.sale_count ?? 0} unit="txns" />
-          <SummaryCard label="Revenue" value={formatCurrency(summary.total_revenue ?? 0)} />
-          <SummaryCard label="Collected" value={formatCurrency(summary.total_paid ?? 0)} highlight="green" />
-          <SummaryCard label="Outstanding" value={formatCurrency(summary.total_due ?? 0)} highlight={summary.total_due > 0 ? 'red' : undefined} />
+          <SummaryCard
+            label="Today's Transactions"
+            value={summary.sale_count ?? 0}
+            unit="sales"
+            icon={ShoppingCartIcon}
+            accent="#818cf8"
+          />
+          <SummaryCard
+            label="Today's Revenue"
+            value={formatCurrency(summary.total_revenue ?? 0)}
+            icon={CurrencyDollarIcon}
+            accent="#34d399"
+          />
+          <SummaryCard
+            label="Total Collected"
+            value={formatCurrency(summary.total_paid ?? 0)}
+            icon={CheckCircleIcon}
+            accent="#60a5fa"
+            highlight="green"
+          />
+          <SummaryCard
+            label="Outstanding"
+            value={formatCurrency(summary.total_due ?? 0)}
+            icon={ExclamationTriangleIcon}
+            accent={summary.total_due > 0 ? '#fbbf24' : '#34d399'}
+            highlight={summary.total_due > 0 ? 'amber' : 'green'}
+          />
         </div>
       )}
 
@@ -159,16 +184,29 @@ export default function SalesPage() {
   );
 }
 
-function SummaryCard({ label, value, unit, highlight }) {
-  const valueClass = highlight === 'green' ? 'text-green-400'
-                   : highlight === 'red'   ? 'text-red-400'
-                   : 'text-surface-100';
+function SummaryCard({ label, value, unit, highlight, icon: Icon, accent = '#6366f1' }) {
+  const valueColor = highlight === 'green' ? '#34d399'
+                   : highlight === 'amber' ? '#fbbf24'
+                   : highlight === 'red'   ? '#f87171'
+                   : '#f8fafc';
   return (
-    <div className="card p-4">
-      <p className="text-xs text-surface-500 mb-1">{label}</p>
-      <p className={`text-lg font-bold ${valueClass}`}>
-        {value}{unit && <span className="text-sm font-normal text-surface-400 ml-1">{unit}</span>}
-      </p>
+    <div
+      className="card p-4 flex items-center gap-3 overflow-hidden transition-transform duration-150 hover:-translate-y-0.5"
+      style={{ borderLeft: `3px solid ${accent}` }}
+    >
+      {Icon && (
+        <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: `${accent}1a` }}>
+          <Icon className="h-4 w-4" style={{ color: accent }} />
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="text-[10px] text-surface-500 font-bold uppercase tracking-widest truncate">{label}</p>
+        <p className="text-lg font-black mt-0.5 leading-none truncate" style={{ color: valueColor }}>
+          {value}
+          {unit && <span className="text-sm font-normal text-surface-500 ml-1">{unit}</span>}
+        </p>
+      </div>
     </div>
   );
 }

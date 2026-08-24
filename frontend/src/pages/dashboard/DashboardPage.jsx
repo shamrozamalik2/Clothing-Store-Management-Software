@@ -1,11 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTip,
 } from 'recharts';
-import { format, startOfMonth } from 'date-fns';
+import { format, startOfMonth, subDays } from 'date-fns';
 import { setPageTitle } from '@store/slices/uiSlice';
 import { selectCurrentUser } from '@store/slices/authSlice';
 import Card from '@components/ui/Card';
@@ -14,7 +14,7 @@ import {
   CurrencyDollarIcon, ShoppingCartIcon, ArchiveBoxIcon,
   ExclamationTriangleIcon, ArrowTrendingUpIcon, ClockIcon,
   ChevronRightIcon, ArrowsRightLeftIcon, ChartPieIcon, PlusIcon,
-  CalendarDaysIcon,
+  CalendarDaysIcon, TrophyIcon, PencilSquareIcon, CheckIcon,
 } from '@heroicons/react/24/outline';
 import { salesApi }    from '@api/sales.api';
 import { productsApi } from '@api/products.api';
@@ -63,25 +63,18 @@ const KPI_THEMES = {
   },
 };
 
-function KpiCard({ label, value, sub, badge, icon: Icon, theme = 'blue', loading }) {
+function KpiCard({ label, value, sub, badge, trend, icon: Icon, theme = 'blue', loading }) {
   const t = KPI_THEMES[theme] || KPI_THEMES.blue;
+  const showTrend = !loading && trend !== null && trend !== undefined && !isNaN(trend);
   return (
     <div
       className="relative overflow-hidden rounded-2xl p-5 transition-transform duration-200 hover:-translate-y-1"
-      style={{
-        background:  t.grad,
-        boxShadow:   `0 8px 28px ${t.glow}`,
-      }}
+      style={{ background: t.grad, boxShadow: `0 8px 28px ${t.glow}` }}
     >
-      {/* Decorative circle */}
-      <div
-        className="absolute -top-6 -right-6 w-28 h-28 rounded-full pointer-events-none"
-        style={{ background: 'rgba(255,255,255,0.08)' }}
-      />
-      <div
-        className="absolute -bottom-8 -right-2 w-20 h-20 rounded-full pointer-events-none"
-        style={{ background: 'rgba(255,255,255,0.05)' }}
-      />
+      <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full pointer-events-none"
+        style={{ background: 'rgba(255,255,255,0.08)' }} />
+      <div className="absolute -bottom-8 -right-2 w-20 h-20 rounded-full pointer-events-none"
+        style={{ background: 'rgba(255,255,255,0.05)' }} />
 
       <div className="relative flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -96,7 +89,7 @@ function KpiCard({ label, value, sub, badge, icon: Icon, theme = 'blue', loading
               {value}
             </p>
           )}
-          {!loading && (sub || badge) && (
+          {!loading && (sub || badge || showTrend) && (
             <div className="flex items-center gap-2 mt-2.5 flex-wrap">
               {sub && (
                 <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>
@@ -104,20 +97,25 @@ function KpiCard({ label, value, sub, badge, icon: Icon, theme = 'blue', loading
                 </span>
               )}
               {badge && (
-                <span
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(255,255,255,0.22)', color: 'rgba(255,255,255,0.95)' }}
-                >
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(255,255,255,0.22)', color: 'rgba(255,255,255,0.95)' }}>
                   {badge}
+                </span>
+              )}
+              {showTrend && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{
+                    background: trend >= 0 ? 'rgba(52,211,153,0.25)' : 'rgba(239,68,68,0.25)',
+                    color:      trend >= 0 ? '#6ee7b7'                : '#fca5a5',
+                  }}>
+                  {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}% vs yesterday
                 </span>
               )}
             </div>
           )}
         </div>
-        <div
-          className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: t.icon }}
-        >
+        <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: t.icon }}>
           <Icon className="h-5 w-5 text-white" />
         </div>
       </div>
@@ -457,6 +455,121 @@ function StockAlerts({ lowStock, loading }) {
   );
 }
 
+// ── Daily Goal Tracker ────────────────────────────────────────────────────────
+
+function GoalTracker({ todaySales, loading }) {
+  const [goal, setGoal] = useState(() => {
+    try { return Number(localStorage.getItem('pbc:daily-goal') || '50000'); }
+    catch { return 50000; }
+  });
+  const [editing, setEditing]   = useState(false);
+  const [draft,   setDraft]     = useState('');
+
+  const pct = goal > 0 ? Math.min(100, Math.round((todaySales / goal) * 100)) : 0;
+  const R = 46;
+  const C = 2 * Math.PI * R;
+  const offset = C * (1 - pct / 100);
+  const achieved = pct >= 100;
+
+  const ringColor = achieved ? '#10b981' : pct >= 60 ? '#3b82f6' : pct >= 30 ? '#f59e0b' : '#ef4444';
+
+  function save() {
+    const val = Number(String(draft).replace(/,/g, ''));
+    if (val > 0) {
+      setGoal(val);
+      try { localStorage.setItem('pbc:daily-goal', String(val)); } catch {}
+    }
+    setEditing(false);
+  }
+
+  return (
+    <Card className="h-full flex flex-col">
+      <Card.Header className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="h-7 w-7 rounded-lg flex items-center justify-center icon-grad-amber shrink-0">
+            <TrophyIcon className="h-3.5 w-3.5" />
+          </div>
+          <div>
+            <Card.Title>Daily Goal</Card.Title>
+            <p className="text-[10px] text-surface-400 mt-0.5">Today's revenue target</p>
+          </div>
+        </div>
+        <button
+          onClick={() => { setDraft(String(goal)); setEditing(e => !e); }}
+          className="h-6 w-6 rounded-md flex items-center justify-center text-surface-400 hover:text-primary-400 hover:bg-primary-500/10 transition-colors"
+        >
+          <PencilSquareIcon className="h-3.5 w-3.5" />
+        </button>
+      </Card.Header>
+
+      <Card.Content className="flex flex-col items-center gap-4 flex-1">
+        {loading ? (
+          <div className="h-[120px] w-[120px] rounded-full skeleton" />
+        ) : (
+          <>
+            {/* Progress ring */}
+            <div className="relative">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                {/* Track */}
+                <circle cx="60" cy="60" r={R} fill="none"
+                  stroke="rgba(99,102,241,0.10)" strokeWidth="12" />
+                {/* Progress */}
+                <circle cx="60" cy="60" r={R} fill="none"
+                  stroke={ringColor} strokeWidth="12"
+                  strokeLinecap="round"
+                  strokeDasharray={C}
+                  strokeDashoffset={offset}
+                  transform="rotate(-90 60 60)"
+                  style={{ transition: 'stroke-dashoffset 1.2s ease-out, stroke 0.4s ease' }}
+                />
+              </svg>
+              {/* Centre label */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <p className="text-2xl font-black leading-none" style={{ color: ringColor }}>{pct}%</p>
+                <p className="text-[9px] text-surface-500 font-bold uppercase tracking-wide mt-0.5">done</p>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="w-full text-center">
+              <p className="text-sm font-black text-surface-100">{formatCurrency(todaySales)}</p>
+              <p className="text-xs text-surface-500 mt-0.5">of {formatCurrency(goal)} target</p>
+              {achieved && (
+                <p className="text-xs font-bold mt-2" style={{ color: '#34d399' }}>🎯 Goal achieved!</p>
+              )}
+              {!achieved && todaySales > 0 && (
+                <p className="text-xs text-surface-500 mt-2">
+                  {formatCurrency(goal - todaySales)} remaining
+                </p>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Inline edit */}
+        {editing && (
+          <div className="w-full flex gap-2">
+            <input
+              type="number"
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+              autoFocus
+              className="flex-1 h-8 px-3 text-xs rounded-lg bg-surface-800 border border-surface-600 text-surface-100 outline-none focus:border-primary-500"
+              placeholder="Set daily target…"
+            />
+            <button onClick={save}
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)' }}>
+              <CheckIcon className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </Card.Content>
+    </Card>
+  );
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -466,6 +579,7 @@ export default function DashboardPage() {
   useEffect(() => { dispatch(setPageTitle('Dashboard')); }, []);
 
   const today      = todayStr();
+  const yesterday  = format(subDays(new Date(), 1), 'yyyy-MM-dd');
   const monthFrom  = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const todayLabel = new Date().toLocaleDateString('en-PK', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -497,6 +611,11 @@ export default function DashboardPage() {
     queryFn:  () => reportsApi.overview({ from: monthFrom, to: today }),
     staleTime: 60_000,
   });
+  const { data: yestRes } = useQuery({
+    queryKey: ['dashboard-yesterday-kpi', yesterday],
+    queryFn:  () => reportsApi.overview({ from: yesterday, to: yesterday }),
+    staleTime: 5 * 60_000,
+  });
 
   const t        = todayRes?.data;
   const dash     = dashRes?.data;
@@ -514,6 +633,19 @@ export default function DashboardPage() {
   const loading      = loadingToday && loadingDash;
   const profitMargin = todaySales > 0 ? Math.round((todayProfit / todaySales) * 100) : 0;
   const avgOrder     = todayOrders > 0 ? (todaySales / todayOrders) : 0;
+
+  const yKpi         = yestRes?.data?.sales ?? {};
+  const yRevenue     = Number(yKpi.revenue    ?? 0);
+  const yOrders      = Number(yKpi.sale_count ?? 0);
+
+  function trendPct(curr, prev) {
+    if (!prev || prev === 0) return null;
+    return Math.round(((curr - prev) / prev) * 100);
+  }
+
+  const revenueTrend = trendPct(todaySales,  yRevenue);
+  const ordersTrend  = trendPct(todayOrders, yOrders);
+  const profitTrend  = trendPct(todayProfit, Number(yKpi.profit ?? 0));
 
   const monthKpi     = monthRes?.data?.sales ?? {};
   const monthRevenue = Number(monthKpi.revenue    ?? 0);
@@ -548,6 +680,7 @@ export default function DashboardPage() {
           value={formatCurrency(todaySales)}
           sub={todayOrders > 0 ? `${todayOrders} orders today` : 'No orders yet'}
           badge={avgOrder > 0 ? `Avg ${formatCurrency(avgOrder)}` : undefined}
+          trend={revenueTrend}
           icon={CurrencyDollarIcon}
           theme="green"
           loading={loading}
@@ -557,6 +690,7 @@ export default function DashboardPage() {
           value={formatCurrency(todayProfit)}
           sub={pendingPay > 0 ? `${formatCurrency(pendingPay)} pending` : 'Fully collected'}
           badge={todaySales > 0 ? `${profitMargin}% margin` : undefined}
+          trend={profitTrend}
           icon={ArrowTrendingUpIcon}
           theme="blue"
           loading={loading}
@@ -565,6 +699,7 @@ export default function DashboardPage() {
           label="Today's Orders"
           value={todayOrders}
           sub={t?.total_paid > 0 ? `${formatCurrency(t.total_paid)} collected` : 'No payments yet'}
+          trend={ordersTrend}
           icon={ShoppingCartIcon}
           theme="violet"
           loading={loadingToday}
@@ -619,12 +754,13 @@ export default function DashboardPage() {
       {/* ── Sales Overview (full width) ── */}
       <SalesOverviewChart />
 
-      {/* ── Row: Top Products + Payment Donut ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* ── Row: Top Products + Payment Donut + Goal Tracker ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-2">
           <TopProductsCard products={topProducts} loading={loadingDash && topProducts.length === 0} />
         </div>
         <PaymentDonut from={today} to={today} />
+        <GoalTracker todaySales={todaySales} loading={loading} />
       </div>
 
       {/* ── Row: Recent Sales + Stock Alerts ── */}

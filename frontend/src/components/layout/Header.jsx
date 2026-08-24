@@ -22,6 +22,8 @@ import { selectCurrentUser, clearCredentials } from '@store/slices/authSlice';
 import { selectTheme, toggleTheme, selectPageTitle } from '@store/slices/uiSlice';
 import { authApi } from '@api/auth.api';
 import { productsApi } from '@api/products.api';
+import { salesApi } from '@api/sales.api';
+import { formatCurrency } from '@utils/format';
 import { cn } from '@utils/cn';
 
 /* ─── Gradient avatar ────────────────────────────────────────────────────── */
@@ -75,8 +77,15 @@ export default function Header() {
     staleTime: 2 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
   });
-  const lowStock   = lowStockRes?.data ?? [];
-  const alertCount = lowStock.length;
+  const { data: pendingRes } = useQuery({
+    queryKey: ['notifications-pending-sales'],
+    queryFn:  () => salesApi.list({ payment_status: 'partial', limit: 5, page: 1 }),
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+  const lowStock    = lowStockRes?.data ?? [];
+  const pendingSales = (pendingRes?.data ?? []).filter(s => Number(s.due_amount) > 0).slice(0, 5);
+  const alertCount  = lowStock.length + pendingSales.length;
 
   return (
     <header
@@ -158,70 +167,127 @@ export default function Header() {
             )}>
               <div className="px-4 py-3 border-b border-surface-700 flex items-center justify-between">
                 <p className="text-sm font-semibold text-surface-100">Notifications</p>
-                {alertCount > 0 && (
-                  <span className="badge badge-warning">
-                    {alertCount} alert{alertCount !== 1 ? 's' : ''}
-                  </span>
+                {alertCount > 0 ? (
+                  <span className="badge badge-warning">{alertCount} alert{alertCount !== 1 ? 's' : ''}</span>
+                ) : (
+                  <span className="badge badge-success">All clear</span>
                 )}
               </div>
 
-              <div className="max-h-72 overflow-y-auto">
-                {lowStock.length === 0 ? (
+              <div className="max-h-80 overflow-y-auto">
+                {alertCount === 0 ? (
                   <div className="flex flex-col items-center justify-center py-10 text-surface-500">
                     <InboxIcon className="h-8 w-8 mb-2 opacity-40" />
-                    <p className="text-xs font-medium">All stock levels are healthy</p>
+                    <p className="text-xs font-semibold">You're all caught up!</p>
+                    <p className="text-[10px] mt-0.5 opacity-60">No pending alerts</p>
                   </div>
                 ) : (
-                  lowStock.slice(0, 10).map(p => (
-                    <Menu.Item key={p.id}>
+                  <>
+                    {/* Pending payments section */}
+                    {pendingSales.length > 0 && (
+                      <>
+                        <div className="px-4 pt-2.5 pb-1">
+                          <p className="text-[10px] font-bold text-surface-500 uppercase tracking-widest">
+                            Pending Payments ({pendingSales.length})
+                          </p>
+                        </div>
+                        {pendingSales.map(s => (
+                          <Menu.Item key={`sale-${s.id}`}>
+                            {({ active }) => (
+                              <button
+                                onClick={() => navigate(`/sales/${s.id}`)}
+                                className={cn(
+                                  'w-full flex items-start gap-3 px-4 py-2.5 text-left transition-colors',
+                                  'border-b border-surface-700/30 last:border-0',
+                                  active ? 'bg-surface-800/50' : ''
+                                )}
+                              >
+                                <span className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-amber-500/10 text-amber-400">
+                                  <UserCircleIcon className="h-3.5 w-3.5" />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-semibold text-surface-100 truncate">
+                                    {s.customer_name || 'Walk-in'} · {s.reference}
+                                  </p>
+                                  <p className="text-[10px] text-amber-400 mt-0.5">
+                                    {formatCurrency(s.due_amount)} outstanding
+                                  </p>
+                                </div>
+                              </button>
+                            )}
+                          </Menu.Item>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Low stock section */}
+                    {lowStock.length > 0 && (
+                      <>
+                        <div className="px-4 pt-2.5 pb-1">
+                          <p className="text-[10px] font-bold text-surface-500 uppercase tracking-widest">
+                            Low Stock ({lowStock.length})
+                          </p>
+                        </div>
+                        {lowStock.slice(0, 8).map(p => (
+                          <Menu.Item key={`stock-${p.id}`}>
+                            {({ active }) => (
+                              <button
+                                onClick={() => navigate('/products')}
+                                className={cn(
+                                  'w-full flex items-start gap-3 px-4 py-2.5 text-left transition-colors',
+                                  'border-b border-surface-700/30 last:border-0',
+                                  active ? 'bg-surface-800/50' : ''
+                                )}
+                              >
+                                <span className={cn(
+                                  'h-7 w-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5',
+                                  p.stock_quantity <= 0
+                                    ? 'bg-red-500/10 text-red-400'
+                                    : 'bg-amber-500/10 text-amber-400'
+                                )}>
+                                  <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-surface-100 truncate">{p.name}</p>
+                                  <p className={cn('text-[10px] mt-0.5',
+                                    p.stock_quantity <= 0 ? 'text-red-400' : 'text-amber-400')}>
+                                    {p.stock_quantity <= 0 ? 'Out of stock' : `Only ${p.stock_quantity} left`}
+                                  </p>
+                                </div>
+                              </button>
+                            )}
+                          </Menu.Item>
+                        ))}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {alertCount > 0 && (
+                <div className="border-t border-surface-700 px-4 py-2.5 flex gap-3">
+                  {pendingSales.length > 0 && (
+                    <Menu.Item>
                       {({ active }) => (
-                        <button
-                          onClick={() => navigate('/products')}
-                          className={cn(
-                            'w-full flex items-start gap-3 px-4 py-3 text-left transition-colors',
-                            'border-b border-surface-700/40 last:border-0',
-                            active ? 'bg-surface-800/50' : ''
-                          )}
-                        >
-                          <span className={cn(
-                            'h-7 w-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5',
-                            p.stock_quantity <= 0
-                              ? 'bg-red-500/10 text-red-500'
-                              : 'bg-amber-500/10 text-amber-500'
-                          )}>
-                            <ExclamationTriangleIcon className="h-3.5 w-3.5" />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-surface-100 truncate">{p.name}</p>
-                            <p className={cn(
-                              'text-xs mt-0.5',
-                              p.stock_quantity <= 0 ? 'text-red-500' : 'text-amber-500'
-                            )}>
-                              {p.stock_quantity <= 0 ? 'Out of stock' : `Only ${p.stock_quantity} left`}
-                            </p>
-                          </div>
+                        <button onClick={() => navigate('/sales')}
+                          className={cn('text-xs font-semibold transition-colors flex-1 text-center',
+                            active ? 'text-amber-300' : 'text-amber-400')}>
+                          View sales →
                         </button>
                       )}
                     </Menu.Item>
-                  ))
-                )}
-              </div>
-
-              {lowStock.length > 0 && (
-                <div className="border-t border-surface-700 px-4 py-2.5">
-                  <Menu.Item>
-                    {({ active }) => (
-                      <button
-                        onClick={() => navigate('/products')}
-                        className={cn(
-                          'w-full text-xs text-center font-medium transition-colors',
-                          active ? 'text-primary-400' : 'text-primary-500'
-                        )}
-                      >
-                        View all products →
-                      </button>
-                    )}
-                  </Menu.Item>
+                  )}
+                  {lowStock.length > 0 && (
+                    <Menu.Item>
+                      {({ active }) => (
+                        <button onClick={() => navigate('/products')}
+                          className={cn('text-xs font-semibold transition-colors flex-1 text-center',
+                            active ? 'text-primary-300' : 'text-primary-400')}>
+                          View products →
+                        </button>
+                      )}
+                    </Menu.Item>
+                  )}
                 </div>
               )}
             </Menu.Items>
