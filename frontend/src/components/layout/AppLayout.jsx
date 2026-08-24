@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import CommandPalette from '@components/ui/CommandPalette';
 import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 
 export default function AppLayout() {
@@ -33,6 +34,7 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'rgb(var(--app-bg))' }}>
+      <CommandPalette />
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0">
         {/* Update notification banner */}

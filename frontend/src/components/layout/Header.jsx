@@ -11,7 +11,9 @@ import {
   ExclamationTriangleIcon,
   InboxIcon,
   UserCircleIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
+import { openCommandPalette } from '@components/ui/CommandPalette';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -85,9 +87,27 @@ export default function Header() {
       }}
     >
       {/* Page title */}
-      <h1 className="text-sm font-semibold text-surface-100 tracking-tight">{pageTitle}</h1>
+      <h1 className="text-sm font-semibold text-surface-100 tracking-tight shrink-0">{pageTitle}</h1>
 
-      <div className="flex items-center gap-1">
+      {/* Command palette trigger (center) */}
+      <button
+        onClick={openCommandPalette}
+        className="hidden sm:flex items-center gap-2.5 h-8 px-3 rounded-lg text-xs font-medium text-surface-400 hover:text-surface-100 transition-all mx-4 flex-1 max-w-[280px]"
+        style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.07)',
+        }}
+        title="Command Palette (Ctrl+K)"
+      >
+        <MagnifyingGlassIcon className="h-3.5 w-3.5 shrink-0" />
+        <span className="flex-1 text-left hidden md:block text-surface-500">Search anything…</span>
+        <div className="hidden lg:flex items-center gap-0.5 shrink-0">
+          <kbd className="text-[10px] text-surface-600 border border-surface-700 rounded px-1 py-0.5 font-mono leading-none">Ctrl</kbd>
+          <kbd className="text-[10px] text-surface-600 border border-surface-700 rounded px-1 py-0.5 font-mono leading-none">K</kbd>
+        </div>
+      </button>
+
+      <div className="flex items-center gap-1 shrink-0">
 
         {/* Theme toggle */}
         <IconBtn onClick={() => dispatch(toggleTheme())} title="Toggle theme">
