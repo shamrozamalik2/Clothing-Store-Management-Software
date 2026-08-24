@@ -24,6 +24,7 @@ export const STORY = [
 export const GROUPS = [
   {
     id: 'sell',
+    short: 'Selling',
     icon: ShoppingCartIcon,
     title: 'Sell faster at the counter',
     lede: 'A point of sale built for a real shop floor — barcode in, receipt out, without hunting through menus.',
@@ -40,6 +41,7 @@ export const GROUPS = [
   },
   {
     id: 'stock',
+    short: 'Inventory',
     icon: CubeIcon,
     title: 'Keep every variant and movement visible',
     lede: 'Apparel lives and dies by variants. Track each size and colour as its own stock line, not a guess.',
@@ -56,6 +58,7 @@ export const GROUPS = [
   },
   {
     id: 'buy',
+    short: 'Purchasing',
     icon: TruckIcon,
     title: 'Buy smarter, and know what you owe',
     lede: 'Purchase orders, receiving and supplier balances in one place, so payables never live in a notebook.',
@@ -70,6 +73,7 @@ export const GROUPS = [
   },
   {
     id: 'customers',
+    short: 'Customers',
     icon: UsersIcon,
     title: 'Build stronger customer relationships',
     lede: 'Know who buys what, who owes you, and who is worth keeping close.',
@@ -84,6 +88,7 @@ export const GROUPS = [
   },
   {
     id: 'money',
+    short: 'Finance',
     icon: BanknotesIcon,
     title: 'Understand revenue, profit and cash',
     lede: 'Dashboard KPIs and reports that answer the questions an owner actually asks.',
@@ -98,6 +103,7 @@ export const GROUPS = [
   },
   {
     id: 'people',
+    short: 'People & payroll',
     icon: IdentificationIcon,
     title: 'Manage people, payroll and attendance',
     lede: 'Staff records, hours and pay handled inside the same system that runs the shop.',
@@ -111,6 +117,7 @@ export const GROUPS = [
   },
   {
     id: 'make',
+    short: 'Manufacturing',
     icon: WrenchScrewdriverIcon,
     title: 'Turn raw materials into finished products',
     lede: 'For businesses that manufacture as well as sell — production tracked against real material consumption.',
@@ -124,6 +131,7 @@ export const GROUPS = [
   },
   {
     id: 'control',
+    short: 'Control',
     icon: ShieldCheckIcon,
     title: 'Control access, backups and operations',
     lede: 'The administrative layer that makes the system safe to hand to a team.',

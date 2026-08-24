@@ -1,5 +1,5 @@
-import FeatureRail from './components/FeatureRail';
-import { SectionHeading } from './components/ui';
+import PlatformHero from './components/PlatformHero';
+import CapabilityExplorer from './components/CapabilityExplorer';
 import { Reveal } from './components/motion';
 import { GROUPS } from './content';
 import { FinalCta } from './HomePage';
@@ -14,35 +14,13 @@ export default function PlatformPage() {
 
   return (
     <>
-      {/* Page header */}
-      <section className="pbc-ink pbc-grain" style={{ position: 'relative', overflow: 'hidden' }}>
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute', top: '-45%', left: '50%', transform: 'translateX(-50%)',
-            width: 'min(900px, 130%)', height: 560,
-            background: 'radial-gradient(ellipse at center, rgba(47,91,245,0.16) 0%, transparent 68%)',
-            pointerEvents: 'none',
-          }}
-        />
-        <div className="pbc-shell" style={{ position: 'relative', paddingTop: 'var(--s10)', paddingBottom: 'var(--s10)' }}>
-          <SectionHeading
-            eyebrow="The platform"
-            tone="ink"
-            max={780}
-            title="Everything the shop needs, in one record."
-            lede="Twenty-four modules and more than two hundred capabilities. Below they are grouped by what you are trying to achieve, rather than listed as a menu."
-          />
-        </div>
-      </section>
+      <PlatformHero groups={GROUPS} />
 
-      {/* Capability groups — alternating rails */}
+      {/* The eight outcome groups. On a wide screen the interface sits still
+          while the copy scrolls past it; below that each group becomes a
+          self-contained card. */}
       <section className="pbc-paper pbc-section">
-        <div className="pbc-shell" style={{ display: 'grid', gap: 'var(--s16)' }}>
-          {GROUPS.map((g, i) => (
-            <FeatureRail key={g.id} group={g} index={i} tone="paper" />
-          ))}
-        </div>
+        <CapabilityExplorer groups={GROUPS} />
       </section>
 
       {/* Honest note about scope */}

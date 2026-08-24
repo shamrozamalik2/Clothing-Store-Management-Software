@@ -480,3 +480,161 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Platform page
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+.pbc-ph-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s6);
+  margin-top: var(--s6);
+}
+
+.pbc-ph-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: var(--s6);
+}
+.pbc-ph-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--on-paper-line);
+  background: var(--white);
+  color: var(--on-paper-mute);
+  text-decoration: none;
+  transition: border-color 0.2s var(--ease), color 0.2s var(--ease), background-color 0.2s var(--ease);
+}
+.pbc-ph-chip:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .pbc-ph-stats { gap: var(--s4); }
+  /* Three counters would wrap to three lines at this width; two-up keeps the
+     claim readable as a single block. */
+  .pbc-ph-stats > * { flex: 1 1 40%; }
+  .pbc-ph-chip { min-height: 40px; }
+}
+
+/* ── Capability explorer ──────────────────────────────────────────────────── */
+.pbc-cx-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: var(--s3);
+}
+.pbc-cx-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r);
+  display: grid;
+  place-items: center;
+  background: var(--accent-wash);
+  border: 1px solid var(--accent-line);
+  flex-shrink: 0;
+}
+.pbc-cx-index {
+  font-size: 0.8125rem;
+  letter-spacing: 0.08em;
+  color: var(--on-paper-soft);
+}
+
+/* Each card holds a 680px-wide mockup that scrolls inside its own box. Without
+   this the grid track would take its floor from that intrinsic width and drag
+   the headings out past the clip with it. */
+.pbc-cx-stack > * { min-width: 0; }
+
+.pbc-cx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4375rem;
+  margin-top: var(--s3);
+}
+.pbc-cx-chip {
+  padding: 0.3125rem 0.6875rem;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--on-paper-line);
+  color: var(--on-paper-mute);
+}
+
+/* The two-column arrangement only exists above the explorer's own breakpoint;
+   the component renders a different tree below it, so there is nothing here
+   to unwind on narrow screens. */
+@media (min-width: 1025px) {
+  .pbc-cx {
+    display: grid;
+    grid-template-columns: 1fr 1.12fr;
+    gap: var(--s8);
+    align-items: start;
+  }
+  .pbc-cx > * { min-width: 0; }
+
+  /* Each panel occupies most of a screen, which is what gives the sticky
+     stage its scroll distance. `justify-content: center` keeps short and long
+     panels optically aligned with the stage beside them. */
+  .pbc-cx-panel {
+    min-height: 72vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: var(--s6) 0;
+  }
+
+  .pbc-cx-stage {
+    position: sticky;
+    /* Clears the sticky site header, then a little air. */
+    top: 104px;
+  }
+
+  .pbc-cx-stage-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    margin-bottom: var(--s2);
+  }
+  .pbc-cx-counter {
+    font-size: 0.8125rem;
+    letter-spacing: 0.08em;
+    color: var(--on-paper);
+    flex-shrink: 0;
+  }
+  .pbc-cx-progress {
+    flex: 1;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--on-paper-line);
+    overflow: hidden;
+  }
+  .pbc-cx-progress-fill {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+
+  /* Reserving the frame height stops the sticky column from jumping as one
+     mockup swaps for another of a different height. */
+  .pbc-cx-frame { position: relative; min-height: 430px; }
+
+  .pbc-cx-caption-slot { min-height: 58px; margin-top: var(--s3); }
+  .pbc-cx-caption {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--r);
+    border: 1px solid var(--on-paper-line);
+    background: var(--white);
+    box-shadow: var(--shadow-sm);
+  }
+}
