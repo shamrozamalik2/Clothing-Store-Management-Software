@@ -153,11 +153,12 @@ function QuickBtn({ to, icon: Icon, label, primary }) {
 const PM_LABEL = { cash: 'Cash', card: 'Card', bank_transfer: 'Bank Transfer', credit: 'Credit', online: 'Online', cheque: 'Cheque' };
 const PM_COLOR = { cash: '#10b981', card: '#3b82f6', bank_transfer: '#8b5cf6', credit: '#f59e0b', online: '#06b6d4', cheque: '#f97316' };
 
-function PaymentDonut({ from, to }) {
+function PaymentDonut() {
   const { data, isLoading } = useQuery({
-    queryKey: ['dash-payment-donut', from, to],
-    queryFn:  () => reportsApi.paymentMethods({ from, to }),
+    queryKey: ['dash-payment-donut-today'],
+    queryFn:  () => reportsApi.paymentMethods({}),   // no params → server uses CURRENT_DATE (UTC)
     staleTime: 60_000,
+    refetchInterval: 60_000,
   });
   const rows      = (data?.data ?? []).filter(r => Number(r.revenue) > 0);
   const total     = rows.reduce((s, r) => s + Number(r.revenue), 0);
@@ -759,7 +760,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-2">
           <TopProductsCard products={topProducts} loading={loadingDash && topProducts.length === 0} />
         </div>
-        <PaymentDonut from={today} to={today} />
+        <PaymentDonut />
         <GoalTracker todaySales={todaySales} loading={loading} />
       </div>
 

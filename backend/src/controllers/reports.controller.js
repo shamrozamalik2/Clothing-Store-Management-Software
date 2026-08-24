@@ -221,7 +221,8 @@ exports.paymentMethods = async (req, res, next) => {
         COALESCE(SUM(total_amount), 0)   AS revenue
       FROM sales
       WHERE company_id=$1 AND status='completed'
-        AND sale_date::date BETWEEN $2 AND $3
+        AND (sale_date::date BETWEEN $2 AND $3
+          OR (sale_date IS NULL AND created_at::date BETWEEN $2 AND $3))
       GROUP BY payment_method
       ORDER BY revenue DESC
     `, [cid, from, to]);
