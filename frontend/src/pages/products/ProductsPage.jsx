@@ -6,16 +6,15 @@ import {
   ArrowUpTrayIcon, LockClosedIcon, Squares2X2Icon, ListBulletIcon,
   ArrowDownTrayIcon, ChevronUpIcon, ChevronDownIcon, ChevronUpDownIcon,
   CurrencyDollarIcon, ExclamationTriangleIcon, ArchiveBoxXMarkIcon, TagIcon,
+  MagnifyingGlassIcon, XMarkIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
 import Badge from '@components/common/Badge';
-import SearchInput from '@components/common/SearchInput';
 import Pagination from '@components/common/Pagination';
 import ConfirmDialog from '@components/common/ConfirmDialog';
 import EmptyState from '@components/common/EmptyState';
-import Select from '@components/common/Select';
 import StockBadge from '@components/common/StockBadge';
 import { usePermission } from '@hooks/usePermission';
 import { categoriesApi } from '@api/categories.api';
@@ -27,68 +26,33 @@ import ImportCsvModal from '@components/common/ImportCsvModal';
 
 const LIMIT = 25;
 
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, sub, icon: Icon, accent = '#6366f1', onClick, active }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'card p-4 flex items-center gap-3 overflow-hidden transition-all duration-150 text-left w-full',
-        onClick ? 'hover:-translate-y-0.5 hover:shadow-lg cursor-pointer' : 'cursor-default',
-        active && 'ring-2 ring-offset-0'
-      )}
-      style={{
-        borderLeft: `3px solid ${accent}`,
-        ...(active ? { '--tw-ring-color': accent } : {}),
-      }}
-    >
-      <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: `${accent}1a` }}>
-        <Icon className="h-5 w-5" style={{ color: accent }} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] text-surface-500 font-bold uppercase tracking-widest truncate">{label}</p>
-        <p className="text-xl font-black mt-0.5 leading-none text-surface-100 truncate">{value}</p>
-        {sub && <p className="text-[10px] text-surface-500 mt-0.5 truncate">{sub}</p>}
-      </div>
-    </button>
-  );
-}
-
 // ─── Sort header ──────────────────────────────────────────────────────────────
 function SortTh({ children, col, sortBy, sortDir, onSort, className = '' }) {
   const active = sortBy === col;
   const Icon = active ? (sortDir === 'asc' ? ChevronUpIcon : ChevronDownIcon) : ChevronUpDownIcon;
   return (
-    <th
-      onClick={() => onSort(col)}
-      className={cn('px-4 py-3 text-surface-400 font-medium cursor-pointer select-none group', className)}
-    >
-      <span className="inline-flex items-center gap-1">
+    <th onClick={() => onSort(col)}
+      className={cn('px-4 py-3.5 text-xs font-semibold text-surface-400 uppercase tracking-wider cursor-pointer select-none group whitespace-nowrap', className)}>
+      <span className="inline-flex items-center gap-1.5">
         {children}
-        <Icon className={cn('h-3.5 w-3.5 transition-opacity', active ? 'opacity-100' : 'opacity-0 group-hover:opacity-50')} />
+        <Icon className={cn('h-3.5 w-3.5 transition-opacity', active ? 'opacity-100 text-primary-400' : 'opacity-0 group-hover:opacity-50')} />
       </span>
     </th>
   );
 }
 
-// ─── Export helper ────────────────────────────────────────────────────────────
-function exportCsv(products) {
-  const escape = (v) => {
-    const s = String(v ?? '');
-    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const headers = ['Name', 'SKU', 'Category', 'Brand', 'Cost Price', 'Sale Price', 'Stock', 'Status', 'Stock Status'];
-  const rows = products.map(p => [
-    p.name, p.sku, p.category_name ?? '', p.brand_name ?? '',
-    p.cost_price, p.sale_price, p.stock_quantity,
-    p.is_active ? 'Active' : 'Inactive', p.stock_status,
-  ]);
-  const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\n');
+// ─── Export CSV helper ────────────────────────────────────────────────────────
+function buildCsv(products) {
+  const esc = (v) => { const s = String(v ?? ''); return (s.includes(',') || s.includes('"') || s.includes('\n')) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const headers = ['Name', 'SKU', 'Category', 'Brand', 'Cost Price', 'Sale Price', 'Margin %', 'Stock', 'Status', 'Stock Status'];
+  const rows = products.map(p => {
+    const margin = (p.cost_price > 0 && p.sale_price > 0) ? Math.round(((p.sale_price - p.cost_price) / p.sale_price) * 100) : '';
+    return [p.name, p.sku, p.category_name ?? '', p.brand_name ?? '', p.cost_price, p.sale_price, margin, p.stock_quantity, p.is_active ? 'Active' : 'Inactive', p.stock_status];
+  });
+  const csv = [headers, ...rows].map(r => r.map(esc).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'products.csv'; a.click();
+  const a = document.createElement('a'); a.href = url; a.download = 'products.csv'; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -148,10 +112,7 @@ export default function ProductsPage() {
       qc.invalidateQueries({ queryKey: ['products-stats'] });
       setDeleteTarget(null);
     },
-    onError: (err) => {
-      toast.error(err.message);
-      setDeleteTarget(null);
-    },
+    onError: (err) => { toast.error(err.message); setDeleteTarget(null); },
   });
 
   async function handleImportCsv(file) {
@@ -164,9 +125,7 @@ export default function ProductsPage() {
     } catch (err) {
       toast.error(err.message || 'Import failed');
       return null;
-    } finally {
-      setImporting(false);
-    }
+    } finally { setImporting(false); }
   }
 
   async function handleBulkDelete() {
@@ -185,166 +144,241 @@ export default function ProductsPage() {
   async function handleExport() {
     try {
       const res = await productsApi.list({ search, category: catFilter, brand: brandFilter, stock_status: stockFilter, status: statusFilter, sort: sortBy, order: sortDir, limit: 10000, page: 1 });
-      exportCsv(res.data ?? []);
+      buildCsv(res.data ?? []);
       toast.success(`Exported ${(res.data ?? []).length} products`);
-    } catch {
-      toast.error('Export failed');
-    }
+    } catch { toast.error('Export failed'); }
   }
 
-  function resetFilters() {
-    setCat(''); setBrand(''); setStock(''); setSearch(''); setStatus(''); setPage(1);
-  }
-
+  function resetFilters() { setCat(''); setBrand(''); setStock(''); setSearch(''); setStatus(''); setPage(1); }
   const hasFilter = !!(catFilter || brandFilter || stockFilter || search || statusFilter);
-
-  // Margin % for grid cards
   const margin = (p) => {
-    const cost = parseFloat(p.cost_price);
-    const sale = parseFloat(p.sale_price);
-    if (!cost || !sale || sale === 0) return null;
-    return Math.round(((sale - cost) / sale) * 100);
+    const c = parseFloat(p.cost_price), s = parseFloat(p.sale_price);
+    if (!c || !s || s === 0) return null;
+    return Math.round(((s - c) / s) * 100);
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* ── Page header ── */}
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-surface-100">Products</h1>
-          <p className="text-sm text-surface-400 mt-0.5">Manage your product catalogue, pricing, and stock levels.</p>
+          <h1 className="text-2xl font-bold text-surface-100 tracking-tight">Products</h1>
+          <p className="text-sm text-surface-400 mt-0.5">
+            {stats ? `${formatNumber(stats.total)} products · ${formatCurrency(stats.inventory_value)} inventory value` : 'Manage your product catalogue'}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" icon={<ArrowDownTrayIcon className="h-4 w-4" />} onClick={handleExport}>
-            Export CSV
-          </Button>
-          {can('products', 'create') && (
-            <Button variant="ghost" icon={<ArrowUpTrayIcon className="h-4 w-4" />} onClick={() => setImportOpen(true)}>
-              Import CSV
-            </Button>
-          )}
-          {can('products', 'create') && (
-            <Button icon={<PlusIcon className="h-4 w-4" />} onClick={() => navigate('/products/new')}>
-              New Product
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* KPI bar */}
-      {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard
-            label="Total Products"
-            value={formatNumber(stats.total)}
-            sub={`${stats.active} active · ${stats.inactive} inactive`}
-            icon={CubeIcon}
-            accent="#6366f1"
-          />
-          <KpiCard
-            label="Inventory Value"
-            value={formatCurrency(stats.inventory_value)}
-            sub={`Cost: ${formatCurrency(stats.inventory_cost)}`}
-            icon={CurrencyDollarIcon}
-            accent="#34d399"
-          />
-          <KpiCard
-            label="Low Stock"
-            value={formatNumber(stats.low_stock)}
-            sub="items running low"
-            icon={ExclamationTriangleIcon}
-            accent="#fbbf24"
-            onClick={stats.low_stock > 0 ? () => { setStock('low_stock'); setPage(1); } : undefined}
-            active={stockFilter === 'low_stock'}
-          />
-          <KpiCard
-            label="Out of Stock"
-            value={formatNumber(stats.out_of_stock)}
-            sub="items depleted"
-            icon={ArchiveBoxXMarkIcon}
-            accent="#f87171"
-            onClick={stats.out_of_stock > 0 ? () => { setStock('out_of_stock'); setPage(1); } : undefined}
-            active={stockFilter === 'out_of_stock'}
-          />
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <SearchInput
-          value={search}
-          onChange={(v) => { setSearch(v); setPage(1); }}
-          placeholder="Search name, SKU, barcode…"
-          className="w-64"
-        />
-        <Select value={catFilter} onChange={e => { setCat(e.target.value); setPage(1); }}
-          placeholder="All Categories" className="w-44 !py-1.5 !text-sm">
-          {categories.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.parent_name ? `${c.parent_name} › ` : ''}{c.name}
-            </option>
-          ))}
-        </Select>
-        <Select value={brandFilter} onChange={e => { setBrand(e.target.value); setPage(1); }}
-          placeholder="All Brands" className="w-36 !py-1.5 !text-sm">
-          {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </Select>
-        <Select value={stockFilter} onChange={e => { setStock(e.target.value); setPage(1); }}
-          placeholder="All Stock" className="w-36 !py-1.5 !text-sm">
-          <option value="in_stock">In Stock</option>
-          <option value="low_stock">Low Stock</option>
-          <option value="out_of_stock">Out of Stock</option>
-        </Select>
-        <Select value={statusFilter} onChange={e => { setStatus(e.target.value); setPage(1); }}
-          placeholder="All Status" className="w-32 !py-1.5 !text-sm">
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </Select>
-        {hasFilter && (
-          <button onClick={resetFilters}
-            className="text-xs text-surface-500 hover:text-surface-200 transition-colors flex items-center gap-1">
-            <FunnelIcon className="h-3.5 w-3.5" /> Clear filters
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={handleExport}
+            className="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium text-surface-300 hover:text-surface-100 border border-surface-700 hover:border-surface-600 transition-all"
+            style={{ background: 'rgba(255,255,255,0.03)' }}>
+            <ArrowDownTrayIcon className="h-4 w-4" /> Export
           </button>
-        )}
-        <span className="text-sm text-surface-500 ml-auto">{pagination?.total ?? 0} product{(pagination?.total ?? 0) !== 1 ? 's' : ''}</span>
-
-        {/* Grid / List toggle */}
-        <div className="flex items-center rounded-lg overflow-hidden border border-surface-700">
-          {[
-            { id: 'list', Icon: ListBulletIcon, title: 'List view' },
-            { id: 'grid', Icon: Squares2X2Icon, title: 'Grid view' },
-          ].map(({ id, Icon, title }) => (
-            <button key={id} onClick={() => setView(id)} title={title}
-              className="h-8 w-8 flex items-center justify-center transition-colors"
-              style={view === id
-                ? { background: 'linear-gradient(135deg, #2563eb, #7c3aed)', color: '#fff' }
-                : { color: '#64748b' }}>
-              <Icon className="h-4 w-4" />
+          {can('products', 'create') && (
+            <button onClick={() => setImportOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium text-surface-300 hover:text-surface-100 border border-surface-700 hover:border-surface-600 transition-all"
+              style={{ background: 'rgba(255,255,255,0.03)' }}>
+              <ArrowUpTrayIcon className="h-4 w-4" /> Import
             </button>
-          ))}
+          )}
+          {can('products', 'create') && (
+            <button onClick={() => navigate('/products/new')}
+              className="flex items-center gap-1.5 h-9 px-4 rounded-lg text-sm font-semibold text-white transition-all active:scale-[0.98]"
+              style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}>
+              <PlusIcon className="h-4 w-4" /> New Product
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Bulk action bar */}
+      {/* ── KPI bar ── */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        {[
+          {
+            label: 'Total Products', accent: '#6366f1',
+            value: stats ? formatNumber(stats.total) : '—',
+            sub: stats ? `${stats.active} active · ${stats.inactive} inactive` : null,
+            icon: CubeIcon, filter: null,
+          },
+          {
+            label: 'Inventory Value', accent: '#10b981',
+            value: stats ? formatCurrency(stats.inventory_value) : '—',
+            sub: stats ? `Cost basis: ${formatCurrency(stats.inventory_cost)}` : null,
+            icon: CurrencyDollarIcon, filter: null,
+          },
+          {
+            label: 'Low Stock', accent: '#f59e0b',
+            value: stats ? formatNumber(stats.low_stock) : '—',
+            sub: 'items running low',
+            icon: ExclamationTriangleIcon,
+            filter: 'low_stock', active: stockFilter === 'low_stock',
+          },
+          {
+            label: 'Out of Stock', accent: '#ef4444',
+            value: stats ? formatNumber(stats.out_of_stock) : '—',
+            sub: 'items depleted',
+            icon: ArchiveBoxXMarkIcon,
+            filter: 'out_of_stock', active: stockFilter === 'out_of_stock',
+          },
+        ].map(({ label, accent, value, sub, icon: Icon, filter, active }) => (
+          <button key={label}
+            onClick={filter ? () => { setStock(s => s === filter ? '' : filter); setPage(1); } : undefined}
+            className={cn(
+              'card p-4 text-left transition-all duration-150 overflow-hidden',
+              filter ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-lg' : 'cursor-default',
+              active && 'ring-2'
+            )}
+            style={{
+              borderTop: `3px solid ${accent}`,
+              ...(active ? { '--tw-ring-color': accent, '--tw-ring-offset-width': '0px' } : {}),
+              boxShadow: active ? `0 0 0 2px ${accent}40` : undefined,
+            }}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="h-9 w-9 rounded-xl flex items-center justify-center"
+                style={{ background: `${accent}15` }}>
+                <Icon className="h-4.5 w-4.5" style={{ color: accent }} />
+              </div>
+              {active && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: `${accent}20`, color: accent }}>
+                  FILTERED
+                </span>
+              )}
+            </div>
+            <p className="text-2xl font-black text-surface-100 leading-none">{value}</p>
+            <p className="text-[11px] text-surface-500 mt-1.5 font-medium">{label}</p>
+            {sub && <p className="text-[10px] text-surface-600 mt-0.5">{sub}</p>}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Filter bar ── */}
+      <div className="card p-3">
+        <div className="flex flex-col gap-3">
+          {/* Row 1: search + view toggle */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400 pointer-events-none" />
+              <input
+                type="text" value={search}
+                onChange={e => { setSearch(e.target.value); setPage(1); }}
+                placeholder="Search by name, SKU, or barcode…"
+                className="w-full h-9 pl-9 pr-8 rounded-lg text-sm text-surface-100 placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                style={{ background: 'rgb(var(--s-800))', border: '1px solid rgb(var(--s-700))' }}
+              />
+              {search && (
+                <button onClick={() => { setSearch(''); setPage(1); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-300 transition-colors">
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* View toggle */}
+            <div className="flex items-center rounded-lg overflow-hidden shrink-0"
+              style={{ border: '1px solid rgb(var(--s-700))' }}>
+              {[
+                { id: 'list', Icon: ListBulletIcon, title: 'List view' },
+                { id: 'grid', Icon: Squares2X2Icon, title: 'Grid view' },
+              ].map(({ id, Icon, title }) => (
+                <button key={id} onClick={() => setView(id)} title={title}
+                  className="h-9 w-9 flex items-center justify-center transition-all"
+                  style={view === id
+                    ? { background: 'linear-gradient(135deg, #2563eb, #7c3aed)', color: '#fff' }
+                    : { color: 'rgb(var(--s-400))', background: 'transparent' }}>
+                  <Icon className="h-4 w-4" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Row 2: dropdowns + count + clear */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {[
+              {
+                value: catFilter, onChange: v => { setCat(v); setPage(1); },
+                placeholder: 'All Categories',
+                options: categories.map(c => ({ value: c.id, label: (c.parent_name ? `${c.parent_name} › ` : '') + c.name })),
+              },
+              {
+                value: brandFilter, onChange: v => { setBrand(v); setPage(1); },
+                placeholder: 'All Brands',
+                options: brands.map(b => ({ value: b.id, label: b.name })),
+              },
+              {
+                value: stockFilter, onChange: v => { setStock(v); setPage(1); },
+                placeholder: 'All Stock',
+                options: [
+                  { value: 'in_stock', label: 'In Stock' },
+                  { value: 'low_stock', label: 'Low Stock' },
+                  { value: 'out_of_stock', label: 'Out of Stock' },
+                ],
+              },
+              {
+                value: statusFilter, onChange: v => { setStatus(v); setPage(1); },
+                placeholder: 'All Status',
+                options: [
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                ],
+              },
+            ].map(({ value, onChange, placeholder, options }) => (
+              <div key={placeholder} className="relative">
+                <select value={value} onChange={e => onChange(e.target.value)}
+                  className="h-8 pl-3 pr-7 rounded-lg text-xs font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                  style={{
+                    background: value ? 'rgba(99,102,241,0.12)' : 'rgb(var(--s-800))',
+                    border: value ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgb(var(--s-700))',
+                    color: value ? '#a5b4fc' : 'rgb(var(--s-300))',
+                  }}>
+                  <option value="">{placeholder}</option>
+                  {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <ChevronDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none"
+                  style={{ color: value ? '#a5b4fc' : 'rgb(var(--s-500))' }} />
+              </div>
+            ))}
+
+            {hasFilter && (
+              <button onClick={resetFilters}
+                className="h-8 px-3 rounded-lg text-xs font-medium text-surface-400 hover:text-surface-200 hover:bg-surface-700 border border-surface-700 transition-all flex items-center gap-1">
+                <XMarkIcon className="h-3.5 w-3.5" /> Clear
+              </button>
+            )}
+
+            <span className="ml-auto text-xs text-surface-500 font-medium">
+              {pagination?.total ?? 0} product{(pagination?.total ?? 0) !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Bulk action bar ── */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-900/30 border border-primary-700/40 rounded-xl">
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
+          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
+          <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+            style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)' }}>
+            {selectedIds.size}
+          </div>
           <span className="text-sm text-primary-300 font-medium">{selectedIds.size} selected</span>
+          <div className="h-4 w-px bg-surface-700 mx-1" />
           <button onClick={handleBulkDelete} disabled={bulkDeleting}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50">
-            <TrashIcon className="h-3.5 w-3.5" /> Delete selected
+            className="flex items-center gap-1.5 px-3 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50">
+            <TrashIcon className="h-3.5 w-3.5" /> Delete
           </button>
-          <button onClick={() => exportCsv(products.filter(p => selectedIds.has(p.id)))}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-surface-400 hover:text-surface-200 hover:bg-surface-700 rounded-md transition-colors">
-            <ArrowDownTrayIcon className="h-3.5 w-3.5" /> Export selected
+          <button onClick={() => buildCsv(products.filter(p => selectedIds.has(p.id)))}
+            className="flex items-center gap-1.5 px-3 py-1 text-xs text-surface-400 hover:text-surface-200 hover:bg-surface-700 rounded-md transition-colors">
+            <ArrowDownTrayIcon className="h-3.5 w-3.5" /> Export
           </button>
-          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-surface-400 hover:text-surface-200 transition-colors">
-            Clear
+          <button onClick={() => setSelectedIds(new Set())}
+            className="ml-auto text-xs text-surface-500 hover:text-surface-300 transition-colors flex items-center gap-1">
+            <XMarkIcon className="h-3.5 w-3.5" /> Clear selection
           </button>
         </div>
       )}
 
-      {/* Product list / grid */}
+      {/* ── Products ── */}
       {isLoading ? (
         view === 'grid' ? <GridSkeleton /> : <div className="card overflow-hidden p-0"><TableSkeleton /></div>
       ) : products.length === 0 ? (
@@ -359,54 +393,48 @@ export default function ProductsPage() {
           />
         </div>
       ) : view === 'grid' ? (
-        /* ── Grid view ── */
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {products.map(p => {
             const m = margin(p);
             return (
               <div key={p.id}
-                className="card p-0 overflow-hidden group hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+                className="card p-0 overflow-hidden group hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
                 onClick={() => can('products', 'edit') && navigate(`/products/${p.id}/edit`)}>
-                {/* Image */}
                 <div className="relative aspect-square bg-surface-800 overflow-hidden">
                   {p.image ? (
                     <img src={`http://localhost:3001${p.image}`} alt={p.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-surface-800 to-surface-900">
                       <CubeIcon className="h-10 w-10 text-surface-600" />
                     </div>
                   )}
-                  {/* Stock badge */}
                   <div className="absolute top-2 left-2">
                     <StockBadge status={p.stock_status} qty={p.stock_quantity} />
                   </div>
-                  {/* Margin badge */}
                   {m !== null && (
-                    <div className="absolute bottom-2 right-2 text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                    <div className="absolute bottom-2 right-2 text-[10px] font-bold px-1.5 py-0.5 rounded-md backdrop-blur-sm"
                       style={{
-                        background: m >= 40 ? 'rgba(52,211,153,0.85)' : m >= 20 ? 'rgba(251,191,36,0.85)' : 'rgba(248,113,113,0.85)',
+                        background: m >= 40 ? 'rgba(16,185,129,0.85)' : m >= 20 ? 'rgba(245,158,11,0.85)' : 'rgba(239,68,68,0.85)',
                         color: '#fff',
                       }}>
                       {m}% margin
                     </div>
                   )}
-                  {/* Actions overlay */}
-                  <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                     {can('products', 'edit') && (
                       <button onClick={e => { e.stopPropagation(); navigate(`/products/${p.id}/edit`); }}
-                        className="h-7 w-7 rounded-lg bg-surface-900/80 backdrop-blur flex items-center justify-center text-surface-300 hover:text-primary-400 transition-colors" title="Edit">
+                        className="h-7 w-7 rounded-lg bg-surface-900/90 backdrop-blur-sm flex items-center justify-center text-surface-300 hover:text-primary-400 transition-colors shadow-lg">
                         <PencilSquareIcon className="h-3.5 w-3.5" />
                       </button>
                     )}
                     {can('products', 'delete') && (
                       <button onClick={e => { e.stopPropagation(); setDeleteTarget(p); }}
-                        className="h-7 w-7 rounded-lg bg-surface-900/80 backdrop-blur flex items-center justify-center text-surface-300 hover:text-red-400 transition-colors" title="Delete">
+                        className="h-7 w-7 rounded-lg bg-surface-900/90 backdrop-blur-sm flex items-center justify-center text-surface-300 hover:text-red-400 transition-colors shadow-lg">
                         <TrashIcon className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
-                  {/* Select checkbox */}
                   <div className="absolute bottom-2 left-2" onClick={e => e.stopPropagation()}>
                     <input type="checkbox"
                       className="h-4 w-4 rounded border-surface-600 bg-surface-700/80 text-primary-600 focus:ring-primary-500 cursor-pointer"
@@ -415,21 +443,19 @@ export default function ProductsPage() {
                     />
                   </div>
                 </div>
-                {/* Info */}
                 <div className="p-3">
                   <p className="text-sm font-semibold text-surface-100 truncate leading-tight">{p.name}</p>
                   <p className="text-[11px] text-surface-500 font-mono mt-0.5 truncate">{p.sku}</p>
                   {p.category_name && (
-                    <span className="inline-flex items-center gap-1 mt-1 text-[10px] text-surface-500 bg-surface-700/60 rounded px-1.5 py-0.5">
-                      <TagIcon className="h-2.5 w-2.5" />{p.category_name}
-                    </span>
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <TagIcon className="h-3 w-3 text-surface-600 shrink-0" />
+                      <span className="text-[10px] text-surface-500 truncate">{p.category_name}</span>
+                    </div>
                   )}
-                  <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-surface-700/50">
                     <div>
-                      <span className="text-sm font-bold text-surface-100">{formatCurrency(p.sale_price)}</span>
-                      {p.cost_price > 0 && (
-                        <span className="text-[10px] text-surface-500 ml-1">/ {formatCurrency(p.cost_price)} cost</span>
-                      )}
+                      <p className="text-sm font-bold text-surface-100">{formatCurrency(p.sale_price)}</p>
+                      {p.cost_price > 0 && <p className="text-[10px] text-surface-500">Cost {formatCurrency(p.cost_price)}</p>}
                     </div>
                     <Badge variant={p.is_active ? 'success' : 'neutral'} dot>
                       {p.is_active ? 'Active' : 'Off'}
@@ -441,32 +467,31 @@ export default function ProductsPage() {
           })}
         </div>
       ) : (
-        /* ── List / Table view ── */
         <div className="card overflow-hidden p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-surface-700 bg-surface-800/50">
-                <th className="w-10 px-4 py-3">
+              <tr className="border-b border-surface-700" style={{ background: 'rgb(var(--s-800))' }}>
+                <th className="w-10 px-4 py-3.5">
                   <input type="checkbox"
                     className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
                     checked={products.length > 0 && selectedIds.size === products.length}
                     onChange={e => setSelectedIds(e.target.checked ? new Set(products.map(p => p.id)) : new Set())}
                   />
                 </th>
-                <SortTh col="name"    sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-left">Product</SortTh>
-                <th className="text-left px-4 py-3 text-surface-400 font-medium hidden md:table-cell">Category / Brand</th>
-                <SortTh col="price"   sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-right hidden sm:table-cell">Price</SortTh>
-                <th className="text-right px-4 py-3 text-surface-400 font-medium hidden lg:table-cell">Margin</th>
-                <SortTh col="stock"   sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-center">Stock</SortTh>
-                <th className="text-center px-4 py-3 text-surface-400 font-medium hidden sm:table-cell">Status</th>
-                <th className="px-4 py-3" />
+                <SortTh col="name"  sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-left">Product</SortTh>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-surface-400 uppercase tracking-wider hidden md:table-cell">Category / Brand</th>
+                <SortTh col="price" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-right hidden sm:table-cell">Price</SortTh>
+                <th className="text-center px-4 py-3.5 text-xs font-semibold text-surface-400 uppercase tracking-wider hidden lg:table-cell">Margin</th>
+                <SortTh col="stock" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-center">Stock</SortTh>
+                <th className="text-center px-4 py-3.5 text-xs font-semibold text-surface-400 uppercase tracking-wider hidden sm:table-cell">Status</th>
+                <th className="px-4 py-3.5 w-20" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-surface-700/50">
+            <tbody className="divide-y divide-surface-700/40">
               {products.map(p => {
                 const m = margin(p);
                 return (
-                  <tr key={p.id} className="hover:bg-surface-800/30 transition-colors">
+                  <tr key={p.id} className="hover:bg-surface-800/40 transition-colors">
                     <td className="px-4 py-3">
                       <input type="checkbox"
                         className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
@@ -476,48 +501,38 @@ export default function ProductsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        {p.image ? (
-                          <img src={`http://localhost:3001${p.image}`} alt={p.name}
-                            className="h-9 w-9 rounded-lg object-cover flex-shrink-0" />
-                        ) : (
-                          <div className="h-9 w-9 rounded-lg bg-surface-700 flex items-center justify-center flex-shrink-0">
-                            <CubeIcon className="h-5 w-5 text-surface-500" />
-                          </div>
-                        )}
+                        <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 bg-surface-700">
+                          {p.image
+                            ? <img src={`http://localhost:3001${p.image}`} alt={p.name} className="h-10 w-10 object-cover" />
+                            : <div className="h-10 w-10 flex items-center justify-center"><CubeIcon className="h-5 w-5 text-surface-500" /></div>
+                          }
+                        </div>
                         <div className="min-w-0">
-                          <p className="font-medium text-surface-100 truncate max-w-[220px]">
+                          <p className="font-semibold text-surface-100 truncate max-w-[200px]">
                             {p.name}
-                            {p.has_transactions && (
-                              <LockClosedIcon className="inline h-3 w-3 ml-1.5 text-surface-500 shrink-0" title="Has transaction history" />
-                            )}
+                            {p.has_transactions && <LockClosedIcon className="inline h-3 w-3 ml-1.5 text-surface-500 shrink-0" title="Has transaction history" />}
                           </p>
-                          <p className="text-xs text-surface-500 font-mono">{p.sku}</p>
+                          <p className="text-xs text-surface-500 font-mono mt-0.5">{p.sku}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       <div className="flex flex-col gap-0.5">
-                        {p.category_name && <span className="text-xs text-surface-400">{p.category_name}</span>}
+                        {p.category_name && <span className="text-xs text-surface-300">{p.category_name}</span>}
                         {p.brand_name    && <span className="text-xs text-surface-500">{p.brand_name}</span>}
-                        {!p.category_name && !p.brand_name && <span className="text-surface-600">—</span>}
+                        {!p.category_name && !p.brand_name && <span className="text-surface-600 text-xs">—</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right hidden sm:table-cell">
-                      <div className="flex flex-col items-end">
-                        <span className="font-medium text-surface-100">{formatCurrency(p.sale_price)}</span>
-                        {p.cost_price > 0 && (
-                          <span className="text-xs text-surface-500">Cost: {formatCurrency(p.cost_price)}</span>
-                        )}
-                      </div>
+                      <p className="font-semibold text-surface-100">{formatCurrency(p.sale_price)}</p>
+                      {p.cost_price > 0 && <p className="text-xs text-surface-500 mt-0.5">Cost {formatCurrency(p.cost_price)}</p>}
                     </td>
-                    <td className="px-4 py-3 text-right hidden lg:table-cell">
+                    <td className="px-4 py-3 text-center hidden lg:table-cell">
                       {m !== null ? (
-                        <span className={cn(
-                          'text-xs font-bold px-2 py-0.5 rounded-full',
-                          m >= 40 ? 'bg-green-500/15 text-green-400'
+                        <span className={cn('text-xs font-bold px-2.5 py-1 rounded-full',
+                          m >= 40 ? 'bg-emerald-500/15 text-emerald-400'
                           : m >= 20 ? 'bg-amber-500/15 text-amber-400'
-                          : 'bg-red-500/15 text-red-400'
-                        )}>
+                          : 'bg-red-500/15 text-red-400')}>
                           {m}%
                         </span>
                       ) : <span className="text-surface-600">—</span>}
@@ -534,13 +549,13 @@ export default function ProductsPage() {
                       <div className="flex items-center justify-end gap-1">
                         {can('products', 'edit') && (
                           <button onClick={() => navigate(`/products/${p.id}/edit`)}
-                            className="p-1.5 rounded-md text-surface-400 hover:text-primary-400 hover:bg-primary-500/10 transition-colors" title="Edit">
+                            className="p-1.5 rounded-lg text-surface-500 hover:text-primary-400 hover:bg-primary-500/10 transition-colors">
                             <PencilSquareIcon className="h-4 w-4" />
                           </button>
                         )}
                         {can('products', 'delete') && (
                           <button onClick={() => setDeleteTarget(p)}
-                            className="p-1.5 rounded-md text-surface-400 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Delete">
+                            className="p-1.5 rounded-lg text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-colors">
                             <TrashIcon className="h-4 w-4" />
                           </button>
                         )}
@@ -564,7 +579,7 @@ export default function ProductsPage() {
         title={`Deactivate "${deleteTarget?.name}"?`}
         description={
           deleteTarget?.has_transactions
-            ? 'This product has sales/purchase history. It will be deactivated and hidden from POS, but all historical records will be fully preserved.'
+            ? 'This product has sales/purchase history. It will be deactivated and hidden from POS, but all historical records will be preserved.'
             : 'This will deactivate the product and hide it from POS. No data will be deleted.'
         }
         variant="danger"
@@ -587,9 +602,7 @@ export default function ProductsPage() {
 function TableSkeleton() {
   return (
     <div className="p-4 space-y-3">
-      {[...Array(8)].map((_, i) => (
-        <div key={i} className="h-14 rounded-lg bg-surface-700/40 animate-pulse" />
-      ))}
+      {[...Array(8)].map((_, i) => <div key={i} className="h-14 rounded-xl bg-surface-700/40 animate-pulse" />)}
     </div>
   );
 }
