@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTip,
 } from 'recharts';
-import { format } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
 import { setPageTitle } from '@store/slices/uiSlice';
 import { selectCurrentUser } from '@store/slices/authSlice';
 import Card from '@components/ui/Card';
@@ -14,6 +14,7 @@ import {
   CurrencyDollarIcon, ShoppingCartIcon, ArchiveBoxIcon,
   ExclamationTriangleIcon, ArrowTrendingUpIcon, ClockIcon,
   ChevronRightIcon, ArrowsRightLeftIcon, ChartPieIcon, PlusIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import { salesApi }    from '@api/sales.api';
 import { productsApi } from '@api/products.api';
@@ -465,6 +466,7 @@ export default function DashboardPage() {
   useEffect(() => { dispatch(setPageTitle('Dashboard')); }, []);
 
   const today      = todayStr();
+  const monthFrom  = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const todayLabel = new Date().toLocaleDateString('en-PK', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
@@ -490,6 +492,11 @@ export default function DashboardPage() {
     queryFn:  () => salesApi.list({ page: 1, limit: 8 }),
     refetchInterval: 60_000,
   });
+  const { data: monthRes, isLoading: loadingMonth } = useQuery({
+    queryKey: ['dashboard-month-kpi', monthFrom, today],
+    queryFn:  () => reportsApi.overview({ from: monthFrom, to: today }),
+    staleTime: 60_000,
+  });
 
   const t        = todayRes?.data;
   const dash     = dashRes?.data;
@@ -507,6 +514,12 @@ export default function DashboardPage() {
   const loading      = loadingToday && loadingDash;
   const profitMargin = todaySales > 0 ? Math.round((todayProfit / todaySales) * 100) : 0;
   const avgOrder     = todayOrders > 0 ? (todaySales / todayOrders) : 0;
+
+  const monthKpi     = monthRes?.data?.sales ?? {};
+  const monthRevenue = Number(monthKpi.revenue    ?? 0);
+  const monthOrders  = Number(monthKpi.sale_count ?? 0);
+  const monthAvg     = monthOrders > 0 ? monthRevenue / monthOrders : 0;
+  const monthName    = new Date().toLocaleDateString('en-US', { month: 'long' });
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -567,6 +580,40 @@ export default function DashboardPage() {
           theme={lowStockCnt > 0 ? 'amber' : 'green'}
           loading={loadingLow && loadingDash}
         />
+      </div>
+
+      {/* ── Month-to-date strip ── */}
+      <div
+        className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4 rounded-2xl"
+        style={{
+          background: 'rgba(99,102,241,0.06)',
+          border: '1px solid rgba(99,102,241,0.14)',
+        }}
+      >
+        <div className="flex items-center gap-2 shrink-0">
+          <CalendarDaysIcon className="h-4 w-4 text-primary-400" />
+          <span className="text-xs font-bold text-surface-300">{monthName} — Month to Date</span>
+        </div>
+        <div className="hidden sm:block w-px h-5 bg-surface-700" />
+        {[
+          { label: 'Revenue',   value: formatCurrency(monthRevenue),         color: '#34d399' },
+          { label: 'Orders',    value: monthOrders.toLocaleString(),          color: '#60a5fa' },
+          { label: 'Avg Order', value: formatCurrency(monthAvg),             color: '#a78bfa' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="flex items-center gap-4">
+            <div>
+              <p className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">{label}</p>
+              {loadingMonth ? (
+                <div className="h-5 w-20 skeleton rounded mt-1" />
+              ) : (
+                <p className="text-sm font-black mt-0.5" style={{ color }}>{value}</p>
+              )}
+            </div>
+          </div>
+        ))}
+        <div className="ml-auto hidden lg:block text-[10px] text-surface-500 font-medium">
+          {monthFrom} → {today}
+        </div>
       </div>
 
       {/* ── Sales Overview (full width) ── */}

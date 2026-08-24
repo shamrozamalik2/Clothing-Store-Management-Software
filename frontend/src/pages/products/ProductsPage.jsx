@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { PlusIcon, PencilSquareIcon, TrashIcon, CubeIcon, FunnelIcon, ArrowUpTrayIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, TrashIcon, CubeIcon, FunnelIcon, ArrowUpTrayIcon, LockClosedIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
@@ -36,6 +36,7 @@ export default function ProductsPage() {
   const [importing, setImporting]       = useState(false);
   const [selectedIds, setSelectedIds]   = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [view,         setView]         = useState('list');
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', { search, page, category_id: catFilter, brand_id: brandFilter, stock_status: stockFilter }],
@@ -151,6 +152,27 @@ export default function ProductsPage() {
           </button>
         )}
         <span className="text-sm text-surface-500 ml-auto">{pagination?.total ?? 0} product{(pagination?.total ?? 0) !== 1 ? 's' : ''}</span>
+
+        {/* Grid / List toggle */}
+        <div className="flex items-center rounded-lg overflow-hidden border border-surface-700">
+          {[
+            { id: 'list', Icon: ListBulletIcon,  title: 'List view' },
+            { id: 'grid', Icon: Squares2X2Icon,  title: 'Grid view' },
+          ].map(({ id, Icon, title }) => (
+            <button
+              key={id}
+              onClick={() => setView(id)}
+              title={title}
+              className="h-8 w-8 flex items-center justify-center transition-colors"
+              style={view === id
+                ? { background: 'linear-gradient(135deg, #2563eb, #7c3aed)', color: '#fff' }
+                : { color: '#64748b' }
+              }
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Bulk action bar */}
@@ -167,11 +189,11 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Table */}
-      <div className="card overflow-hidden p-0">
-        {isLoading ? (
-          <TableSkeleton />
-        ) : products.length === 0 ? (
+      {/* Product list / grid */}
+      {isLoading ? (
+        view === 'grid' ? <GridSkeleton /> : <div className="card overflow-hidden p-0"><TableSkeleton /></div>
+      ) : products.length === 0 ? (
+        <div className="card overflow-hidden p-0">
           <EmptyState
             icon={<CubeIcon className="h-10 w-10" />}
             title="No products found"
@@ -180,7 +202,81 @@ export default function ProductsPage() {
               ? { label: 'New Product', onClick: () => navigate('/products/new') }
               : hasFilter ? { label: 'Clear Filters', onClick: resetFilters } : null}
           />
-        ) : (
+        </div>
+      ) : view === 'grid' ? (
+        /* ── Grid view ── */
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {products.map(p => (
+            <div
+              key={p.id}
+              className="card p-0 overflow-hidden group hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+              onClick={() => can('products', 'edit') && navigate(`/products/${p.id}/edit`)}
+            >
+              {/* Image */}
+              <div className="relative aspect-square bg-surface-800 overflow-hidden">
+                {p.image ? (
+                  <img
+                    src={`http://localhost:3001${p.image}`}
+                    alt={p.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <CubeIcon className="h-10 w-10 text-surface-600" />
+                  </div>
+                )}
+                {/* Stock badge overlay */}
+                <div className="absolute top-2 left-2">
+                  <StockBadge status={p.stock_status} qty={p.stock_quantity} />
+                </div>
+                {/* Action buttons overlay */}
+                <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {can('products', 'edit') && (
+                    <button
+                      onClick={e => { e.stopPropagation(); navigate(`/products/${p.id}/edit`); }}
+                      className="h-7 w-7 rounded-lg bg-surface-900/80 backdrop-blur flex items-center justify-center text-surface-300 hover:text-primary-400 transition-colors"
+                      title="Edit"
+                    >
+                      <PencilSquareIcon className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {can('products', 'delete') && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setDeleteTarget(p); }}
+                      className="h-7 w-7 rounded-lg bg-surface-900/80 backdrop-blur flex items-center justify-center text-surface-300 hover:text-red-400 transition-colors"
+                      title="Delete"
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                {/* Select checkbox */}
+                <div className="absolute bottom-2 left-2" onClick={e => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-surface-600 bg-surface-700/80 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    checked={selectedIds.has(p.id)}
+                    onChange={e => { const n = new Set(selectedIds); e.target.checked ? n.add(p.id) : n.delete(p.id); setSelectedIds(n); }}
+                  />
+                </div>
+              </div>
+              {/* Info */}
+              <div className="p-3">
+                <p className="text-sm font-semibold text-surface-100 truncate leading-tight">{p.name}</p>
+                <p className="text-[11px] text-surface-500 font-mono mt-0.5 truncate">{p.sku}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-sm font-bold text-surface-100">{formatCurrency(p.sale_price)}</span>
+                  <Badge variant={p.is_active ? 'success' : 'neutral'} dot>
+                    {p.is_active ? 'Active' : 'Off'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* ── List / Table view ── */
+        <div className="card overflow-hidden p-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-700 bg-surface-800/50">
@@ -287,8 +383,8 @@ export default function ProductsPage() {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
 
       <Pagination pagination={pagination} onPageChange={setPage} />
 
@@ -325,6 +421,23 @@ function TableSkeleton() {
     <div className="p-4 space-y-3">
       {[...Array(8)].map((_, i) => (
         <div key={i} className="h-14 rounded-lg bg-surface-700/40 animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+function GridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      {[...Array(10)].map((_, i) => (
+        <div key={i} className="card p-0 overflow-hidden">
+          <div className="aspect-square skeleton" />
+          <div className="p-3 space-y-2">
+            <div className="h-4 skeleton rounded w-3/4" />
+            <div className="h-3 skeleton rounded w-1/2" />
+            <div className="h-4 skeleton rounded w-1/3" />
+          </div>
+        </div>
       ))}
     </div>
   );
