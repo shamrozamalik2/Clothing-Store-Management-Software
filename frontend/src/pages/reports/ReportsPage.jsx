@@ -8,11 +8,14 @@ import {
   ChartBarIcon, ShoppingBagIcon, CubeIcon,
   TruckIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon,
   UserGroupIcon, ExclamationTriangleIcon, DocumentArrowDownIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
-import { subDays, subMonths, format, parseISO, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
+import { subDays, subMonths, differenceInDays, format, parseISO, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
 import toast from 'react-hot-toast';
 
 import { reportsApi } from '@api/reports.api';
+import { expensesApi } from '@api/expenses.api';
+import { salesApi } from '@api/sales.api';
 import { formatCurrency, formatNumber } from '@utils/format';
 import { cn } from '@utils/cn';
 import Badge from '@components/common/Badge';
@@ -48,7 +51,7 @@ const PRESETS = [
   { label: 'This Year',   from: () => format(startOfYear(new Date()), 'yyyy-MM-dd'), to: () => today() },
 ];
 
-const TABS = ['Overview', 'Sales', 'Inventory', 'Purchases'];
+const TABS = ['Overview', 'Sales', 'Inventory', 'Purchases', 'P&L', 'Staff', 'FBR/GST'];
 
 const CHART_COLORS = ['#6366f1', '#22d3ee', '#f59e0b', '#10b981', '#f43f5e', '#a78bfa'];
 
@@ -77,8 +80,18 @@ export default function ReportsPage() {
   const [from, setFrom]             = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [to, setTo]                 = useState(() => today());
   const [exporting, setExporting]   = useState(false);
+  const [compareOn, setCompareOn]   = useState(false);
 
   const params = { from, to };
+
+  const compareParams = useMemo(() => {
+    if (!compareOn) return null;
+    const diff = differenceInDays(parseISO(to), parseISO(from));
+    return {
+      from: format(subDays(parseISO(from), diff + 1), 'yyyy-MM-dd'),
+      to:   format(subDays(parseISO(from), 1),         'yyyy-MM-dd'),
+    };
+  }, [compareOn, from, to]);
 
   function applyPreset(p) {
     setPreset(p.label);
@@ -149,42 +162,23 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-surface-100">Reports & Analytics</h1>
-          <p className="text-sm text-surface-400 mt-0.5">Business performance insights across all operations.</p>
-        </div>
-
-        {/* Date range controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          {PRESETS.map(p => (
-            <button key={p.label}
-              onClick={() => applyPreset(p)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
-                preset === p.label
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-surface-700 text-surface-300 hover:bg-surface-600'
-              )}>
-              {p.label}
-            </button>
-          ))}
-          <div className="flex items-center gap-1.5">
-            <input type="date" value={from} onChange={e => handleCustomDate('from', e.target.value)}
-              max={to}
-              className="h-8 px-2 rounded-lg bg-surface-700 border border-surface-600 text-xs text-surface-200 focus:outline-none focus:ring-1 focus:ring-primary-500" />
-            <span className="text-surface-500 text-xs">to</span>
-            <input type="date" value={to} onChange={e => handleCustomDate('to', e.target.value)}
-              min={from}
-              className="h-8 px-2 rounded-lg bg-surface-700 border border-surface-600 text-xs text-surface-200 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-800 via-surface-800 to-surface-900 border border-surface-700/60 p-6">
+        <div className="pointer-events-none absolute -top-10 -left-10 h-40 w-40 rounded-full bg-primary-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-8 right-16 h-32 w-32 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <SparklesIcon className="h-4 w-4 text-primary-400" />
+              <span className="text-xs font-bold uppercase tracking-widest text-primary-400">Analytics</span>
+            </div>
+            <h1 className="text-2xl font-black text-surface-100 tracking-tight">Reports & Analytics</h1>
+            <p className="text-sm text-surface-400 mt-1">Business performance insights across all operations.</p>
           </div>
-
-          {/* Export button */}
           <button
             onClick={handleExportCsv}
             disabled={exporting}
-            className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50 shrink-0 hover:opacity-90"
+            className="flex items-center gap-1.5 h-9 px-4 rounded-xl text-xs font-bold text-white transition-all disabled:opacity-50 shrink-0 hover:opacity-90"
             style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)' }}
             title="Export report as CSV"
           >
@@ -192,6 +186,41 @@ export default function ReportsPage() {
             {exporting ? 'Exporting…' : 'Export CSV'}
           </button>
         </div>
+      </div>
+
+      {/* Date range filter bar */}
+      <div className="rounded-2xl border border-surface-700/50 bg-surface-800/60 p-4 flex flex-wrap items-center gap-2">
+        {PRESETS.map(p => (
+          <button key={p.label}
+            onClick={() => applyPreset(p)}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+              preset === p.label
+                ? 'bg-primary-600 text-white'
+                : 'bg-surface-700 text-surface-300 hover:bg-surface-600'
+            )}>
+            {p.label}
+          </button>
+        ))}
+        <div className="flex items-center gap-1.5 ml-2">
+          <input type="date" value={from} onChange={e => handleCustomDate('from', e.target.value)}
+            max={to}
+            className="h-8 px-2 rounded-lg bg-surface-700 border border-surface-600 text-xs text-surface-200 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+          <span className="text-surface-500 text-xs">to</span>
+          <input type="date" value={to} onChange={e => handleCustomDate('to', e.target.value)}
+            min={from}
+            className="h-8 px-2 rounded-lg bg-surface-700 border border-surface-600 text-xs text-surface-200 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+        </div>
+        <button
+          onClick={() => setCompareOn(o => !o)}
+          className={cn(
+            'ml-auto px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+            compareOn
+              ? 'border-primary-500/60 bg-primary-500/10 text-primary-300'
+              : 'border-surface-600 bg-transparent text-surface-400 hover:border-surface-500 hover:text-surface-300',
+          )}>
+          {compareOn ? '⇄ Comparing prior period' : '⇄ Compare prior period'}
+        </button>
       </div>
 
       {/* Tabs */}
@@ -210,21 +239,37 @@ export default function ReportsPage() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'Overview'   && <OverviewTab   params={params} />}
+      {activeTab === 'Overview'   && <OverviewTab   params={params} compareParams={compareParams} />}
       {activeTab === 'Sales'      && <SalesTab       params={params} />}
       {activeTab === 'Inventory'  && <InventoryTab   />}
       {activeTab === 'Purchases'  && <PurchasesTab   params={params} />}
+      {activeTab === 'P&L'        && <PLTab          params={params} />}
+      {activeTab === 'Staff'      && <StaffTab       params={params} />}
+      {activeTab === 'FBR/GST'    && <FBRTab         params={params} />}
     </div>
   );
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ params }) {
+function pct(cur, prev) {
+  const c = parseFloat(cur) || 0;
+  const p = parseFloat(prev) || 0;
+  if (p === 0) return c > 0 ? Infinity : null;
+  return ((c - p) / p) * 100;
+}
+
+function OverviewTab({ params, compareParams }) {
   const ct = getChartTheme();
   const { data: ov, isLoading: loadingOv } = useQuery({
     queryKey: ['reports-overview', params],
     queryFn:  () => reportsApi.overview(params),
+  });
+
+  const { data: cmpOv } = useQuery({
+    queryKey: ['reports-overview-cmp', compareParams],
+    queryFn:  () => reportsApi.overview(compareParams),
+    enabled:  !!compareParams,
   });
 
   const { data: ds } = useQuery({
@@ -248,6 +293,7 @@ function OverviewTab({ params }) {
   });
 
   const o          = ov?.data;
+  const cmp        = cmpOv?.data;
   const dailyData  = ds?.data ?? [];
   const pmData     = pm?.data ?? [];
   const topProds   = tp?.data ?? [];
@@ -263,10 +309,17 @@ function OverviewTab({ params }) {
   return (
     <div className="flex flex-col gap-6">
       {/* KPI cards */}
+      {compareParams && (
+        <p className="text-xs text-surface-500 -mb-2">
+          <span className="text-surface-300 font-medium">{params.from} → {params.to}</span>
+          <span className="mx-2 text-surface-600">vs prior</span>
+          <span className="text-surface-400">{compareParams.from} → {compareParams.to}</span>
+        </p>
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Revenue" value={formatCurrency(o?.sales?.revenue)} icon={<ArrowTrendingUpIcon className="h-5 w-5" />} color="primary" loading={loadingOv} />
-        <KpiCard label="Gross Profit" value={formatCurrency(o?.gross_profit)} sub={`${(o?.profit_margin ?? 0).toFixed(1)}% margin`} icon={<ChartBarIcon className="h-5 w-5" />} color="green" loading={loadingOv} />
-        <KpiCard label="Orders" value={formatNumber(o?.sales?.sale_count)} sub={`Avg ${formatCurrency(o?.sales?.avg_order_value)}`} icon={<ShoppingBagIcon className="h-5 w-5" />} color="cyan" loading={loadingOv} />
+        <KpiCard label="Revenue" value={formatCurrency(o?.sales?.revenue)} icon={<ArrowTrendingUpIcon className="h-5 w-5" />} color="primary" loading={loadingOv} delta={cmp ? pct(o?.sales?.revenue, cmp?.sales?.revenue) : undefined} />
+        <KpiCard label="Gross Profit" value={formatCurrency(o?.gross_profit)} sub={`${(o?.profit_margin ?? 0).toFixed(1)}% margin`} icon={<ChartBarIcon className="h-5 w-5" />} color="green" loading={loadingOv} delta={cmp ? pct(o?.gross_profit, cmp?.gross_profit) : undefined} />
+        <KpiCard label="Orders" value={formatNumber(o?.sales?.sale_count)} sub={`Avg ${formatCurrency(o?.sales?.avg_order_value)}`} icon={<ShoppingBagIcon className="h-5 w-5" />} color="cyan" loading={loadingOv} delta={cmp ? pct(o?.sales?.sale_count, cmp?.sales?.sale_count) : undefined} />
         <KpiCard label="Outstanding" value={formatCurrency(o?.sales?.outstanding)} icon={<ExclamationTriangleIcon className="h-5 w-5" />} color={o?.sales?.outstanding > 0 ? 'red' : 'neutral'} loading={loadingOv} />
       </div>
 
@@ -746,8 +799,10 @@ const COLOR_MAP = {
   neutral: { bg: 'bg-surface-700',    text: 'text-surface-200', icon: 'text-surface-400' },
 };
 
-function KpiCard({ label, value, sub, icon, color = 'neutral', loading, unit }) {
+function KpiCard({ label, value, sub, icon, color = 'neutral', loading, unit, delta }) {
   const c = COLOR_MAP[color] ?? COLOR_MAP.neutral;
+  const deltaNum = delta !== null && delta !== undefined ? parseFloat(delta) : null;
+  const deltaUp  = deltaNum !== null && deltaNum >= 0;
   return (
     <div className="card p-4 flex items-start gap-3">
       {icon && (
@@ -755,7 +810,7 @@ function KpiCard({ label, value, sub, icon, color = 'neutral', loading, unit }) 
           <span className={c.icon}>{icon}</span>
         </div>
       )}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-xs text-surface-500 mb-0.5">{label}</p>
         {loading ? (
           <div className="h-6 w-24 bg-surface-700 rounded animate-pulse" />
@@ -765,7 +820,17 @@ function KpiCard({ label, value, sub, icon, color = 'neutral', loading, unit }) 
             {unit && <span className="text-sm font-normal text-surface-400 ml-1">{unit}</span>}
           </p>
         )}
-        {sub && !loading && <p className="text-2xs text-surface-500 mt-0.5">{sub}</p>}
+        <div className="flex items-center gap-2 mt-0.5">
+          {sub && !loading && <p className="text-2xs text-surface-500">{sub}</p>}
+          {!loading && deltaNum !== null && !isNaN(deltaNum) && isFinite(deltaNum) && (
+            <span className={cn(
+              'inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full',
+              deltaUp ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400',
+            )}>
+              {deltaUp ? '▲' : '▼'} {Math.abs(deltaNum).toFixed(1)}%
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -810,6 +875,314 @@ function TopList({ title, icon, rows, labelKey, valueKey, subKey, subSuffix }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ─── P&L Tab ──────────────────────────────────────────────────────────────────
+
+function PLTab({ params }) {
+  const { data: ovRes, isLoading: loadOv } = useQuery({
+    queryKey: ['reports-overview', params],
+    queryFn:  () => reportsApi.overview(params),
+  });
+  const { data: exRes, isLoading: loadEx } = useQuery({
+    queryKey: ['reports-expenses-pl', params],
+    queryFn:  () => expensesApi.list({ from: params.from, to: params.to, limit: 1000 }),
+  });
+  const { data: pvRes } = useQuery({
+    queryKey: ['reports-stock-val'],
+    queryFn:  () => reportsApi.stockValuation(),
+  });
+
+  const sales    = ovRes?.data?.sales ?? {};
+  const expenses = exRes?.data ?? [];
+  const stockVal = pvRes?.data;
+
+  const revenue    = parseFloat(sales.revenue)         || 0;
+  const collected  = parseFloat(sales.collected)        || 0;
+  const totalExp   = expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const grossProfit = revenue - (parseFloat(stockVal?.total_cost) || 0);
+  const netProfit  = revenue - totalExp;
+  const grossMargin = revenue > 0 ? ((grossProfit / revenue) * 100) : 0;
+  const netMargin   = revenue > 0 ? ((netProfit  / revenue) * 100) : 0;
+
+  const expByCat = expenses.reduce((acc, e) => {
+    const cat = e.category_name || 'Uncategorised';
+    acc[cat] = (acc[cat] || 0) + parseFloat(e.amount || 0);
+    return acc;
+  }, {});
+  const expRows = Object.entries(expByCat).sort((a, b) => b[1] - a[1]);
+
+  const loading = loadOv || loadEx;
+
+  const PnlRow = ({ label, value, bold, accent, indent }) => (
+    <div className={cn(
+      'flex items-center justify-between py-2.5 border-b border-surface-700/30 last:border-0',
+      bold && 'font-bold',
+      indent && 'pl-4',
+    )}>
+      <span className={cn('text-sm', bold ? 'text-surface-100' : 'text-surface-400', indent && 'text-xs')}>{label}</span>
+      <span className={cn('text-sm tabular-nums font-semibold', accent || (bold ? 'text-surface-100' : 'text-surface-300'))}>
+        {loading ? '…' : formatCurrency(value)}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Revenue',      value: formatCurrency(revenue),    color: 'text-green-400' },
+          { label: 'Total Expenses', value: formatCurrency(totalExp), color: 'text-red-400'  },
+          { label: 'Net Profit',   value: formatCurrency(netProfit),  color: netProfit >= 0 ? 'text-green-400' : 'text-red-400' },
+          { label: 'Net Margin',   value: `${netMargin.toFixed(1)}%`,  color: netMargin >= 0 ? 'text-primary-400' : 'text-red-400' },
+        ].map(k => (
+          <div key={k.label} className="card p-5 flex flex-col gap-1">
+            <p className="text-xs text-surface-500 uppercase tracking-wider">{k.label}</p>
+            <p className={cn('text-2xl font-black', k.color)}>{loading ? '—' : k.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold text-surface-200 mb-4">Profit & Loss Statement</h2>
+          <div className="divide-y divide-surface-700/30">
+            <PnlRow label="Revenue (Sales)"       value={revenue}    bold accent="text-green-400" />
+            <PnlRow label="Cost of Goods (Stock)" value={parseFloat(stockVal?.total_cost) || 0} indent />
+            <PnlRow label="Gross Profit"           value={grossProfit} bold accent={grossProfit >= 0 ? 'text-emerald-400' : 'text-red-400'} />
+            <PnlRow label="Total Expenses"         value={totalExp}   indent />
+            <PnlRow label="Net Profit / (Loss)"    value={netProfit}  bold accent={netProfit >= 0 ? 'text-green-400' : 'text-red-400'} />
+          </div>
+          <div className="mt-4 flex gap-4 text-xs text-surface-500 border-t border-surface-700/30 pt-3">
+            <span>Gross margin: <strong className="text-surface-300">{grossMargin.toFixed(1)}%</strong></span>
+            <span>Net margin: <strong className="text-surface-300">{netMargin.toFixed(1)}%</strong></span>
+          </div>
+        </div>
+
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold text-surface-200 mb-4">Expense Breakdown by Category</h2>
+          {expRows.length === 0 ? (
+            <p className="text-sm text-surface-500 text-center py-6">No expenses in this period.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {expRows.map(([cat, amt]) => (
+                <div key={cat}>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-xs text-surface-300 truncate">{cat}</span>
+                    <span className="text-xs font-semibold text-surface-100 ml-2">{formatCurrency(amt)}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-surface-700">
+                    <div className="h-1.5 rounded-full bg-red-500/70"
+                      style={{ width: `${((amt / (totalExp || 1)) * 100).toFixed(1)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Staff Sales Tab ──────────────────────────────────────────────────────────
+
+function StaffTab({ params }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['reports-staff-sales', params],
+    queryFn:  () => salesApi.list({ from: params.from, to: params.to, limit: 5000 }),
+  });
+
+  const sales = data?.data ?? [];
+
+  const byStaff = sales.reduce((acc, s) => {
+    const name = s.cashier_name || 'Unknown';
+    if (!acc[name]) acc[name] = { name, count: 0, revenue: 0, collected: 0 };
+    acc[name].count++;
+    acc[name].revenue   += parseFloat(s.total_amount || 0);
+    acc[name].collected += parseFloat(s.paid_amount  || 0);
+    return acc;
+  }, {});
+
+  const rows = Object.values(byStaff).sort((a, b) => b.revenue - a.revenue);
+  const maxRev = rows[0]?.revenue || 1;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="card p-5"><p className="text-xs text-surface-500 mb-1">Staff Members</p><p className="text-2xl font-black text-surface-100">{rows.length}</p></div>
+        <div className="card p-5"><p className="text-xs text-surface-500 mb-1">Total Sales</p><p className="text-2xl font-black text-surface-100">{sales.length}</p></div>
+        <div className="card p-5"><p className="text-xs text-surface-500 mb-1">Total Revenue</p><p className="text-2xl font-black text-green-400">{formatCurrency(rows.reduce((s, r) => s + r.revenue, 0))}</p></div>
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="px-5 py-3 border-b border-surface-700/50">
+          <h2 className="text-sm font-semibold text-surface-200">Sales by Cashier / Staff</h2>
+        </div>
+        {isLoading ? (
+          <div className="p-6"><div className="h-32 bg-surface-700/30 rounded animate-pulse" /></div>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-surface-500 text-center py-10">No sales data in this period.</p>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-surface-700/40">
+                {['Staff Member', 'Sales Count', 'Revenue', 'Collected', '% of Total'].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-[11px] font-bold text-surface-500 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.name} className="border-b border-surface-700/20 last:border-0 hover:bg-surface-800/30">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                        style={{ background: `hsl(${i * 47 + 200} 65% 55%)` }}>
+                        {r.name.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="text-sm font-medium text-surface-100">{r.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-surface-300">{r.count}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-surface-100">{formatCurrency(r.revenue)}</td>
+                  <td className="px-4 py-3 text-sm text-surface-300">{formatCurrency(r.collected)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full bg-surface-700 max-w-[80px]">
+                        <div className="h-1.5 rounded-full bg-primary-500"
+                          style={{ width: `${((r.revenue / maxRev) * 100).toFixed(1)}%` }} />
+                      </div>
+                      <span className="text-xs text-surface-400">{((r.revenue / rows.reduce((s, x) => s + x.revenue, 0)) * 100).toFixed(1)}%</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── FBR / GST Tax Tab ────────────────────────────────────────────────────────
+
+function FBRTab({ params }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['reports-fbr-sales', params],
+    queryFn:  () => salesApi.list({ from: params.from, to: params.to, limit: 5000 }),
+  });
+
+  const sales = data?.data ?? [];
+
+  const totalRevenue   = sales.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0);
+  const totalTax       = sales.reduce((s, x) => s + parseFloat(x.tax_amount   || 0), 0);
+  const taxableSales   = sales.filter(x => parseFloat(x.tax_amount || 0) > 0);
+  const exemptSales    = sales.filter(x => !parseFloat(x.tax_amount || 0));
+  const taxableRevenue = taxableSales.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0);
+  const exemptRevenue  = exemptSales.reduce((s, x)  => s + parseFloat(x.total_amount || 0), 0);
+
+  const byMethod = taxableSales.reduce((acc, s) => {
+    const m = (s.payment_method || 'cash').replace('_', ' ');
+    if (!acc[m]) acc[m] = { count: 0, revenue: 0, tax: 0 };
+    acc[m].count++;
+    acc[m].revenue += parseFloat(s.total_amount || 0);
+    acc[m].tax     += parseFloat(s.tax_amount   || 0);
+    return acc;
+  }, {});
+
+  function exportFBR() {
+    const rows = [
+      ['FBR / GST TAX REPORT'],
+      ['Period', `${params.from}  →  ${params.to}`],
+      ['Generated', new Date().toLocaleString('en-PK')],
+      [],
+      ['SUMMARY'],
+      ['Total Revenue (incl. tax)', totalRevenue],
+      ['Total Tax Collected (GST)', totalTax],
+      ['Taxable Sales Count', taxableSales.length],
+      ['Exempt Sales Count', exemptSales.length],
+      ['Taxable Revenue', taxableRevenue],
+      ['Exempt Revenue', exemptRevenue],
+      [],
+      ['TAXABLE TRANSACTIONS'],
+      ['Date', 'Reference', 'Customer', 'Total Amount', 'Tax Amount', 'Payment Method'],
+      ...taxableSales.map(s => [
+        s.sale_date, s.reference, s.customer_name || 'Walk-in',
+        s.total_amount, s.tax_amount, s.payment_method,
+      ]),
+    ];
+    const escape = (v) => { const str = String(v ?? ''); return str.includes(',') ? `"${str}"` : str; };
+    const csv = rows.map(r => r.map(escape).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: `fbr-gst-report-${params.from}-to-${params.to}.csv` });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-surface-400">FBR/GST compliant sales tax summary for filing.</p>
+        <button onClick={exportFBR}
+          className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-bold text-white"
+          style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)' }}>
+          Export FBR CSV
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Revenue',    value: formatCurrency(totalRevenue),   color: 'text-surface-100' },
+          { label: 'Tax Collected',    value: formatCurrency(totalTax),        color: 'text-amber-400'   },
+          { label: 'Taxable Sales',    value: taxableSales.length + ' sales',  color: 'text-surface-100' },
+          { label: 'Exempt Sales',     value: exemptSales.length  + ' sales',  color: 'text-surface-400' },
+        ].map(k => (
+          <div key={k.label} className="card p-5">
+            <p className="text-xs text-surface-500 mb-1">{k.label}</p>
+            <p className={cn('text-xl font-black', k.color)}>{isLoading ? '—' : k.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold text-surface-200 mb-4">Tax Summary</h2>
+          <div className="space-y-3 text-sm">
+            {[
+              ['Taxable Revenue',   taxableRevenue, 'text-surface-100'],
+              ['Tax Collected',     totalTax,        'text-amber-400'  ],
+              ['Exempt Revenue',    exemptRevenue,   'text-surface-400'],
+              ['Net of Tax',        taxableRevenue - totalTax, 'text-surface-100'],
+            ].map(([l, v, c]) => (
+              <div key={l} className="flex justify-between py-2 border-b border-surface-700/30 last:border-0">
+                <span className="text-surface-400">{l}</span>
+                <span className={cn('font-semibold tabular-nums', c)}>{isLoading ? '…' : formatCurrency(v)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold text-surface-200 mb-4">Tax by Payment Method</h2>
+          {isLoading ? <div className="h-24 bg-surface-700/30 rounded animate-pulse" /> : (
+            <div className="space-y-2">
+              {Object.entries(byMethod).map(([method, d]) => (
+                <div key={method} className="flex items-center justify-between py-2 border-b border-surface-700/20 last:border-0">
+                  <span className="text-xs text-surface-300 capitalize">{method}</span>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold text-surface-100">{formatCurrency(d.revenue)}</p>
+                    <p className="text-[10px] text-amber-400">{formatCurrency(d.tax)} tax</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

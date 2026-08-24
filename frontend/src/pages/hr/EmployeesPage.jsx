@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusIcon, PencilSquareIcon, TrashIcon, CalendarDaysIcon, BanknotesIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilSquareIcon, TrashIcon, CalendarDaysIcon, BanknotesIcon, SparklesIcon, UsersIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { employeesApi } from '@api/employees.api';
 import { cn } from '@utils/cn';
@@ -14,9 +14,15 @@ export default function EmployeesPage() {
   const [tab, setTab] = useState('employees'); // employees | salary | attendance
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold text-surface-100">HR & Payroll</h1>
-        <p className="text-sm text-surface-400 mt-0.5">Manage employees, process monthly salary, and track attendance.</p>
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-800 via-surface-800 to-surface-900 border border-surface-700/60 p-6">
+        <div className="pointer-events-none absolute -top-10 -left-10 h-40 w-40 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-8 right-20 h-32 w-32 rounded-full bg-primary-500/10 blur-3xl" />
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-1"><SparklesIcon className="h-4 w-4 text-primary-400" /><span className="text-xs font-bold uppercase tracking-widest text-primary-400">Human Resources</span></div>
+          <h1 className="text-2xl font-black text-surface-100 tracking-tight">HR & Payroll</h1>
+          <p className="text-sm text-surface-400 mt-1">Manage employees, process monthly salary, and track attendance</p>
+        </div>
       </div>
       <div className="flex gap-1 p-1 rounded-xl bg-surface-800 w-fit">
         {[['employees','Employees'],['salary','Salary'],['attendance','Attendance']].map(([k,l]) => (

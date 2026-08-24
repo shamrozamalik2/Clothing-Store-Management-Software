@@ -322,14 +322,17 @@ export default function BarcodePage() {
   return (
     <div className="flex flex-col gap-6">
 
-      {/* ── Page header ── */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-surface-100 flex items-center gap-2">
-            <QrCodeIcon className="h-6 w-6 text-primary-400" />
-            Product Barcode
-          </h1>
-          <p className="text-sm text-surface-400 mt-0.5">Generate, manage, and print product barcodes.</p>
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-800 via-surface-800 to-surface-900 border border-surface-700/60 p-6">
+        <div className="pointer-events-none absolute -top-10 -left-10 h-40 w-40 rounded-full bg-primary-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-8 right-16 h-32 w-32 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-1">
+            <SparklesIcon className="h-4 w-4 text-primary-400" />
+            <span className="text-xs font-bold uppercase tracking-widest text-primary-400">Barcodes</span>
+          </div>
+          <h1 className="text-2xl font-black text-surface-100 tracking-tight">Product Barcodes</h1>
+          <p className="text-sm text-surface-400 mt-1">Generate, manage, and print product barcodes.</p>
         </div>
       </div>
 

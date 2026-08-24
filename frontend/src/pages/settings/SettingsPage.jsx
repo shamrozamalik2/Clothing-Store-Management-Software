@@ -6,7 +6,7 @@ import {
   ArrowDownTrayIcon, ArrowUpTrayIcon, ShieldCheckIcon,
   ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon,
   ClockIcon, FolderOpenIcon, Cog6ToothIcon, DocumentTextIcon,
-  CubeIcon, CurrencyDollarIcon,
+  CubeIcon, CurrencyDollarIcon, SparklesIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -20,6 +20,7 @@ import { cn } from '@utils/cn';
 const TABS = [
   { id: 'company',     label: 'Company',          icon: BuildingOfficeIcon },
   { id: 'preferences', label: 'Preferences',       icon: Cog6ToothIcon },
+  { id: 'receipt',     label: 'Receipt',           icon: DocumentTextIcon },
   { id: 'backup',      label: 'Backup & Restore',  icon: ArchiveBoxIcon },
   { id: 'license',     label: 'License & Updates', icon: KeyIcon },
 ];
@@ -29,9 +30,18 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold text-surface-100">Settings</h1>
-        <p className="text-sm text-surface-400 mt-0.5">Configure your store, manage backups, and license.</p>
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-800 via-surface-800 to-surface-900 border border-surface-700/60 p-6">
+        <div className="pointer-events-none absolute -top-10 -left-10 h-40 w-40 rounded-full bg-primary-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-8 right-16 h-32 w-32 rounded-full bg-slate-500/10 blur-3xl" />
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-1">
+            <SparklesIcon className="h-4 w-4 text-primary-400" />
+            <span className="text-xs font-bold uppercase tracking-widest text-primary-400">Configuration</span>
+          </div>
+          <h1 className="text-2xl font-black text-surface-100 tracking-tight">Settings</h1>
+          <p className="text-sm text-surface-400 mt-1">Configure your store, manage backups, and license.</p>
+        </div>
       </div>
 
       {/* Tab bar */}
@@ -54,6 +64,7 @@ export default function SettingsPage() {
 
       {tab === 'company'     && <CompanyTab />}
       {tab === 'preferences' && <PreferencesTab />}
+      {tab === 'receipt'     && <ReceiptTab />}
       {tab === 'backup'      && <BackupTab />}
       {tab === 'license'     && <LicenseTab />}
     </div>
@@ -1117,6 +1128,195 @@ function MetaRow({ label, value }) {
     <div className="flex items-center justify-between gap-2">
       <span className="text-surface-500">{label}</span>
       <span className="text-surface-200">{value}</span>
+    </div>
+  );
+}
+
+// ─── Receipt Customization ────────────────────────────────────────────────────
+
+function ToggleRow({ label, hint, checked, onChange }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2.5">
+      <div className="flex-1">
+        <p className="text-sm font-medium text-surface-200">{label}</p>
+        {hint && <p className="text-xs text-surface-500 mt-0.5">{hint}</p>}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={cn(
+          'relative w-10 h-5 rounded-full transition-colors shrink-0 mt-0.5 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 focus:ring-offset-surface-900',
+          checked ? 'bg-primary-600' : 'bg-surface-600',
+        )}>
+        <span className={cn(
+          'absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform',
+          checked ? 'translate-x-5' : 'translate-x-0',
+        )} />
+      </button>
+    </div>
+  );
+}
+
+function ReceiptTab() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ['settings'], queryFn: settingsApi.getAll });
+
+  const [paperSize,    setPaperSize]    = useState('80mm');
+  const [showLogo,     setShowLogo]     = useState(true);
+  const [showAddress,  setShowAddress]  = useState(true);
+  const [showPhone,    setShowPhone]    = useState(true);
+  const [showEmail,    setShowEmail]    = useState(false);
+  const [showTax,      setShowTax]      = useState(true);
+  const [showLoyalty,  setShowLoyalty]  = useState(true);
+  const [showBarcode,  setShowBarcode]  = useState(false);
+  const [footer,       setFooter]       = useState('Thank you for shopping with us!');
+  const [returnPolicy, setReturnPolicy] = useState('');
+  const [dirty,        setDirty]        = useState(false);
+
+  const mark = (setter) => (val) => { setter(val); setDirty(true); };
+
+  useEffect(() => {
+    if (!data) return;
+    const rcpt  = data.data?.receipt     ?? {};
+    const prefs = data.data?.preferences ?? {};
+    const b = (key, def) => (rcpt[key]?.value ?? def) !== 'false';
+    setPaperSize(rcpt.receipt_paper_size?.value ?? '80mm');
+    setShowLogo(    b('receipt_show_logo',    'true'));
+    setShowAddress( b('receipt_show_address', 'true'));
+    setShowPhone(   b('receipt_show_phone',   'true'));
+    setShowEmail(   b('receipt_show_email',   'false'));
+    setShowTax(     b('receipt_show_tax',     'true'));
+    setShowLoyalty( b('receipt_show_loyalty', 'true'));
+    setShowBarcode( b('receipt_show_barcode', 'false'));
+    setFooter(prefs.receipt_footer?.value ?? rcpt.receipt_footer?.value ?? 'Thank you for shopping with us!');
+    setReturnPolicy(rcpt.receipt_return_policy?.value ?? '');
+  }, [data]);
+
+  const saveMutation = useMutation({
+    mutationFn: settingsApi.updateBulk,
+    onSuccess:  () => { toast.success('Receipt settings saved.'); setDirty(false); qc.invalidateQueries({ queryKey: ['settings'] }); },
+    onError:    (err) => toast.error(err.message),
+  });
+
+  function handleSave() {
+    saveMutation.mutate({
+      receipt_paper_size:    paperSize,
+      receipt_show_logo:     String(showLogo),
+      receipt_show_address:  String(showAddress),
+      receipt_show_phone:    String(showPhone),
+      receipt_show_email:    String(showEmail),
+      receipt_show_tax:      String(showTax),
+      receipt_show_loyalty:  String(showLoyalty),
+      receipt_show_barcode:  String(showBarcode),
+      receipt_footer:        footer,
+      receipt_return_policy: returnPolicy,
+    });
+  }
+
+  if (isLoading) return <div className="h-40 rounded-xl bg-surface-700/40 animate-pulse" />;
+
+  return (
+    <div className="flex flex-col gap-5 max-w-2xl">
+
+      {/* Paper size */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center gap-3 pb-1 border-b border-surface-700">
+          <div className="h-8 w-8 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
+            <DocumentTextIcon className="h-4 w-4 text-primary-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-surface-200">Paper Size</h2>
+            <p className="text-xs text-surface-400">Receipt printer paper width</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { value: '80mm', label: '80mm Thermal', hint: 'Standard POS receipt' },
+            { value: '58mm', label: '58mm Thermal', hint: 'Narrow mini receipt' },
+            { value: 'A4',   label: 'A4 Laser',     hint: 'Full-page invoice' },
+          ].map(opt => (
+            <button key={opt.value} type="button"
+              onClick={() => { setPaperSize(opt.value); setDirty(true); }}
+              className={cn(
+                'flex flex-col items-start p-3.5 rounded-xl border text-left transition-colors',
+                paperSize === opt.value
+                  ? 'border-primary-500 bg-primary-500/10'
+                  : 'border-surface-600 bg-surface-800/50 hover:border-surface-500',
+              )}>
+              <span className={cn('text-sm font-semibold', paperSize === opt.value ? 'text-primary-300' : 'text-surface-200')}>{opt.label}</span>
+              <span className="text-xs text-surface-500 mt-0.5">{opt.hint}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Header elements */}
+      <div className="card p-6 space-y-1">
+        <div className="flex items-center gap-3 pb-2 mb-1 border-b border-surface-700">
+          <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
+            <BuildingOfficeIcon className="h-4 w-4 text-green-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-surface-200">Header Elements</h2>
+            <p className="text-xs text-surface-400">What to show at the top of each receipt</p>
+          </div>
+        </div>
+        <ToggleRow label="Company Logo"  hint="Print the company logo at the top"  checked={showLogo}    onChange={mark(setShowLogo)} />
+        <ToggleRow label="Address"       hint="Show the store address"              checked={showAddress} onChange={mark(setShowAddress)} />
+        <ToggleRow label="Phone Number"  hint="Show contact phone number"           checked={showPhone}   onChange={mark(setShowPhone)} />
+        <ToggleRow label="Email Address" hint="Show contact email"                  checked={showEmail}   onChange={mark(setShowEmail)} />
+      </div>
+
+      {/* Body elements */}
+      <div className="card p-6 space-y-1">
+        <div className="flex items-center gap-3 pb-2 mb-1 border-b border-surface-700">
+          <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+            <CurrencyDollarIcon className="h-4 w-4 text-amber-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-surface-200">Receipt Body</h2>
+            <p className="text-xs text-surface-400">Line items and totals section options</p>
+          </div>
+        </div>
+        <ToggleRow label="Tax Breakdown"  hint="Show tax amount separately in totals"          checked={showTax}     onChange={mark(setShowTax)} />
+        <ToggleRow label="Loyalty Points" hint="Print earned points and balance at the bottom" checked={showLoyalty} onChange={mark(setShowLoyalty)} />
+        <ToggleRow label="Sale Barcode"   hint="Print a scannable barcode of the invoice number" checked={showBarcode} onChange={mark(setShowBarcode)} />
+      </div>
+
+      {/* Footer text */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center gap-3 pb-1 border-b border-surface-700">
+          <div className="h-8 w-8 rounded-lg bg-surface-700 flex items-center justify-center shrink-0">
+            <SparklesIcon className="h-4 w-4 text-surface-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-surface-200">Footer Content</h2>
+            <p className="text-xs text-surface-400">Text printed at the bottom of every receipt</p>
+          </div>
+        </div>
+        <div>
+          <Textarea label="Thank-You Message" rows={2}
+            value={footer}
+            onChange={e => { setFooter(e.target.value); setDirty(true); }}
+            placeholder="Thank you for shopping with us!" />
+          <p className="text-[11px] text-surface-500 mt-1.5">Printed below the totals on every receipt.</p>
+        </div>
+        <div>
+          <Textarea label="Return Policy" rows={2}
+            value={returnPolicy}
+            onChange={e => { setReturnPolicy(e.target.value); setDirty(true); }}
+            placeholder="Returns accepted within 7 days with receipt." />
+          <p className="text-[11px] text-surface-500 mt-1.5">Leave blank to omit the return policy section.</p>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button onClick={handleSave} loading={saveMutation.isPending} disabled={!dirty && !saveMutation.isPending}>
+          Save Receipt Settings
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,9 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { setPageTitle } from '@store/slices/uiSlice';
-import Card from '@components/ui/Card';
-import { PlusIcon, TrashIcon, PencilIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon, PencilIcon, ArrowUpTrayIcon, SparklesIcon, ArrowDownTrayIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { expensesApi } from '@api/expenses.api';
 import { formatCurrency } from '@utils/format';
@@ -152,7 +149,6 @@ function ExpenseModal({ initial, categories, onClose, onSaved }) {
 }
 
 export default function ExpensesPage() {
-  const dispatch     = useDispatch();
   const queryClient  = useQueryClient();
 
   const [modal,  setModal]  = useState(null); // null | {} | expense object
@@ -166,7 +162,6 @@ export default function ExpensesPage() {
   const [importCatOpen, setImportCatOpen]   = useState(false);
   const [importing, setImporting]           = useState(false);
 
-  useEffect(() => { dispatch(setPageTitle('Expenses')); }, []);
 
   const { data: catRes } = useQuery({
     queryKey: ['expense-categories'],
@@ -231,52 +226,41 @@ export default function ExpensesPage() {
   const total = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-surface-100">Expenses</h2>
-          <p className="text-sm text-surface-500 mt-0.5">Track business expenditures</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setImportCatOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 border border-surface-600 hover:border-surface-500 text-surface-300 hover:text-surface-100 text-sm font-medium rounded-lg transition-colors"
-          >
-            <ArrowUpTrayIcon className="h-4 w-4" /> Import Categories
-          </button>
-          <button
-            onClick={() => setImportExpOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 border border-surface-600 hover:border-surface-500 text-surface-300 hover:text-surface-100 text-sm font-medium rounded-lg transition-colors"
-          >
-            <ArrowUpTrayIcon className="h-4 w-4" /> Import Expenses
-          </button>
-          <button
-            onClick={() => setModal({})}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg"
-          >
-            <PlusIcon className="h-4 w-4" /> Add Expense
-          </button>
+    <div className="flex flex-col gap-6">
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-800 via-surface-800 to-surface-900 border border-surface-700/60 p-6">
+        <div className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-red-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-8 left-20 h-32 w-32 rounded-full bg-primary-500/10 blur-3xl" />
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 mb-1"><SparklesIcon className="h-4 w-4 text-primary-400" /><span className="text-xs font-bold uppercase tracking-widest text-primary-400">Finance</span></div>
+            <h1 className="text-2xl font-black text-surface-100 tracking-tight">Expenses</h1>
+            <p className="text-sm text-surface-400 mt-1">Track and manage business expenditures</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={() => setImportCatOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-surface-300 border border-surface-600 hover:border-primary-500/50 hover:text-primary-300 transition-all"><ArrowUpTrayIcon className="h-4 w-4" /> Import Categories</button>
+            <button onClick={() => setImportExpOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-surface-300 border border-surface-600 hover:border-primary-500/50 hover:text-primary-300 transition-all"><ArrowUpTrayIcon className="h-4 w-4" /> Import Expenses</button>
+            <button onClick={() => setModal({})} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-primary-600 hover:bg-primary-500 shadow-lg shadow-primary-900/40 transition-all"><PlusIcon className="h-4 w-4" /> Add Expense</button>
+          </div>
         </div>
       </div>
 
       {/* Filters */}
-      <Card>
-        <Card.Content className="flex flex-wrap gap-3 items-end">
+      <div className="rounded-2xl border border-surface-700/50 bg-surface-800/60 p-4 flex flex-wrap gap-3 items-end">
           <div>
             <label className="block text-xs text-surface-400 mb-1">From</label>
             <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPage(1); }}
-              className="bg-surface-800 border border-surface-700 text-surface-100 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              className="h-9 rounded-lg border border-surface-600 bg-surface-700/50 text-surface-200 text-sm px-3 outline-none focus:border-primary-500 transition-colors" />
           </div>
           <div>
             <label className="block text-xs text-surface-400 mb-1">To</label>
             <input type="date" value={to} onChange={e => { setTo(e.target.value); setPage(1); }}
-              className="bg-surface-800 border border-surface-700 text-surface-100 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              className="h-9 rounded-lg border border-surface-600 bg-surface-700/50 text-surface-200 text-sm px-3 outline-none focus:border-primary-500 transition-colors" />
           </div>
           <div>
             <label className="block text-xs text-surface-400 mb-1">Category</label>
             <select value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(1); }}
-              className="bg-surface-800 border border-surface-700 text-surface-100 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
+              className={`h-9 rounded-lg border px-3 text-sm outline-none transition-all ${catFilter ? 'border-primary-500/60 bg-primary-900/30 text-primary-300' : 'border-surface-600 bg-surface-700/50 text-surface-300'}`}>
               <option value="">All categories</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -291,8 +275,7 @@ export default function ExpensesPage() {
               <p className="text-lg font-bold text-red-400">{formatCurrency(total)}</p>
             </div>
           )}
-        </Card.Content>
-      </Card>
+      </div>
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
@@ -307,11 +290,11 @@ export default function ExpensesPage() {
       )}
 
       {/* Table */}
-      <Card>
+      <div className="rounded-2xl border border-surface-700/50 bg-surface-800/60 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-surface-800 text-surface-400 text-xs uppercase tracking-wider">
+              <tr className="border-b border-surface-700 bg-surface-800/80 text-surface-400 text-xs uppercase tracking-widest">
                 <th className="px-4 py-3 w-10">
                   <input type="checkbox" className="h-4 w-4 rounded border-surface-600 bg-surface-700 text-primary-600 focus:ring-primary-500 cursor-pointer"
                     checked={expenses.length > 0 && selectedIds.size === expenses.length}
@@ -326,7 +309,7 @@ export default function ExpensesPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-surface-800">
+            <tbody className="divide-y divide-surface-700/40">
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
@@ -392,7 +375,7 @@ export default function ExpensesPage() {
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-surface-800 text-sm text-surface-400">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-surface-700/50 text-sm text-surface-400">
             <span>{pagination.total} expenses</span>
             <div className="flex gap-2">
               <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
@@ -407,7 +390,7 @@ export default function ExpensesPage() {
             </div>
           </div>
         )}
-      </Card>
+      </div>
 
       {modal !== null && (
         <ExpenseModal

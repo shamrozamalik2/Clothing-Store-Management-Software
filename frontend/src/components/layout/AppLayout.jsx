@@ -1,13 +1,21 @@
 import { Suspense, useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import CommandPalette from '@components/ui/CommandPalette';
 import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 
+const PAGE_VARIANTS = {
+  initial: { opacity: 0, y: 6 },
+  enter:   { opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] } },
+  exit:    { opacity: 0, y: -4, transition: { duration: 0.12, ease: 'easeIn' } },
+};
+
 export default function AppLayout() {
   useTokenRefresh();
+  const location = useLocation();
 
   const [updateState, setUpdateState] = useState(null); // null | 'available' | 'downloaded'
   const [updateInfo,  setUpdateInfo]  = useState(null);
@@ -71,11 +79,20 @@ export default function AppLayout() {
 
         <Header />
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="p-6 max-w-[1600px] mx-auto animate-fade-in">
-            <Suspense fallback={<div className="h-40" aria-busy="true" />}>
-              <Outlet />
-            </Suspense>
-          </div>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={location.pathname}
+              className="p-6 max-w-[1600px] mx-auto"
+              variants={PAGE_VARIANTS}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+            >
+              <Suspense fallback={<div className="h-40" aria-busy="true" />}>
+                <Outlet />
+              </Suspense>
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

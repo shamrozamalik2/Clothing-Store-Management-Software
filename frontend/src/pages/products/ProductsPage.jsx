@@ -22,6 +22,9 @@ import { productsApi } from '@api/products.api';
 import { formatCurrency, formatNumber } from '@utils/format';
 import { cn } from '@utils/cn';
 import ImportCsvModal from '@components/common/ImportCsvModal';
+import BulkPriceModal from './BulkPriceModal';
+import QuickEditModal from './QuickEditModal';
+import { toastWithUndo } from '@utils/undoToast.jsx';
 
 const LIMIT = 25;
 
@@ -77,6 +80,12 @@ export default function ProductsPage() {
   const [importing, setImporting]       = useState(false);
   const [selectedIds, setSelectedIds]   = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkPriceOpen, setBulkPriceOpen] = useState(false);
+  const [quickEditProduct, setQuickEditProduct] = useState(null);
+  const [colsOpen, setColsOpen] = useState(false);
+  const [hiddenCols, setHiddenCols] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('products-hidden-cols') ?? '[]')); } catch { return new Set(); }
+  });
   const [view,    setView]    = useState('list');
   const [sortBy,  setSortBy]  = useState('name');
   const [sortDir, setSortDir] = useState('asc');
@@ -86,6 +95,16 @@ export default function ProductsPage() {
     else { setSortBy(col); setSortDir('asc'); }
     setPage(1);
   }
+
+  function toggleCol(col) {
+    setHiddenCols(prev => {
+      const next = new Set(prev);
+      next.has(col) ? next.delete(col) : next.add(col);
+      try { localStorage.setItem('products-hidden-cols', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+  const colVis = (col) => !hiddenCols.has(col);
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', { search, page, catFilter, brandFilter, stockFilter, statusFilter, sortBy, sortDir }],
@@ -106,8 +125,18 @@ export default function ProductsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => productsApi.remove(id),
-    onSuccess: (res) => { toast.success(res.message); qc.invalidateQueries({ queryKey: ['products'] }); qc.invalidateQueries({ queryKey: ['products-stats'] }); setDeleteTarget(null); },
-    onError:   (err) => { toast.error(err.message); setDeleteTarget(null); },
+    onSuccess: (_res, id) => {
+      const name = deleteTarget?.name ?? 'Product';
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['products-stats'] });
+      setDeleteTarget(null);
+      toastWithUndo(`"${name}" deactivated`, async () => {
+        await productsApi.update(id, { is_active: true });
+        qc.invalidateQueries({ queryKey: ['products'] });
+        toast.success(`"${name}" restored.`);
+      });
+    },
+    onError: (err) => { toast.error(err.message); setDeleteTarget(null); },
   });
 
   async function handleImportCsv(file) {
@@ -169,6 +198,13 @@ export default function ProductsPage() {
               style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgb(var(--s-300))' }}>
               <ArrowDownTrayIcon className="h-4 w-4" /> Export
             </button>
+            {can('products', 'update') && (
+              <button onClick={() => setBulkPriceOpen(true)}
+                className="hidden sm:flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-sm font-medium transition-all hover:bg-white/10"
+                style={{ border: '1px solid rgba(99,102,241,0.30)', color: 'rgb(var(--s-300))' }}>
+                <TagIcon className="h-4 w-4" /> Bulk Price
+              </button>
+            )}
             {can('products', 'create') && (
               <button onClick={() => setImportOpen(true)}
                 className="hidden sm:flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-sm font-medium transition-all hover:bg-white/10"
@@ -268,6 +304,40 @@ export default function ProductsPage() {
               </button>
             ))}
           </div>
+
+          {/* Column visibility picker */}
+          {view === 'list' && (
+            <div className="relative shrink-0">
+              <button onClick={() => setColsOpen(o => !o)}
+                className="h-9 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
+                style={{ border: '1px solid rgb(var(--s-700))', background: colsOpen ? 'rgba(99,102,241,0.12)' : 'transparent', color: colsOpen ? '#a5b4fc' : 'rgb(var(--s-400))' }}>
+                <FunnelIcon className="h-3.5 w-3.5" /> Columns
+                {hiddenCols.size > 0 && (
+                  <span className="flex items-center justify-center h-4 w-4 rounded-full bg-primary-600 text-[9px] text-white font-black">{hiddenCols.size}</span>
+                )}
+              </button>
+              {colsOpen && (
+                <div className="absolute right-0 top-full mt-1.5 z-30 rounded-xl shadow-xl border border-surface-700 overflow-hidden"
+                  style={{ background: 'rgb(var(--card))', minWidth: '160px' }}>
+                  {[
+                    { id: 'cat',    label: 'Category / Brand' },
+                    { id: 'price',  label: 'Price' },
+                    { id: 'margin', label: 'Margin' },
+                    { id: 'status', label: 'Status' },
+                  ].map(col => (
+                    <button key={col.id} onClick={() => toggleCol(col.id)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface-700/50 transition-colors text-left">
+                      <span className={cn('h-4 w-4 rounded border flex items-center justify-center shrink-0',
+                        colVis(col.id) ? 'bg-primary-600 border-primary-500' : 'border-surface-500 bg-transparent')}>
+                        {colVis(col.id) && <span className="text-white text-[10px] font-black">✓</span>}
+                      </span>
+                      <span className={colVis(col.id) ? 'text-surface-200' : 'text-surface-500'}>{col.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Row 2: filters */}
@@ -423,11 +493,11 @@ export default function ProductsPage() {
                   />
                 </th>
                 <SortTh col="name"  sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-left">Product</SortTh>
-                <th className="text-left px-4 py-4 text-[11px] font-bold text-surface-400 uppercase tracking-widest hidden md:table-cell">Category / Brand</th>
-                <SortTh col="price" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-right hidden sm:table-cell">Price</SortTh>
-                <th className="text-center px-4 py-4 text-[11px] font-bold text-surface-400 uppercase tracking-widest hidden lg:table-cell">Margin</th>
+                {colVis('cat')    && <th className="text-left px-4 py-4 text-[11px] font-bold text-surface-400 uppercase tracking-widest">Category / Brand</th>}
+                {colVis('price')  && <SortTh col="price" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-right">Price</SortTh>}
+                {colVis('margin') && <th className="text-center px-4 py-4 text-[11px] font-bold text-surface-400 uppercase tracking-widest">Margin</th>}
                 <SortTh col="stock" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-center">Stock</SortTh>
-                <th className="text-center px-4 py-4 text-[11px] font-bold text-surface-400 uppercase tracking-widest hidden sm:table-cell">Status</th>
+                {colVis('status') && <th className="text-center px-4 py-4 text-[11px] font-bold text-surface-400 uppercase tracking-widest">Status</th>}
                 <th className="px-4 py-4 w-20" />
               </tr>
             </thead>
@@ -467,33 +537,41 @@ export default function ProductsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 hidden md:table-cell">
-                      {p.category_name && <p className="text-xs text-surface-300">{p.category_name}</p>}
-                      {p.brand_name    && <p className="text-xs text-surface-500 mt-0.5">{p.brand_name}</p>}
-                      {!p.category_name && !p.brand_name && <span className="text-surface-600 text-xs">—</span>}
-                    </td>
-                    <td className="px-4 py-3.5 text-right hidden sm:table-cell">
-                      <p className="font-bold text-surface-100">{formatCurrency(p.sale_price)}</p>
-                      {p.cost_price > 0 && <p className="text-xs text-surface-500 mt-0.5">Cost {formatCurrency(p.cost_price)}</p>}
-                    </td>
-                    <td className="px-4 py-3.5 text-center hidden lg:table-cell">
-                      {m !== null ? (
-                        <span className={cn('text-xs font-black px-2.5 py-1 rounded-full',
-                          m >= 40 ? 'bg-emerald-500/15 text-emerald-400'
-                          : m >= 20 ? 'bg-amber-500/15 text-amber-400'
-                          : 'bg-red-500/15 text-red-400')}>
-                          {m}%
-                        </span>
-                      ) : <span className="text-surface-600 text-xs">—</span>}
-                    </td>
+                    {colVis('cat') && (
+                      <td className="px-4 py-3.5">
+                        {p.category_name && <p className="text-xs text-surface-300">{p.category_name}</p>}
+                        {p.brand_name    && <p className="text-xs text-surface-500 mt-0.5">{p.brand_name}</p>}
+                        {!p.category_name && !p.brand_name && <span className="text-surface-600 text-xs">—</span>}
+                      </td>
+                    )}
+                    {colVis('price') && (
+                      <td className="px-4 py-3.5 text-right">
+                        <p className="font-bold text-surface-100">{formatCurrency(p.sale_price)}</p>
+                        {p.cost_price > 0 && <p className="text-xs text-surface-500 mt-0.5">Cost {formatCurrency(p.cost_price)}</p>}
+                      </td>
+                    )}
+                    {colVis('margin') && (
+                      <td className="px-4 py-3.5 text-center">
+                        {m !== null ? (
+                          <span className={cn('text-xs font-black px-2.5 py-1 rounded-full',
+                            m >= 40 ? 'bg-emerald-500/15 text-emerald-400'
+                            : m >= 20 ? 'bg-amber-500/15 text-amber-400'
+                            : 'bg-red-500/15 text-red-400')}>
+                            {m}%
+                          </span>
+                        ) : <span className="text-surface-600 text-xs">—</span>}
+                      </td>
+                    )}
                     <td className="px-4 py-3.5 text-center"><StockBadge status={p.stock_status} qty={p.stock_quantity} /></td>
-                    <td className="px-4 py-3.5 text-center hidden sm:table-cell">
-                      <Badge variant={p.is_active ? 'success' : 'neutral'} dot>{p.is_active ? 'Active' : 'Inactive'}</Badge>
-                    </td>
+                    {colVis('status') && (
+                      <td className="px-4 py-3.5 text-center">
+                        <Badge variant={p.is_active ? 'success' : 'neutral'} dot>{p.is_active ? 'Active' : 'Inactive'}</Badge>
+                      </td>
+                    )}
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-end gap-0.5">
                         {can('products', 'edit') && (
-                          <button onClick={() => navigate(`/products/${p.id}/edit`)}
+                          <button onClick={() => setQuickEditProduct(p)} title="Quick edit"
                             className="p-2 rounded-lg text-surface-500 hover:text-primary-400 hover:bg-primary-500/10 transition-colors">
                             <PencilSquareIcon className="h-4 w-4" />
                           </button>
@@ -533,6 +611,25 @@ export default function ProductsPage() {
         columns={['name', 'sku', 'barcode', 'description', 'unit', 'cost_price', 'sale_price', 'wholesale_price', 'tax_rate', 'stock_quantity', 'low_stock_alert', 'track_inventory', 'is_active']}
         templateFilename="products_template.csv" loading={importing}
       />
+
+      {bulkPriceOpen && (
+        <BulkPriceModal
+          onClose={() => setBulkPriceOpen(false)}
+          categories={categories}
+          brands={brands}
+          onDone={() => {
+            qc.invalidateQueries({ queryKey: ['products'] });
+            qc.invalidateQueries({ queryKey: ['products-stats'] });
+          }}
+        />
+      )}
+
+      {quickEditProduct && (
+        <QuickEditModal
+          product={quickEditProduct}
+          onClose={() => setQuickEditProduct(null)}
+        />
+      )}
     </div>
   );
 }

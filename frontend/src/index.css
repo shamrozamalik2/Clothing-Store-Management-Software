@@ -150,17 +150,56 @@ html.dark {
 
 @layer components {
 
-  /* ── Skeleton loader ── */
+  /* ── Skeleton loader — shimmer sweep ── */
   .skeleton {
-    background: rgb(var(--s-700));
-    @apply animate-pulse rounded;
+    background: linear-gradient(
+      90deg,
+      rgb(var(--s-700)) 25%,
+      rgb(var(--s-600)) 50%,
+      rgb(var(--s-700)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+    @apply rounded;
+  }
+  html.light .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--s-800)) 25%,
+      rgb(var(--s-700)) 50%,
+      rgb(var(--s-800)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
   }
 
-  /* ── Card ── */
+  /* ── Card — the core surface component ── */
+  .card {
+    background-color: rgb(var(--card));
+    border: 1px solid rgb(var(--s-700) / 0.7);
+    @apply rounded-2xl;
+    /* Dark mode: inner top-highlight + drop shadow gives depth */
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.05),
+      0 4px 20px rgba(0,0,0,0.28),
+      0 1px 4px rgba(0,0,0,0.18);
+  }
+  html.light .card {
+    border-color: rgba(15,23,42,0.07);
+    box-shadow:
+      0 1px 2px rgba(15,23,42,0.04),
+      0 4px 16px rgba(15,23,42,0.06),
+      0 0 0 1px rgba(15,23,42,0.03);
+  }
+
+  /* ── pbc-card — legacy alias ── */
   .pbc-card {
     background-color: rgb(var(--card));
     border: 1px solid rgb(var(--s-700));
-    @apply rounded-xl shadow-card;
+    @apply rounded-xl;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.04),
+      0 4px 16px rgba(0,0,0,0.22);
   }
   html.light .pbc-card {
     box-shadow: 0 1px 4px 0 rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.05);
@@ -191,8 +230,24 @@ html.dark {
     @apply transition-colors duration-100;
   }
 
+  .data-table tbody tr {
+    position: relative;
+  }
   .data-table tbody tr:hover {
-    background: linear-gradient(90deg, rgba(99,102,241,0.04), rgba(139,92,246,0.04));
+    background: linear-gradient(90deg, rgba(99,102,241,0.06), rgba(139,92,246,0.03));
+  }
+  .data-table tbody tr:hover::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, #6366f1, #8b5cf6);
+    border-radius: 0 1px 1px 0;
+  }
+  html.light .data-table tbody tr:hover {
+    background: linear-gradient(90deg, rgba(79,70,229,0.04), transparent);
   }
 
   .data-table tbody td {
@@ -291,11 +346,46 @@ html.dark {
   html.light .icon-grad-violet { color: #7c3aed; background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(99,102,241,0.08)); }
   html.light .icon-grad-amber  { color: #d97706; background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(249,115,22,0.08)); }
 
-  /* Gradient input focus ring */
-  .pbc-input:focus {
+  /* Gradient input focus ring — applies to all inputs, selects, textareas */
+  .pbc-input:focus,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+  select:focus,
+  textarea:focus {
     border-color: rgba(99,102,241,0.65) !important;
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.14), 0 0 8px rgba(139,92,246,0.10) !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.12), 0 0 10px rgba(139,92,246,0.08) !important;
     outline: none !important;
+  }
+
+  /* ── Modal surface — elevated glass feel ── */
+  .modal-surface {
+    background-color: rgb(var(--card));
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.07),
+      0 8px 40px rgba(0,0,0,0.55),
+      0 2px 8px rgba(0,0,0,0.35);
+    @apply rounded-2xl;
+  }
+  html.light .modal-surface {
+    border-color: rgba(15,23,42,0.08);
+    box-shadow:
+      0 4px 24px rgba(15,23,42,0.12),
+      0 1px 4px rgba(15,23,42,0.06),
+      0 0 0 1px rgba(15,23,42,0.04);
+  }
+
+  /* ── Scrollable data list — for dropdowns and panels ── */
+  .list-surface {
+    background-color: rgb(var(--card));
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow:
+      0 8px 30px rgba(0,0,0,0.45),
+      0 2px 6px rgba(0,0,0,0.25);
+    @apply rounded-xl;
+  }
+  html.light .list-surface {
+    border-color: rgba(15,23,42,0.07);
+    box-shadow: 0 4px 20px rgba(15,23,42,0.10), 0 1px 3px rgba(15,23,42,0.06);
   }
 
   /* Gradient card border accent */

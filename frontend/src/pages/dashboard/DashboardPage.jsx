@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTip,
 } from 'recharts';
@@ -63,13 +64,20 @@ const KPI_THEMES = {
   },
 };
 
+const CARD_ITEM = {
+  hidden: { opacity: 0, y: 18, scale: 0.97 },
+  show:   { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 22, stiffness: 300 } },
+};
+
 function KpiCard({ label, value, sub, badge, trend, icon: Icon, theme = 'blue', loading }) {
   const t = KPI_THEMES[theme] || KPI_THEMES.blue;
   const showTrend = !loading && trend !== null && trend !== undefined && !isNaN(trend);
   return (
-    <div
-      className="relative overflow-hidden rounded-2xl p-5 transition-transform duration-200 hover:-translate-y-1"
-      style={{ background: t.grad, boxShadow: `0 8px 28px ${t.glow}` }}
+    <motion.div
+      variants={CARD_ITEM}
+      whileHover={{ y: -4, boxShadow: `0 16px 40px ${t.glow}` }}
+      className="relative overflow-hidden rounded-2xl p-5 cursor-default"
+      style={{ background: t.grad, boxShadow: `0 8px 28px ${t.glow}`, transition: 'box-shadow 0.2s' }}
     >
       <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full pointer-events-none"
         style={{ background: 'rgba(255,255,255,0.08)' }} />
@@ -119,7 +127,7 @@ function KpiCard({ label, value, sub, badge, trend, icon: Icon, theme = 'blue', 
           <Icon className="h-5 w-5 text-white" />
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -655,7 +663,7 @@ export default function DashboardPage() {
   const monthName    = new Date().toLocaleDateString('en-US', { month: 'long' });
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -675,7 +683,12 @@ export default function DashboardPage() {
       </div>
 
       {/* ── KPI cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <motion.div
+        className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}
+        initial="hidden"
+        animate="show"
+      >
         <KpiCard
           label="Today's Revenue"
           value={formatCurrency(todaySales)}
@@ -716,7 +729,7 @@ export default function DashboardPage() {
           theme={lowStockCnt > 0 ? 'amber' : 'green'}
           loading={loadingLow && loadingDash}
         />
-      </div>
+      </motion.div>
 
       {/* ── Month-to-date strip ── */}
       <div

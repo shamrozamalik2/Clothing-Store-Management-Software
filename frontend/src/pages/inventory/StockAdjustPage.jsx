@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { PlusIcon, EyeIcon, ArchiveBoxIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, EyeIcon, ArchiveBoxIcon, XMarkIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 import Button from '@components/ui/Button';
@@ -46,32 +46,39 @@ export default function StockAdjustPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-surface-100">Stock Adjustments</h1>
-          <p className="text-sm text-surface-400 mt-0.5">Manually adjust stock for damage, loss, returns, or corrections.</p>
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-800 via-surface-800 to-surface-900 border border-surface-700/60 p-6">
+        <div className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-amber-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-8 left-20 h-32 w-32 rounded-full bg-primary-500/10 blur-3xl" />
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 mb-1"><ArchiveBoxIcon className="h-4 w-4 text-primary-400" /><span className="text-xs font-bold uppercase tracking-widest text-primary-400">Inventory</span></div>
+            <h1 className="text-2xl font-black text-surface-100 tracking-tight">Stock Adjustments</h1>
+            <p className="text-sm text-surface-400 mt-1">{pagination?.total ?? 0} adjustment{(pagination?.total ?? 0) !== 1 ? 's' : ''} · manually adjust for damage, loss, or corrections</p>
+          </div>
+          {can('inventory', 'create') && (
+            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-primary-600 hover:bg-primary-500 shadow-lg shadow-primary-900/40 transition-all self-start">
+              <PlusIcon className="h-4 w-4" /> New Adjustment
+            </button>
+          )}
         </div>
-        {can('inventory', 'create') && (
-          <Button icon={<PlusIcon className="h-4 w-4" />} onClick={() => setCreateOpen(true)}>
-            New Adjustment
-          </Button>
-        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="rounded-2xl border border-surface-700/50 bg-surface-800/60 p-4 flex items-center gap-3 flex-wrap">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }}
           placeholder="Search reference…" className="w-64" />
-        <Select value={typeFilter} onChange={e => { setType(e.target.value); setPage(1); }}
-          placeholder="All Types" className="w-36 !py-1.5 !text-sm">
+        <select value={typeFilter} onChange={e => { setType(e.target.value); setPage(1); }}
+          className={`h-9 rounded-lg border px-3 text-sm outline-none transition-all ${typeFilter ? 'border-primary-500/60 bg-primary-900/30 text-primary-300' : 'border-surface-600 bg-surface-700/50 text-surface-300 hover:border-surface-500'}`}>
+          <option value="">All Types</option>
           <option value="adjustment">Adjustment</option>
           <option value="damage">Damage</option>
           <option value="loss">Loss</option>
           <option value="return">Return</option>
-        </Select>
-        <span className="text-sm text-surface-500 ml-auto">{pagination?.total ?? 0} adjustment{(pagination?.total ?? 0) !== 1 ? 's' : ''}</span>
+        </select>
+        <span className="ml-auto text-xs text-surface-500 font-medium">{pagination?.total ?? 0} adjustment{(pagination?.total ?? 0) !== 1 ? 's' : ''}</span>
       </div>
 
-      <div className="card overflow-hidden p-0">
+      <div className="rounded-2xl border border-surface-700/50 bg-surface-800/60 overflow-hidden">
         {isLoading ? (
           <Skeleton />
         ) : adjustments.length === 0 ? (
@@ -84,12 +91,12 @@ export default function StockAdjustPage() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-surface-700 bg-surface-800/50">
-                <th className="text-left px-4 py-3 text-surface-400 font-medium">Reference</th>
-                <th className="text-left px-4 py-3 text-surface-400 font-medium hidden md:table-cell">Date</th>
-                <th className="text-center px-4 py-3 text-surface-400 font-medium">Type</th>
-                <th className="text-left px-4 py-3 text-surface-400 font-medium hidden lg:table-cell">Created By</th>
-                <th className="px-4 py-3" />
+              <tr className="border-b border-surface-700 bg-surface-800/80">
+                <th className="text-left px-4 py-3"><span className="text-xs font-bold uppercase tracking-widest text-surface-400">Reference</span></th>
+                <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-bold uppercase tracking-widest text-surface-400">Date</span></th>
+                <th className="text-center px-4 py-3"><span className="text-xs font-bold uppercase tracking-widest text-surface-400">Type</span></th>
+                <th className="text-left px-4 py-3 hidden lg:table-cell"><span className="text-xs font-bold uppercase tracking-widest text-surface-400">Created By</span></th>
+                <th className="px-4 py-3 w-16" />
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-700/50">

@@ -12,6 +12,7 @@ import Button from '@components/ui/Button';
 import ConfirmDialog from '@components/common/ConfirmDialog';
 import ReturnExchangeModal from './ReturnExchangeModal';
 import { printReceipt } from '@utils/printReceipt';
+import { printInvoice } from '@utils/printInvoice';
 import { salesApi } from '@api/sales.api';
 import { settingsApi } from '@api/settings.api';
 import { formatCurrency, formatDate } from '@utils/format';
@@ -99,7 +100,11 @@ export default function SaleDetailPage() {
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="ghost" size="sm" icon={<PrinterIcon className="h-4 w-4" />}
             onClick={() => printReceipt(sale, items, settingsRes?.data)}>
-            Print Receipt
+            Receipt
+          </Button>
+          <Button variant="secondary" size="sm" icon={<PrinterIcon className="h-4 w-4" />}
+            onClick={() => printInvoice(sale, items, settingsRes?.data)}>
+            A4 Invoice
           </Button>
           {canReturn && (
             <Button variant="secondary" size="sm" icon={<ArrowPathIcon className="h-4 w-4" />}

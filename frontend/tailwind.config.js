@@ -72,7 +72,7 @@ export default {
         'float':       'float 8s ease-in-out infinite',
       },
       keyframes: {
-        fadeIn:       { from: { opacity: 0 }, to: { opacity: 1 } },
+        fadeIn:       { from: { opacity: 0, transform: 'translateY(8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
         slideUp:      { from: { opacity: 0, transform: 'translateY(10px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
         slideDown:    { from: { opacity: 0, transform: 'translateY(-8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
         slideInLeft:  { from: { opacity: 0, transform: 'translateX(-10px)' }, to: { opacity: 1, transform: 'translateX(0)' } },
