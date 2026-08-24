@@ -463,8 +463,29 @@ const updateBarcode = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ─── stats ────────────────────────────────────────────────────────────────────
+
+const stats = async (req, res, next) => {
+  try {
+    const { rows: [row] } = await query(`
+      SELECT
+        COUNT(*)                                                             AS total,
+        COUNT(*) FILTER (WHERE is_active = TRUE)                            AS active,
+        COUNT(*) FILTER (WHERE is_active = FALSE)                           AS inactive,
+        COUNT(*) FILTER (WHERE track_inventory AND stock_quantity <= 0)     AS out_of_stock,
+        COUNT(*) FILTER (WHERE track_inventory AND stock_quantity > 0
+                           AND stock_quantity <= low_stock_alert)           AS low_stock,
+        COALESCE(SUM(GREATEST(stock_quantity,0) * cost_price),  0)::numeric AS inventory_cost,
+        COALESCE(SUM(GREATEST(stock_quantity,0) * sale_price),  0)::numeric AS inventory_value
+      FROM products
+      WHERE company_id = $1
+    `, [req.companyId]);
+    return res.json({ success: true, data: row });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
-  list, getOne, getByBarcode,
+  list, getOne, getByBarcode, stats,
   create, update, remove,
   updateBarcode,
   lowStock,

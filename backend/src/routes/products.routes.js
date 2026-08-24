@@ -28,6 +28,7 @@ router.use(authenticate);
 
 // Product CRUD
 router.get('/',                    requirePermission('products', 'view'),   ctrl.list);
+router.get('/stats',               requirePermission('products', 'view'),   ctrl.stats);
 router.get('/low-stock',           requirePermission('products', 'view'),   ctrl.lowStock);
 router.get('/barcode/:code',       requirePermission('products', 'view'),   ctrl.getByBarcode);
 router.get('/:id',                 requirePermission('products', 'view'),   ctrl.getOne);
