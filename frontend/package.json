@@ -25,6 +25,7 @@
     "date-fns": "^3.6.0",
     "framer-motion": "^13.1.1",
     "gsap": "^3.15.0",
+    "jsbarcode": "^3.12.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.52.0",

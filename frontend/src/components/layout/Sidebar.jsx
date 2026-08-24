@@ -24,6 +24,7 @@ import {
   BriefcaseIcon,
   BookOpenIcon,
   DocumentMagnifyingGlassIcon,
+  QrCodeIcon,
 } from '@heroicons/react/24/outline';
 import { selectSidebarCollapsed, selectTheme, toggleSidebar } from '@store/slices/uiSlice';
 import { selectCurrentUser } from '@store/slices/authSlice';
@@ -45,6 +46,7 @@ const NAV_GROUPS = [
       { label: 'Categories',   path: '/categories',      icon: TagIcon,                   permission: 'categories' },
       { label: 'Brands',       path: '/brands',          icon: BuildingStorefrontIcon,    permission: 'brands' },
       { label: 'Stock Adjust', path: '/inventory/adjust',icon: ArchiveBoxIcon,            permission: 'inventory' },
+      { label: 'Product Barcode', path: '/barcodes',     icon: QrCodeIcon,                permission: 'products' },
     ],
   },
   {

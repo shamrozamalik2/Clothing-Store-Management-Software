@@ -428,9 +428,45 @@ const deleteVariant = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ─── update barcode only ──────────────────────────────────────────────────────
+
+const updateBarcode = async (req, res, next) => {
+  try {
+    const cid = req.companyId;
+    const id  = parseInt(req.params.id, 10);
+    const barcodeVal = req.body.barcode?.trim() || null;
+
+    const { rows: [existing] } = await query(
+      'SELECT id, name, barcode FROM products WHERE id = $1 AND company_id = $2',
+      [id, cid]
+    );
+    if (!existing) return error(res, 'Product not found.', 404);
+
+    if (barcodeVal) {
+      const { rows: [dup] } = await query(
+        'SELECT id FROM products WHERE barcode = $1 AND company_id = $2 AND id != $3',
+        [barcodeVal, cid, id]
+      );
+      if (dup) return error(res, 'Barcode already in use by another product.', 409);
+    }
+
+    const { rows: [product] } = await query(
+      `UPDATE products SET barcode = $1, updated_at = NOW()
+       WHERE id = $2 AND company_id = $3 RETURNING *`,
+      [barcodeVal, id, cid]
+    );
+
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'products', id,
+      { barcode: existing.barcode }, { barcode: barcodeVal });
+
+    return success(res, product, 'Barcode saved successfully.');
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   list, getOne, getByBarcode,
   create, update, remove,
+  updateBarcode,
   lowStock,
   listVariants, upsertVariant, deleteVariant,
   importCsv,

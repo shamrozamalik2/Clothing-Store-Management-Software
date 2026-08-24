@@ -30,6 +30,7 @@ const ManufacturingPage     = lazy(() => import('@pages/manufacturing/Manufactur
 const EmployeesPage         = lazy(() => import('@pages/hr/EmployeesPage'));
 const LedgerPage            = lazy(() => import('@pages/ledger/LedgerPage'));
 const AuditPage             = lazy(() => import('@pages/audit/AuditPage'));
+const BarcodePage           = lazy(() => import('@pages/barcodes/BarcodePage'));
 
 function ProtectedRoute({ roles }) {
   const isAuth = useSelector(selectIsAuth);
@@ -83,6 +84,7 @@ export const appRouter = createBrowserRouter([
       { path: '/hr',                  element: <EmployeesPage /> },
       { path: '/ledger',              element: <LedgerPage /> },
       { path: '/audit',               element: <AuditPage /> },
+      { path: '/barcodes',            element: <BarcodePage /> },
     ],
   }]},
 

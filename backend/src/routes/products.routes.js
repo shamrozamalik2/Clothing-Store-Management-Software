@@ -34,6 +34,7 @@ router.get('/:id',                 requirePermission('products', 'view'),   ctrl
 router.post('/',                   requirePermission('products', 'create'),  upload.single('image'), createRules, ctrl.create);
 router.put('/:id',                 requirePermission('products', 'update'),  upload.single('image'), updateRules, ctrl.update);
 router.delete('/:id',              requirePermission('products', 'delete'),  ctrl.remove);
+router.patch('/:id/barcode',       requirePermission('products', 'update'),  ctrl.updateBarcode);
 
 // Variants
 router.get('/:id/variants',        requirePermission('products', 'view'),   ctrl.listVariants);

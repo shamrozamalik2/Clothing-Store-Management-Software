@@ -52,7 +52,8 @@ const ReturnsPage = lazy(() => import('@pages/returns/ReturnsPage'));
 const ManufacturingPage = lazy(() => import('@pages/manufacturing/ManufacturingPage'));
 const EmployeesPage = lazy(() => import('@pages/hr/EmployeesPage'));
 const LedgerPage = lazy(() => import('@pages/ledger/LedgerPage'));
-const AuditPage = lazy(() => import('@pages/audit/AuditPage'));
+const AuditPage    = lazy(() => import('@pages/audit/AuditPage'));
+const BarcodePage  = lazy(() => import('@pages/barcodes/BarcodePage'));
 
 // Redirect authenticated users to dashboard; unauthenticated users to login
 function ProtectedRoute({ roles }) {
@@ -151,6 +152,7 @@ export const router = createRouter([
           { path: '/hr',                  element: <EmployeesPage /> },
           { path: '/ledger',              element: <LedgerPage /> },
           { path: '/audit',               element: <AuditPage /> },
+          { path: '/barcodes',            element: <BarcodePage /> },
         ],
       },
     ],
