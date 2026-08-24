@@ -19,6 +19,7 @@ import { productsApi } from '@api/products.api';
 import { reportsApi }  from '@api/reports.api';
 import { formatCurrency, formatDate } from '@utils/format';
 import { cn } from '@utils/cn';
+import SalesOverviewChart from '@components/charts/SalesOverviewChart';
 
 /* ─── KPI Card ────────────────────────────────────────────────────────────── */
 function KpiCard({ label, value, sub, subVariant = 'neutral', icon: Icon, accent, loading }) {
@@ -214,6 +215,9 @@ export default function DashboardPage() {
           loading={loadingLow && loadingDash}
         />
       </div>
+
+      {/* ── Sales Overview chart ── */}
+      <SalesOverviewChart />
 
       {/* ── Main content grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
