@@ -59,7 +59,6 @@ function xFmt(dateStr, numDays) {
 const PERIODS = [
   { id: 'today', label: 'Today' },
   { id: '7d',    label: '7 Days' },
-  { id: '30d',   label: '30 Days' },
   { id: 'month', label: 'This Month' },
   { id: 'year',  label: 'This Year' },
   { id: 'custom',label: 'Custom' },
@@ -126,7 +125,7 @@ export default function SalesOverviewChart() {
   const { can }     = usePermission();
   const canView     = can('reports', 'view');
 
-  const [period,     setPeriod]     = useState('7d');
+  const [period,     setPeriod]     = useState('month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo,   setCustomTo]   = useState('');
 
