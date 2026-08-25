@@ -8,6 +8,7 @@ const { env }          = require('./config/env');
 const { initDb }       = require('./config/database');
 const { runMigrations } = require('./database/migrate');
 const { startAutoBackupScheduler } = require('./utils/backup.scheduler');
+const { startAuditCleanupScheduler } = require('./utils/audit.cleanup');
 const app              = require('./app');
 
 async function main() {
@@ -23,6 +24,9 @@ async function main() {
 
   // Start automatic daily backup scheduler
   startAutoBackupScheduler();
+
+  // Prune audit logs older than 90 days (runs daily)
+  startAuditCleanupScheduler();
 
   // Bind server
   const host = env.IS_DEV ? '127.0.0.1' : '0.0.0.0';

@@ -37,14 +37,56 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// ── Rate limiting ─────────────────────────────────────────────────────────────
+// ── Rate limiting (per IP — global guard) ────────────────────────────────────
 app.use(rateLimit({
-  windowMs:       env.RATE_LIMIT_WINDOW_MS,
-  max:            env.RATE_LIMIT_MAX,
+  windowMs:        env.RATE_LIMIT_WINDOW_MS,
+  max:             env.RATE_LIMIT_MAX,
   standardHeaders: true,
-  legacyHeaders:  false,
+  legacyHeaders:   false,
   message: { success: false, message: 'Too many requests. Please slow down.' },
 }));
+
+// ── Per-company rate limiting (prevents one tenant from hogging the DB) ───────
+// Decodes the JWT payload without verification (safe — used only for key bucketing,
+// not for auth decisions). Falls back to IP for unauthenticated requests.
+{
+  const COMPANY_WINDOW_MS = 60_000;  // 1-minute rolling window
+  const COMPANY_MAX       = 600;     // requests per window per company (across all its users)
+  const buckets           = new Map(); // { key -> { count, resetAt } }
+
+  // Prune stale buckets every minute so the Map doesn't grow unbounded
+  setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of buckets) if (v.resetAt <= now) buckets.delete(k);
+  }, COMPANY_WINDOW_MS).unref();
+
+  app.use('/api', (req, res, next) => {
+    let key = req.ip;
+    try {
+      const auth = req.headers.authorization;
+      if (auth?.startsWith('Bearer ')) {
+        const raw     = auth.split('.')[1];
+        const payload = JSON.parse(Buffer.from(raw, 'base64url').toString());
+        if (payload?.companyId) key = `co:${payload.companyId}`;
+      }
+    } catch (_) { /* malformed JWT — fall back to IP */ }
+
+    const now    = Date.now();
+    const bucket = buckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      buckets.set(key, { count: 1, resetAt: now + COMPANY_WINDOW_MS });
+      return next();
+    }
+    bucket.count++;
+    if (bucket.count > COMPANY_MAX) {
+      return res.status(429).json({
+        success: false,
+        message: 'Company rate limit exceeded. Please slow down.',
+      });
+    }
+    next();
+  });
+}
 
 // ── Parsers ───────────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));

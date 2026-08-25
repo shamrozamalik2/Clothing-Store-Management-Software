@@ -5,13 +5,26 @@ const authRoutes = require('./auth.routes');
 
 const router = Router();
 
-router.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'SAS Garments API is running.',
-    timestamp: new Date().toISOString(),
-    uptime: Math.floor(process.uptime()),
-  });
+router.get('/health', async (req, res) => {
+  try {
+    const { query } = require('../config/database');
+    const t0 = Date.now();
+    await query('SELECT 1');
+    return res.json({
+      success:   true,
+      message:   'SAS Garments API is running.',
+      timestamp: new Date().toISOString(),
+      uptime:    Math.floor(process.uptime()),
+      db:        { status: 'connected', latency_ms: Date.now() - t0 },
+    });
+  } catch (err) {
+    return res.status(503).json({
+      success:   false,
+      message:   'Database unavailable.',
+      timestamp: new Date().toISOString(),
+      db:        { status: 'error', error: err.message },
+    });
+  }
 });
 
 router.use('/auth',  authRoutes);
