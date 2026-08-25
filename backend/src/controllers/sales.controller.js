@@ -164,15 +164,16 @@ const create = async (req, res, next) => {
               [variantId, cid]
             );
             if (!v) throw new Error(`Variant ${variantId} not found.`);
-            const price  = parseFloat(item.unit_price ?? v.sale_price ?? 0);
-            const cost   = parseFloat(v.cost_price ?? v.base_cost ?? 0);
-            const lineTot = qty * price;
+            const price     = parseFloat(item.unit_price ?? v.sale_price ?? 0);
+            const cost      = parseFloat(v.cost_price ?? v.base_cost ?? 0);
+            const itemDisc  = Math.max(0, parseFloat(item.discount) || 0);
+            const lineTot   = Math.max(0, qty * price - itemDisc);
             subtotal += lineTot;
 
             if (v.track_inventory && !v.allow_negative && parseFloat(v.stock_quantity) < qty) {
               throw new Error(`Insufficient stock for variant (${v.size ?? ''} ${v.color ?? ''}).`.trim());
             }
-            lineItems.push({ productId, variantId, qty, price, cost, taxAmt: 0, lineTot, productName: v.product_name, sku: v.sku });
+            lineItems.push({ productId, variantId, qty, price, cost, taxAmt: 0, itemDisc, lineTot, productName: v.product_name, sku: v.sku });
           } else {
             const { rows: [product] } = await client.query(
               'SELECT * FROM products WHERE id = $1 AND company_id = $2 AND is_active = TRUE',
@@ -182,13 +183,14 @@ const create = async (req, res, next) => {
             if (product.track_inventory && !product.allow_negative && parseFloat(product.stock_quantity) < qty) {
               throw new Error(`Insufficient stock for "${product.name}".`);
             }
-            const price   = parseFloat(item.unit_price ?? product.sale_price);
-            const cost    = parseFloat(product.cost_price) || 0;
-            const taxRate = parseFloat(product.tax_rate)   || 0;
-            const taxAmt  = qty * price * taxRate / 100;
-            const lineTot = qty * price;
+            const price    = parseFloat(item.unit_price ?? product.sale_price);
+            const cost     = parseFloat(product.cost_price) || 0;
+            const taxRate  = parseFloat(product.tax_rate)   || 0;
+            const itemDisc = Math.max(0, parseFloat(item.discount) || 0);
+            const taxAmt   = qty * price * taxRate / 100;
+            const lineTot  = Math.max(0, qty * price - itemDisc);
             subtotal += lineTot;
-            lineItems.push({ productId, variantId: null, qty, price, cost, taxAmt, lineTot, productName: product.name, sku: product.sku });
+            lineItems.push({ productId, variantId: null, qty, price, cost, taxAmt, itemDisc, lineTot, productName: product.name, sku: product.sku });
           }
         }
 
@@ -228,9 +230,9 @@ const create = async (req, res, next) => {
             INSERT INTO sale_items
               (company_id, sale_id, product_id, variant_id, product_name, sku,
                quantity, unit_price, cost_price, discount, tax_amount, total)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,$10,$11)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
           `, [cid, sid, li.productId, li.variantId, li.productName, li.sku,
-              li.qty, li.price, li.cost, li.taxAmt, li.lineTot]);
+              li.qty, li.price, li.cost, li.itemDisc, li.taxAmt, li.lineTot]);
 
           if (li.variantId) {
             await client.query(

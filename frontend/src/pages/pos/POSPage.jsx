@@ -501,7 +501,7 @@ export default function POSPage() {
               value={discValue}
               onChange={e => setDiscValue(e.target.value)}
               placeholder={discType === 'flat' ? 'Flat discount' : 'Percent off'}
-              className="flex-1 h-8 px-2.5 rounded-lg bg-surface-800/80 border border-surface-700/40 text-xs text-surface-100 placeholder:text-surface-700 focus:outline-none focus:ring-1 focus:ring-primary-500/50 focus:border-primary-500/40"
+              className="flex-1 h-8 px-2.5 rounded-lg bg-surface-800/80 border border-surface-700/40 text-xs text-surface-100 placeholder:text-surface-500 focus:outline-none focus:ring-1 focus:ring-primary-500/50 focus:border-primary-500/40"
             />
           </div>
 
@@ -733,7 +733,7 @@ function CartItem({ item, dispatch }) {
               />
             ) : (
               <button onClick={startEditPrice}
-                className="text-[10px] text-surface-600 hover:text-primary-400 transition-colors">
+                className="text-[10px] text-surface-400 hover:text-primary-400 transition-colors">
                 {formatCurrency(item.unitPrice)} each
               </button>
             )}
@@ -741,13 +741,13 @@ function CartItem({ item, dispatch }) {
               className={cn('text-[9px] px-1.5 py-0.5 rounded border transition-colors',
                 (item.discount || 0) > 0 || showDiscount
                   ? 'border-amber-500/40 text-amber-400 bg-amber-500/10'
-                  : 'border-surface-700/40 text-surface-700 hover:text-surface-500'
+                  : 'border-surface-600/50 text-surface-400 hover:text-amber-400 hover:border-amber-500/30'
               )}>
               {(item.discount || 0) > 0 ? `-${formatCurrency(item.discount)}` : 'disc'}
             </button>
             <button onClick={() => setShowNotes(v => !v)}
               className={cn('text-[9px] px-1.5 py-0.5 rounded border transition-colors',
-                item.notes ? 'border-blue-500/40 text-blue-400 bg-blue-500/10' : 'border-surface-700/40 text-surface-700 hover:text-surface-500'
+                item.notes ? 'border-blue-500/40 text-blue-400 bg-blue-500/10' : 'border-surface-600/50 text-surface-400 hover:text-blue-400 hover:border-blue-500/30'
               )}>
               note
             </button>
@@ -792,7 +792,7 @@ function CartItem({ item, dispatch }) {
       {/* Discount row */}
       {showDiscount && (
         <div className="mt-1.5 flex items-center gap-1.5">
-          <span className="text-[10px] text-surface-600 shrink-0">Discount ₨</span>
+          <span className="text-[10px] text-surface-400 shrink-0">Discount ₨</span>
           <input
             type="number" min="0" step="1"
             value={item.discount || ''}
@@ -1293,7 +1293,12 @@ function ReceiptModal({ receipt, onClose }) {
                   </div>
                   <span className="text-gray-600 text-right self-start pt-px">{parseInt(item.quantity, 10)}</span>
                   <span className="text-gray-600 text-right self-start pt-px">{fmt(item.unit_price)}</span>
-                  <span className="font-semibold text-gray-900 text-right self-start pt-px">{fmt(item.total ?? item.subtotal)}</span>
+                  <div className="text-right self-start">
+                    <span className="font-semibold text-gray-900">{fmt(item.total ?? item.subtotal)}</span>
+                    {parseFloat(item.discount) > 0 && (
+                      <p className="text-green-600 text-[10px] leading-tight">-{fmt(item.discount)} off</p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
