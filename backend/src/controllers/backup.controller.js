@@ -627,10 +627,20 @@ exports.restoreSnapshot = async (req, res, next) => {
   const id  = Number(req.params.id);
 
   const { rows: [snap] } = await query(
-    `SELECT data FROM company_backups WHERE id=$1 AND company_id=$2`,
+    `SELECT data, row_counts FROM company_backups WHERE id=$1 AND company_id=$2`,
     [id, cid]
   );
   if (!snap) return error(res, 'Backup snapshot not found.', 404);
+
+  // Safety: warn if snapshot has significantly fewer products than current DB
+  const { rows: [cur] } = await query(
+    `SELECT COUNT(*) AS cnt FROM products WHERE company_id=$1`, [cid]
+  );
+  const currentProducts  = Number(cur?.cnt ?? 0);
+  const snapshotProducts = Number(snap.row_counts?.products ?? 0);
+  if (currentProducts > 0 && snapshotProducts === 0) {
+    logger.warn(`[Backup] Snapshot #${id} has 0 products but DB has ${currentProducts} — restore will NOT delete existing records (upsert-only).`);
+  }
 
   const d = snap.data;
 

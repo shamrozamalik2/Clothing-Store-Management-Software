@@ -359,6 +359,7 @@ function BackupTab() {
   const [restoreInput, setRestoreInput]   = useState('');  // user must type RESTORE
   const [restoreReport, setRestoreReport] = useState(null);
   const [snapPreview, setSnapPreview] = useState(null);   // snapshot pending confirmation
+  const [snapInput,   setSnapInput]   = useState('');     // user must type RESTORE
   const fileInputRef = useRef(null);
   const progressRef  = useRef(null);
   const fileRef      = useRef(null);   // holds raw File for FormData upload
@@ -528,6 +529,7 @@ function BackupTab() {
     if (!snapPreview) return;
     const snap = snapPreview;
     setSnapPreview(null);
+    setSnapInput('');
     setRestoreState('running');
     setRestoreProgress(0);
     setRestoreError('');
@@ -677,13 +679,25 @@ function BackupTab() {
                   <span className="text-slate-200 font-mono">{snapPreview.row_counts?.sales ?? '—'}</span>
                 </div>
               </div>
+              <div className="rounded-lg border border-red-900/30 bg-red-500/5 px-3 py-2 text-xs text-red-300">
+                Type <span className="font-mono font-bold text-white">RESTORE</span> to confirm — this cannot be undone
+              </div>
+              <input
+                type="text"
+                value={snapInput}
+                onChange={e => setSnapInput(e.target.value)}
+                placeholder="Type RESTORE to confirm"
+                autoFocus
+                className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-slate-700 text-slate-100 placeholder-slate-600 outline-none focus:border-red-500/60 focus:ring-1 focus:ring-red-500/20 font-mono"
+              />
               <div className="flex gap-2 pt-1">
-                <button onClick={() => setSnapPreview(null)}
+                <button onClick={() => { setSnapPreview(null); setSnapInput(''); }}
                   className="flex-1 px-4 py-2 rounded-lg text-sm text-slate-300 border border-slate-600 hover:bg-slate-800 transition-colors">
                   Cancel
                 </button>
                 <button onClick={doRestoreSnapshot}
-                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-500 text-white transition-colors">
+                  disabled={snapInput.trim().toUpperCase() !== 'RESTORE'}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-500 text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                   Restore This Snapshot
                 </button>
               </div>
@@ -817,7 +831,7 @@ function BackupTab() {
                 <span className="text-surface-400 font-mono pr-4">{snap.row_counts?.products ?? '—'}</span>
                 <span className="text-surface-400 font-mono pr-4">{snap.row_counts?.sales ?? '—'}</span>
                 <button
-                  onClick={() => setSnapPreview(snap)}
+                  onClick={() => { setSnapPreview(snap); setSnapInput(''); }}
                   className="shrink-0 px-2.5 py-1 text-xs rounded-lg bg-surface-700 hover:bg-surface-600 text-surface-300 hover:text-surface-100 transition-colors border border-surface-600"
                 >
                   Restore
