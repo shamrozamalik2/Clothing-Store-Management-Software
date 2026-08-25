@@ -466,6 +466,8 @@ export default function SuperAdminCompanies() {
   const [suspending, setSuspending] = useState(null);
   const [managing,   setManaging]   = useState(null);
   const [error,      setError]      = useState('');
+  const [deleting,   setDeleting]   = useState(null);  // company to delete
+  const [deleteInput,setDeleteInput]= useState('');
 
   const PER_PAGE = 15;
 
@@ -486,10 +488,13 @@ export default function SuperAdminCompanies() {
     catch (e) { alert(e.response?.data?.message || 'Failed.'); }
   };
 
-  const deleteCompany = async (c) => {
-    if (!confirm(`Delete "${c.name}"? This will permanently remove all company data.`)) return;
-    try { await saDeleteCompany(c.id); load(); }
-    catch (e) { alert(e.response?.data?.message || 'Failed to delete.'); }
+  const deleteCompany = async () => {
+    if (!deleting || deleteInput.trim() !== deleting.name) return;
+    try {
+      await saDeleteCompany(deleting.id);
+      setDeleting(null); setDeleteInput('');
+      load();
+    } catch (e) { alert(e.response?.data?.message || 'Failed to delete.'); }
   };
 
   const impersonate = async (c) => {
@@ -583,7 +588,7 @@ export default function SuperAdminCompanies() {
                         {c.subscription_status === 'suspended'
                           ? <ActionBtn Icon={CheckCircleIcon} title="Reinstate" color="green" onClick={() => reinstate(c.id)} />
                           : <ActionBtn Icon={NoSymbolIcon}    title="Suspend"   color="yellow" onClick={() => setSuspending(c)} />}
-                        <ActionBtn Icon={TrashIcon} title="Delete" color="red" onClick={() => deleteCompany(c)} />
+                        <ActionBtn Icon={TrashIcon} title="Delete" color="red" onClick={() => { setDeleting(c); setDeleteInput(''); }} />
                       </div>
                     </td>
                   </tr>
@@ -611,6 +616,42 @@ export default function SuperAdminCompanies() {
         {editing    && <EditModal    company={editing}    onClose={() => setEditing(null)}    onSaved={() => { setEditing(null); load(); }} />}
         {suspending && <SuspendModal company={suspending} onClose={() => setSuspending(null)} onDone={() => { setSuspending(null); load(); }} />}
         {managing   && <PlanModal    company={managing}   onClose={() => setManaging(null)}   onSaved={() => { setManaging(null); load(); }} />}
+
+        {/* Delete Company — typed confirmation to prevent accidental wipe */}
+        {deleting && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-red-900/40 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+              <h3 className="text-lg font-bold text-white mb-1">Delete Company</h3>
+              <p className="text-sm text-slate-400 mb-4">
+                This permanently deletes <span className="text-white font-semibold">{deleting.name}</span> and{' '}
+                <span className="text-red-400 font-semibold">all its data</span> — products, sales, customers, everything.
+                This cannot be undone.
+              </p>
+              <div className="rounded-lg border border-red-900/30 bg-red-500/5 px-3 py-2 text-xs text-red-300 mb-3">
+                Type <span className="font-mono font-bold text-white">{deleting.name}</span> to confirm
+              </div>
+              <input
+                type="text"
+                value={deleteInput}
+                onChange={e => setDeleteInput(e.target.value)}
+                placeholder={`Type "${deleting.name}" to confirm`}
+                autoFocus
+                className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
+              />
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => { setDeleting(null); setDeleteInput(''); }}
+                  className="px-4 py-2 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors">
+                  Cancel
+                </button>
+                <button onClick={deleteCompany}
+                  disabled={deleteInput.trim() !== deleting.name}
+                  className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                  Permanently Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </SuperAdminLayout>
     </SuperAdminGuard>
   );

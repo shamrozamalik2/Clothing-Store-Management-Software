@@ -902,9 +902,10 @@ function PLTab({ params }) {
 
   const revenue    = parseFloat(sales.revenue)         || 0;
   const collected  = parseFloat(sales.collected)        || 0;
+  const cogs       = parseFloat(ovRes?.data?.cogs)     || 0;
   const totalExp   = expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
-  const grossProfit = revenue - (parseFloat(stockVal?.total_cost) || 0);
-  const netProfit  = revenue - totalExp;
+  const grossProfit = revenue - cogs;
+  const netProfit  = grossProfit - totalExp;
   const grossMargin = revenue > 0 ? ((grossProfit / revenue) * 100) : 0;
   const netMargin   = revenue > 0 ? ((netProfit  / revenue) * 100) : 0;
 
@@ -951,7 +952,7 @@ function PLTab({ params }) {
           <h2 className="text-sm font-semibold text-surface-200 mb-4">Profit & Loss Statement</h2>
           <div className="divide-y divide-surface-700/30">
             <PnlRow label="Revenue (Sales)"       value={revenue}    bold accent="text-green-400" />
-            <PnlRow label="Cost of Goods (Stock)" value={parseFloat(stockVal?.total_cost) || 0} indent />
+            <PnlRow label="Cost of Goods Sold" value={cogs} indent />
             <PnlRow label="Gross Profit"           value={grossProfit} bold accent={grossProfit >= 0 ? 'text-emerald-400' : 'text-red-400'} />
             <PnlRow label="Total Expenses"         value={totalExp}   indent />
             <PnlRow label="Net Profit / (Loss)"    value={netProfit}  bold accent={netProfit >= 0 ? 'text-green-400' : 'text-red-400'} />
