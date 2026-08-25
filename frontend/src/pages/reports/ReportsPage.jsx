@@ -897,7 +897,7 @@ function PLTab({ params }) {
   });
 
   const sales    = ovRes?.data?.sales ?? {};
-  const expenses = exRes?.data ?? [];
+  const expenses = exRes?.data?.expenses ?? exRes?.data ?? [];
   const stockVal = pvRes?.data;
 
   const revenue    = parseFloat(sales.revenue)         || 0;
