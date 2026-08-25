@@ -115,39 +115,14 @@ async function sqliteBufferToData(buf) {
   return data;
 }
 
-// ── bulkInsert — UPSERT scoped to the owning company ─────────────────────────
-// The WHERE clause on DO UPDATE ensures we NEVER overwrite a row whose
-// company_id belongs to a different tenant — cross-company ID collisions
-// (which can happen if a backup from company A is restored into company B)
-// are silently skipped rather than stealing data from the other company.
-async function bulkInsert(client, table, cols, rows, mapper) {
-  if (!rows?.length) return 0;
-  let total = 0;
-  const CHUNK     = 500;
-  const updateSet = cols.filter(c => c !== 'id').map(c => `${c}=EXCLUDED.${c}`).join(',');
-  const hasCompanyId = cols.includes('company_id');
-  const conflictClause = hasCompanyId
-    ? `ON CONFLICT (id) DO UPDATE SET ${updateSet} WHERE ${table}.company_id = EXCLUDED.company_id`
-    : `ON CONFLICT (id) DO UPDATE SET ${updateSet}`;
-
-  for (let start = 0; start < rows.length; start += CHUNK) {
-    const chunk = rows.slice(start, start + CHUNK);
-    const n  = cols.length;
-    const ph = chunk
-      .map((_, i) => `(${cols.map((__, j) => `$${i * n + j + 1}`).join(',')})`)
-      .join(',');
-    const res = await client.query(
-      `INSERT INTO ${table} (${cols.join(',')}) VALUES ${ph} ${conflictClause}`,
-      chunk.flatMap(mapper)
-    );
-    total += res.rowCount || 0;
-  }
-  return total;
-}
-
 // ── Core restore — shared by both endpoints ────────────────────────────────────
+//
+// ID-free restore: never insert the original `id` value from the backup.
+// Each row receives a fresh PG-assigned ID. FK references between tables
+// are remapped through old→new maps built from RETURNING clauses.
+// This prevents cross-company ID collisions entirely: two companies can
+// have overlapping legacy IDs with no risk of data theft.
 async function performRestore(client, cid, d, userId) {
-  // Safety guard: never proceed if the backup contains nothing at all
   const totalRows = Object.values(d).reduce((s, rows) => s + (Array.isArray(rows) ? rows.length : 0), 0);
   if (totalRows === 0) {
     throw new Error('Backup file contains no data rows. Restore aborted — your existing data has not been changed.');
@@ -155,229 +130,389 @@ async function performRestore(client, cid, d, userId) {
 
   const report = {};
 
-  const ins = async (table, cols, rows, mapper) => {
-    if (!rows?.length) { report[table] = { provided: 0, inserted: 0 }; return 0; }
-    const inserted = await bulkInsert(client, table, cols, rows, mapper);
-    report[table] = { provided: rows.length, inserted };
-    return inserted;
-  };
+  // Insert rows without `id`, conflict on natural key, return id + key column for mapping.
+  async function insertNatural(table, { cols, mapper, conflictCols, onConflict, returnKey }, rows) {
+    report[table] = { provided: rows?.length ?? 0, inserted: 0 };
+    if (!rows?.length) return {};
+    const CHUNK = 500;
+    const keyToId = {};
+    for (let start = 0; start < rows.length; start += CHUNK) {
+      const chunk = rows.slice(start, start + CHUNK);
+      const n  = cols.length;
+      const ph = chunk.map((_, i) => `(${cols.map((__, j) => `$${i * n + j + 1}`).join(',')})`).join(',');
+      const res = await client.query(
+        `INSERT INTO ${table} (${cols.join(',')}) VALUES ${ph}
+         ON CONFLICT (${conflictCols}) ${onConflict}
+         RETURNING id, ${returnKey}`,
+        chunk.flatMap(mapper)
+      );
+      for (const row of res.rows) keyToId[row[returnKey]] = row.id;
+      report[table].inserted += res.rows.length;
+    }
+    return keyToId;
+  }
 
-  // Restore is upsert-only — existing records are updated, new ones inserted.
-  // Nothing is ever deleted, so data already in the database is always preserved.
+  // Delete existing children for the given parent IDs then bulk-insert fresh rows.
+  async function insertChildren(table, { cols, mapper, parentIdCol, parentIds }, rows) {
+    report[table] = { provided: rows?.length ?? 0, inserted: 0 };
+    if (!parentIds?.size) return;
+    await client.query(
+      `DELETE FROM ${table} WHERE ${parentIdCol} = ANY($1)`,
+      [Array.from(parentIds)]
+    );
+    if (!rows?.length) return;
+    const CHUNK = 500;
+    for (let start = 0; start < rows.length; start += CHUNK) {
+      const chunk = rows.slice(start, start + CHUNK);
+      const n  = cols.length;
+      const ph = chunk.map((_, i) => `(${cols.map((__, j) => `$${i * n + j + 1}`).join(',')})`).join(',');
+      const res = await client.query(
+        `INSERT INTO ${table} (${cols.join(',')}) VALUES ${ph}`,
+        chunk.flatMap(mapper)
+      );
+      report[table].inserted += res.rowCount || 0;
+    }
+  }
 
-  // Insert in FK-safe order (parents first)
-  await ins('categories',
-    ['id','company_id','name','description','is_active','created_at','updated_at'],
-    d.categories, r => [
-      r.id, cid, r.name, r.description ?? null, r.is_active ?? true,
-      ts(r.created_at), ts(r.updated_at ?? r.created_at),
-    ]);
+  // ── 1. Categories ─────────────────────────────────────────────────────────
+  const catKeyMap = await insertNatural('categories', {
+    cols: ['company_id','name','description','is_active','created_at','updated_at'],
+    mapper: r => [cid, r.name, r.description ?? null, r.is_active ?? true, ts(r.created_at), ts(r.updated_at ?? r.created_at)],
+    conflictCols: 'company_id, name',
+    onConflict: 'DO UPDATE SET description=EXCLUDED.description, is_active=EXCLUDED.is_active, updated_at=NOW()',
+    returnKey: 'name',
+  }, d.categories);
+  const catMap = {};
+  for (const r of (d.categories || [])) if (r.name) catMap[r.id] = catKeyMap[r.name];
 
-  await ins('brands',
-    ['id','company_id','name','description','is_active','created_at','updated_at'],
-    d.brands, r => [
-      r.id, cid, r.name, r.description ?? null, r.is_active ?? true,
-      ts(r.created_at), ts(r.updated_at ?? r.created_at),
-    ]);
+  // ── 2. Brands ─────────────────────────────────────────────────────────────
+  const brandKeyMap = await insertNatural('brands', {
+    cols: ['company_id','name','description','is_active','created_at','updated_at'],
+    mapper: r => [cid, r.name, r.description ?? null, r.is_active ?? true, ts(r.created_at), ts(r.updated_at ?? r.created_at)],
+    conflictCols: 'company_id, name',
+    onConflict: 'DO UPDATE SET description=EXCLUDED.description, is_active=EXCLUDED.is_active, updated_at=NOW()',
+    returnKey: 'name',
+  }, d.brands);
+  const brandMap = {};
+  for (const r of (d.brands || [])) if (r.name) brandMap[r.id] = brandKeyMap[r.name];
 
-  await ins('suppliers',
-    ['id','company_id','name','email','phone','address','city','is_active','created_at','updated_at'],
-    d.suppliers, r => [
-      r.id, cid, r.name, r.email ?? null, r.phone ?? null, r.address ?? null, r.city ?? null,
-      r.is_active ?? true, ts(r.created_at), ts(r.updated_at ?? r.created_at),
-    ]);
+  // ── 3. Suppliers ──────────────────────────────────────────────────────────
+  const suppKeyMap = await insertNatural('suppliers', {
+    cols: ['company_id','name','email','phone','address','city','is_active','created_at','updated_at'],
+    mapper: r => [cid, r.name, r.email ?? null, r.phone ?? null, r.address ?? null, r.city ?? null, r.is_active ?? true, ts(r.created_at), ts(r.updated_at ?? r.created_at)],
+    conflictCols: 'company_id, name',
+    onConflict: 'DO UPDATE SET email=EXCLUDED.email, phone=EXCLUDED.phone, address=EXCLUDED.address, updated_at=NOW()',
+    returnKey: 'name',
+  }, d.suppliers);
+  const suppMap = {};
+  for (const r of (d.suppliers || [])) if (r.name) suppMap[r.id] = suppKeyMap[r.name];
 
-  await ins('products',
-    ['id','company_id','name','sku','barcode','description','category_id','brand_id',
-     'cost_price','sale_price','wholesale_price','tax_rate','stock_quantity',
-     'low_stock_alert','unit','is_active','created_at','updated_at'],
-    d.products, r => [
-      r.id, cid,
-      r.name,
-      r.sku ?? String(r.id),
-      r.barcode ?? null,
-      r.description ?? null,
-      r.category_id ?? null,
-      r.brand_id ?? null,
-      r.cost_price ?? 0,
-      r.sale_price ?? r.selling_price ?? r.price ?? 0,
-      r.wholesale_price ?? 0,
-      r.tax_rate ?? 0,
+  // ── 4. Products ───────────────────────────────────────────────────────────
+  const products = (d.products || []).map(r => ({ ...r, _sku: r.sku ?? String(r.id) }));
+  const prodKeyMap = await insertNatural('products', {
+    cols: ['company_id','name','sku','barcode','description','category_id','brand_id',
+           'cost_price','sale_price','wholesale_price','tax_rate','stock_quantity',
+           'low_stock_alert','unit','is_active','created_at','updated_at'],
+    mapper: r => [
+      cid, r.name, r._sku, r.barcode ?? null, r.description ?? null,
+      catMap[r.category_id] ?? null, brandMap[r.brand_id] ?? null,
+      r.cost_price ?? 0, r.sale_price ?? r.selling_price ?? r.price ?? 0,
+      r.wholesale_price ?? 0, r.tax_rate ?? 0,
       r.stock_quantity ?? r.quantity ?? 0,
       r.low_stock_alert ?? r.min_stock_level ?? r.reorder_level ?? 5,
-      r.unit ?? 'pcs',
-      r.is_active ?? true,
+      r.unit ?? 'pcs', r.is_active ?? true,
       ts(r.created_at), ts(r.updated_at ?? r.created_at),
-    ]);
+    ],
+    conflictCols: 'company_id, sku',
+    onConflict: `DO UPDATE SET name=EXCLUDED.name, barcode=EXCLUDED.barcode,
+      description=EXCLUDED.description, category_id=EXCLUDED.category_id,
+      brand_id=EXCLUDED.brand_id, cost_price=EXCLUDED.cost_price,
+      sale_price=EXCLUDED.sale_price, wholesale_price=EXCLUDED.wholesale_price,
+      stock_quantity=EXCLUDED.stock_quantity, is_active=EXCLUDED.is_active, updated_at=NOW()`,
+    returnKey: 'sku',
+  }, products);
+  const productMap = {};
+  for (const r of products) productMap[r.id] = prodKeyMap[r._sku];
 
-  await ins('product_variants',
-    ['id','company_id','product_id','sku','barcode','size','color',
-     'cost_price','sale_price','stock_quantity','is_active','created_at','updated_at'],
-    d.product_variants, r => [
-      r.id, r.company_id ?? cid, r.product_id,
-      r.sku ?? `VAR-${r.id}`, r.barcode ?? null,
+  // ── 5. Product Variants ───────────────────────────────────────────────────
+  const variants = (d.product_variants || [])
+    .filter(r => productMap[r.product_id])
+    .map(r => ({ ...r, _sku: r.sku ?? `VAR-${r.id}` }));
+  const varKeyMap = await insertNatural('product_variants', {
+    cols: ['company_id','product_id','sku','barcode','size','color',
+           'cost_price','sale_price','stock_quantity','is_active','created_at','updated_at'],
+    mapper: r => [
+      cid, productMap[r.product_id], r._sku, r.barcode ?? null,
       r.size ?? null, r.color ?? null,
       r.cost_price ?? 0, r.sale_price ?? 0,
       r.stock_quantity ?? 0, r.is_active ?? true,
       ts(r.created_at), ts(r.updated_at ?? r.created_at),
-    ]);
+    ],
+    conflictCols: 'company_id, sku',
+    onConflict: `DO UPDATE SET product_id=EXCLUDED.product_id, size=EXCLUDED.size,
+      color=EXCLUDED.color, cost_price=EXCLUDED.cost_price,
+      sale_price=EXCLUDED.sale_price, stock_quantity=EXCLUDED.stock_quantity,
+      is_active=EXCLUDED.is_active, updated_at=NOW()`,
+    returnKey: 'sku',
+  }, variants);
+  const variantMap = {};
+  for (const r of variants) variantMap[r.id] = varKeyMap[r._sku];
 
-  await ins('customers',
-    ['id','company_id','name','email','phone','address','city','loyalty_points','is_active','created_at','updated_at'],
-    d.customers, r => [
-      r.id, cid, r.name, r.email ?? null, r.phone ?? null, r.address ?? null, r.city ?? null,
-      r.loyalty_points ?? 0, r.is_active ?? true,
-      ts(r.created_at), ts(r.updated_at ?? r.created_at),
-    ]);
+  // ── 6. Customers (no reliable natural key — insert fresh, build map via RETURNING) ──
+  const customerMap = {};
+  for (const r of (d.customers || [])) {
+    const res = await client.query(
+      `INSERT INTO customers
+         (company_id,name,email,phone,address,city,customer_group,
+          credit_limit,current_balance,loyalty_points,is_active,notes,created_at,updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       RETURNING id`,
+      [cid, r.name, r.email ?? null, r.phone ?? null, r.address ?? null, r.city ?? null,
+       r.customer_group ?? 'general', r.credit_limit ?? 0, r.current_balance ?? 0,
+       r.loyalty_points ?? 0, r.is_active ?? true, r.notes ?? null,
+       ts(r.created_at), ts(r.updated_at ?? r.created_at)]
+    );
+    customerMap[r.id] = res.rows[0].id;
+  }
+  report['customers'] = { provided: (d.customers || []).length, inserted: Object.keys(customerMap).length };
 
-  await ins('sales',
-    ['id','company_id','branch_id','customer_id','reference','status','sale_date',
-     'subtotal','tax_amount','discount_amount','total_amount','paid_amount',
-     'change_amount','due_amount','payment_method','notes','created_by','created_at','updated_at'],
-    d.sales, r => {
+  // ── 7. Sales ──────────────────────────────────────────────────────────────
+  const salesRows = (d.sales || []).map(r => ({
+    ...r,
+    _ref: r.reference ?? r.reference_no ?? r.invoice_no ?? `IMPORT-${r.id}`,
+  }));
+  const saleKeyMap = await insertNatural('sales', {
+    cols: ['company_id','branch_id','customer_id','reference','status','sale_date',
+           'subtotal','tax_amount','discount_amount','total_amount','paid_amount',
+           'change_amount','due_amount','payment_method','notes','created_by','created_at','updated_at'],
+    mapper: r => {
       const total = r.total_amount ?? r.total ?? r.grand_total ?? 0;
       return [
-        r.id, cid, r.branch_id ?? null, r.customer_id ?? null,
-        r.reference ?? r.reference_no ?? r.invoice_no ?? `IMPORT-${r.id}`,
-        r.status ?? 'completed',
+        cid, r.branch_id ?? null,
+        r.customer_id ? (customerMap[r.customer_id] ?? null) : null,
+        r._ref, r.status ?? 'completed',
         r.sale_date ?? r.date ?? ts(r.created_at),
         r.subtotal ?? total, r.tax_amount ?? r.tax ?? 0,
         r.discount_amount ?? r.discount ?? 0, total,
         r.paid_amount ?? total, r.change_amount ?? 0, r.due_amount ?? 0,
         r.payment_method ?? r.payment_type ?? 'cash',
-        r.notes ?? null, r.created_by ?? r.user_id ?? null,
+        r.notes ?? null, null,
         ts(r.created_at), ts(r.updated_at ?? r.created_at),
       ];
-    });
+    },
+    conflictCols: 'company_id, reference',
+    onConflict: `DO UPDATE SET customer_id=EXCLUDED.customer_id, status=EXCLUDED.status,
+      total_amount=EXCLUDED.total_amount, paid_amount=EXCLUDED.paid_amount,
+      due_amount=EXCLUDED.due_amount, updated_at=NOW()`,
+    returnKey: 'reference',
+  }, salesRows);
+  const saleMap = {};
+  for (const r of salesRows) saleMap[r.id] = saleKeyMap[r._ref];
+  const saleIds = new Set(Object.values(saleMap).filter(Boolean));
 
-  await ins('sale_items',
-    ['id','company_id','sale_id','product_id','product_name','sku',
-     'quantity','unit_price','cost_price','discount','tax_amount','total','created_at'],
-    d.sale_items, r => [
-      r.id, cid, r.sale_id, r.product_id ?? null,
+  // ── 8. Sale Items ─────────────────────────────────────────────────────────
+  await insertChildren('sale_items', {
+    cols: ['company_id','sale_id','product_id','variant_id','product_name','sku',
+           'quantity','unit_price','cost_price','discount','tax_amount','total','created_at'],
+    mapper: r => [
+      cid, saleMap[r.sale_id], productMap[r.product_id] ?? null, variantMap[r.variant_id] ?? null,
       r.product_name ?? r.name ?? 'Product', r.sku ?? null,
       r.quantity ?? 0, r.unit_price ?? r.price ?? 0,
       r.cost_price ?? 0, r.discount ?? 0, r.tax_amount ?? 0,
       r.total ?? r.subtotal ?? 0, ts(r.created_at),
-    ]);
+    ],
+    parentIdCol: 'sale_id',
+    parentIds: saleIds,
+  }, (d.sale_items || []).filter(r => saleMap[r.sale_id]));
 
-  await ins('purchases',
-    ['id','company_id','branch_id','supplier_id','reference','status','purchase_date',
-     'subtotal','tax_amount','discount_amount','total_amount','paid_amount',
-     'due_amount','notes','created_by','created_at','updated_at'],
-    d.purchases, r => {
+  // ── 9. Purchases ──────────────────────────────────────────────────────────
+  const purchRows = (d.purchases || []).map(r => ({
+    ...r,
+    _ref: r.reference ?? r.reference_no ?? `IMPORT-PO-${r.id}`,
+  }));
+  const purchKeyMap = await insertNatural('purchases', {
+    cols: ['company_id','branch_id','supplier_id','reference','status','purchase_date',
+           'subtotal','tax_amount','discount_amount','total_amount','paid_amount',
+           'due_amount','notes','created_by','created_at','updated_at'],
+    mapper: r => {
       const total = r.total_amount ?? r.total ?? 0;
       return [
-        r.id, cid, r.branch_id ?? null, r.supplier_id ?? null,
-        r.reference ?? r.reference_no ?? `IMPORT-PO-${r.id}`,
-        r.status ?? 'received',
+        cid, r.branch_id ?? null,
+        r.supplier_id ? (suppMap[r.supplier_id] ?? null) : null,
+        r._ref, r.status ?? 'received',
         r.purchase_date ?? r.date ?? ts(r.created_at),
         r.subtotal ?? total, r.tax_amount ?? r.tax ?? 0,
         r.discount_amount ?? r.discount ?? 0, total,
         r.paid_amount ?? total, r.due_amount ?? 0,
-        r.notes ?? null, r.created_by ?? r.user_id ?? null,
+        r.notes ?? null, null,
         ts(r.created_at), ts(r.updated_at ?? r.created_at),
       ];
-    });
+    },
+    conflictCols: 'company_id, reference',
+    onConflict: `DO UPDATE SET supplier_id=EXCLUDED.supplier_id, status=EXCLUDED.status,
+      total_amount=EXCLUDED.total_amount, paid_amount=EXCLUDED.paid_amount,
+      due_amount=EXCLUDED.due_amount, updated_at=NOW()`,
+    returnKey: 'reference',
+  }, purchRows);
+  const purchMap = {};
+  for (const r of purchRows) purchMap[r.id] = purchKeyMap[r._ref];
+  const purchIds = new Set(Object.values(purchMap).filter(Boolean));
 
-  await ins('purchase_items',
-    ['id','company_id','purchase_id','product_id','product_name','sku',
-     'quantity','unit_cost','discount','tax_amount','total','created_at'],
-    d.purchase_items, r => [
-      r.id, cid, r.purchase_id, r.product_id ?? null,
+  // ── 10. Purchase Items ────────────────────────────────────────────────────
+  await insertChildren('purchase_items', {
+    cols: ['company_id','purchase_id','product_id','product_name','sku',
+           'quantity','unit_cost','discount','tax_amount','total','created_at'],
+    mapper: r => [
+      cid, purchMap[r.purchase_id], productMap[r.product_id] ?? null,
       r.product_name ?? r.name ?? 'Product', r.sku ?? null,
       r.quantity ?? 0, r.unit_cost ?? r.cost ?? 0,
-      r.discount ?? 0, r.tax_amount ?? 0, r.total ?? 0,
-      ts(r.created_at),
-    ]);
+      r.discount ?? 0, r.tax_amount ?? 0, r.total ?? 0, ts(r.created_at),
+    ],
+    parentIdCol: 'purchase_id',
+    parentIds: purchIds,
+  }, (d.purchase_items || []).filter(r => purchMap[r.purchase_id]));
 
-  await ins('purchase_payments',
-    ['id','company_id','purchase_id','amount','payment_method','reference',
-     'notes','paid_at','created_by','created_at','updated_at'],
-    d.purchase_payments, r => [
-      r.id, cid, r.purchase_id, r.amount ?? 0,
+  // ── 11. Purchase Payments ─────────────────────────────────────────────────
+  await insertChildren('purchase_payments', {
+    cols: ['company_id','purchase_id','amount','payment_method','reference',
+           'notes','paid_at','created_by','created_at'],
+    mapper: r => [
+      cid, purchMap[r.purchase_id], r.amount ?? 0,
       r.payment_method ?? 'cash', r.reference ?? null, r.notes ?? null,
-      r.paid_at ?? ts(r.created_at),
-      r.created_by ?? null,
-      ts(r.created_at), ts(r.updated_at ?? r.created_at),
-    ]);
+      r.paid_at ?? ts(r.created_at), null, ts(r.created_at),
+    ],
+    parentIdCol: 'purchase_id',
+    parentIds: purchIds,
+  }, (d.purchase_payments || []).filter(r => purchMap[r.purchase_id]));
 
-  await ins('returns',
-    ['id','company_id','sale_id','reference','return_date','total_amount',
-     'refund_method','refund_amount','type','reason','notes','created_by','created_at','updated_at'],
-    d.returns, r => [
-      r.id, cid, r.sale_id ?? null,
-      r.reference ?? `IMPORT-RET-${r.id}`,
-      r.return_date ?? ts(r.created_at),
-      r.total_amount ?? 0,
-      r.refund_method ?? 'cash', r.refund_amount ?? r.total_amount ?? 0,
-      r.type ?? 'return', r.reason ?? null, r.notes ?? null,
-      r.created_by ?? null,
+  // ── 12. Returns ───────────────────────────────────────────────────────────
+  const retRows = (d.returns || []).map(r => ({
+    ...r,
+    _ref: r.reference ?? `IMPORT-RET-${r.id}`,
+  }));
+  const retKeyMap = await insertNatural('returns', {
+    cols: ['company_id','sale_id','reference','return_date','total_amount',
+           'refund_method','refund_amount','type','reason','notes','created_by','created_at','updated_at'],
+    mapper: r => [
+      cid, r.sale_id ? (saleMap[r.sale_id] ?? null) : null,
+      r._ref, r.return_date ?? ts(r.created_at),
+      r.total_amount ?? 0, r.refund_method ?? 'cash',
+      r.refund_amount ?? r.total_amount ?? 0,
+      r.type ?? 'return', r.reason ?? null, r.notes ?? null, null,
       ts(r.created_at), ts(r.updated_at ?? r.created_at),
-    ]);
+    ],
+    conflictCols: 'company_id, reference',
+    onConflict: 'DO UPDATE SET total_amount=EXCLUDED.total_amount, updated_at=NOW()',
+    returnKey: 'reference',
+  }, retRows);
+  const returnMap = {};
+  for (const r of retRows) returnMap[r.id] = retKeyMap[r._ref];
+  const retIds = new Set(Object.values(returnMap).filter(Boolean));
 
-  await ins('return_items',
-    ['id','company_id','return_id','product_id','variant_id',
-     'product_name','sku','quantity','unit_price','total','created_at'],
-    d.return_items, r => [
-      r.id, cid, r.return_id, r.product_id ?? null, r.variant_id ?? null,
+  // ── 13. Return Items ──────────────────────────────────────────────────────
+  await insertChildren('return_items', {
+    cols: ['company_id','return_id','product_id','variant_id',
+           'product_name','sku','quantity','unit_price','total','created_at'],
+    mapper: r => [
+      cid, returnMap[r.return_id], productMap[r.product_id] ?? null, variantMap[r.variant_id] ?? null,
+      r.product_name ?? 'Product', r.sku ?? null,
+      r.quantity ?? 0, r.unit_price ?? 0, r.total ?? 0, ts(r.created_at),
+    ],
+    parentIdCol: 'return_id',
+    parentIds: retIds,
+  }, (d.return_items || []).filter(r => returnMap[r.return_id]));
+
+  // ── 14. Exchange Items ────────────────────────────────────────────────────
+  await insertChildren('exchange_items', {
+    cols: ['company_id','return_id','product_id','variant_id',
+           'product_name','sku','quantity','unit_price','total'],
+    mapper: r => [
+      cid, returnMap[r.return_id], productMap[r.product_id] ?? null, variantMap[r.variant_id] ?? null,
       r.product_name ?? 'Product', r.sku ?? null,
       r.quantity ?? 0, r.unit_price ?? 0, r.total ?? 0,
-      ts(r.created_at),
-    ]);
+    ],
+    parentIdCol: 'return_id',
+    parentIds: retIds,
+  }, (d.exchange_items || []).filter(r => returnMap[r.return_id]));
 
-  await ins('exchange_items',
-    ['id','company_id','return_id','product_id','variant_id',
-     'product_name','sku','quantity','unit_price','total'],
-    d.exchange_items, r => [
-      r.id, cid, r.return_id, r.product_id ?? null, r.variant_id ?? null,
-      r.product_name ?? 'Product', r.sku ?? null,
-      r.quantity ?? 0, r.unit_price ?? 0, r.total ?? 0,
-    ]);
+  // ── 15. Expense Categories (already has unique constraint) ─────────────────
+  const expCatKeyMap = await insertNatural('expense_categories', {
+    cols: ['company_id','name','is_active','created_at'],
+    mapper: r => [cid, r.name, r.is_active ?? true, ts(r.created_at)],
+    conflictCols: 'company_id, name',
+    onConflict: 'DO UPDATE SET is_active=EXCLUDED.is_active',
+    returnKey: 'name',
+  }, d.expense_categories);
+  const expCatMap = {};
+  for (const r of (d.expense_categories || [])) if (r.name) expCatMap[r.id] = expCatKeyMap[r.name];
 
-  await ins('expense_categories',
-    ['id','company_id','name','is_active','created_at'],
-    d.expense_categories, r => [
-      r.id, cid, r.name, r.is_active ?? true, ts(r.created_at),
-    ]);
+  // ── 16. Expenses (no unique key — insert fresh) ────────────────────────────
+  const expRows = d.expenses || [];
+  if (expRows.length) {
+    const CHUNK = 500;
+    const n = 11;
+    let total = 0;
+    for (let start = 0; start < expRows.length; start += CHUNK) {
+      const chunk = expRows.slice(start, start + CHUNK);
+      const ph = chunk.map((_, i) => `(${Array.from({ length: n }, (__, j) => `$${i * n + j + 1}`).join(',')})`).join(',');
+      const res = await client.query(
+        `INSERT INTO expenses
+           (company_id,branch_id,category_id,title,amount,payment_method,expense_date,notes,created_by,created_at,updated_at)
+         VALUES ${ph}`,
+        chunk.flatMap(r => [
+          cid, r.branch_id ?? null, expCatMap[r.category_id] ?? null,
+          r.title ?? r.description ?? r.name ?? 'Expense',
+          r.amount ?? 0, r.payment_method ?? 'cash',
+          r.expense_date ?? r.date ?? ts(r.created_at),
+          r.notes ?? null, null,
+          ts(r.created_at), ts(r.updated_at ?? r.created_at),
+        ])
+      );
+      total += res.rowCount || 0;
+    }
+    report['expenses'] = { provided: expRows.length, inserted: total };
+  } else {
+    report['expenses'] = { provided: 0, inserted: 0 };
+  }
 
-  await ins('expenses',
-    ['id','company_id','branch_id','category_id','title','amount',
-     'payment_method','expense_date','notes','created_by','created_at','updated_at'],
-    d.expenses, r => [
-      r.id, cid, r.branch_id ?? null, r.category_id ?? null,
-      r.title ?? r.description ?? r.name ?? 'Expense',
-      r.amount ?? 0, r.payment_method ?? 'cash',
-      r.expense_date ?? r.date ?? ts(r.created_at),
-      r.notes ?? null, r.created_by ?? r.user_id ?? null,
-      ts(r.created_at), ts(r.updated_at ?? r.created_at),
-    ]);
-
-  await ins('stock_adjustments',
-    ['id','company_id','branch_id','reference','type','reason',
-     'status','notes','created_by','created_at','updated_at'],
-    d.stock_adjustments, r => [
-      r.id, cid, r.branch_id ?? null,
-      r.reference ?? `IMPORT-ADJ-${r.id}`,
+  // ── 17. Stock Adjustments ─────────────────────────────────────────────────
+  const adjRows = (d.stock_adjustments || []).map(r => ({
+    ...r,
+    _ref: r.reference ?? `IMPORT-ADJ-${r.id}`,
+  }));
+  const adjKeyMap = await insertNatural('stock_adjustments', {
+    cols: ['company_id','branch_id','reference','type','reason','status','notes','created_by','created_at','updated_at'],
+    mapper: r => [
+      cid, r.branch_id ?? null, r._ref,
       r.type ?? 'adjustment', r.reason ?? null,
-      r.status ?? 'completed', r.notes ?? null,
-      r.created_by ?? r.user_id ?? null,
+      r.status ?? 'completed', r.notes ?? null, null,
       ts(r.created_at), ts(r.updated_at ?? r.created_at),
-    ]);
+    ],
+    conflictCols: 'company_id, reference',
+    onConflict: 'DO UPDATE SET status=EXCLUDED.status, updated_at=NOW()',
+    returnKey: 'reference',
+  }, adjRows);
+  const adjMap = {};
+  for (const r of adjRows) adjMap[r.id] = adjKeyMap[r._ref];
+  const adjIds = new Set(Object.values(adjMap).filter(Boolean));
 
-  await ins('stock_adjustment_items',
-    ['id','company_id','adjustment_id','product_id','product_name','sku',
-     'quantity_before','quantity_adjusted','quantity_after','unit_cost','created_at'],
-    d.stock_adjustment_items, r => [
-      r.id, cid, r.adjustment_id, r.product_id ?? null,
+  // ── 18. Stock Adjustment Items ─────────────────────────────────────────────
+  await insertChildren('stock_adjustment_items', {
+    cols: ['company_id','adjustment_id','product_id','variant_id','product_name','sku',
+           'quantity_before','quantity_adjusted','quantity_after','unit_cost','created_at'],
+    mapper: r => [
+      cid, adjMap[r.adjustment_id], productMap[r.product_id] ?? null, variantMap[r.variant_id] ?? null,
       r.product_name ?? r.name ?? 'Product', r.sku ?? null,
       r.quantity_before ?? r.old_quantity ?? 0,
       r.quantity_adjusted ?? r.quantity ?? 0,
       r.quantity_after ?? r.new_quantity ?? 0,
       r.unit_cost ?? 0, ts(r.created_at),
-    ]);
+    ],
+    parentIdCol: 'adjustment_id',
+    parentIds: adjIds,
+  }, (d.stock_adjustment_items || []).filter(r => adjMap[r.adjustment_id]));
 
-  // Settings — upsert (preserve existing keys not in backup)
+  // ── 19. Settings (upsert by key, no id needed) ─────────────────────────────
   for (const r of (d.settings || [])) {
     await client.query(
       `INSERT INTO settings (company_id,key,value,type,group_name,label)
@@ -386,23 +521,7 @@ async function performRestore(client, cid, d, userId) {
       [cid, r.key, r.value ?? null, r.type ?? 'string', r.group_name ?? 'general', r.label ?? null]
     );
   }
-
-  // Reset sequences so new records don't clash with restored IDs
-  const seqTables = [
-    'categories','brands','suppliers','products','customers',
-    'sales','sale_items','purchases','purchase_items',
-    'expense_categories','expenses',
-    'stock_adjustments','stock_adjustment_items',
-    'product_variants','purchase_payments',
-    'returns','return_items','exchange_items',
-  ];
-  for (const t of seqTables) {
-    try {
-      await client.query(
-        `SELECT setval(pg_get_serial_sequence('${t}', 'id'), COALESCE((SELECT MAX(id) FROM ${t}), 1))`
-      );
-    } catch (_) {}
-  }
+  report['settings'] = { provided: (d.settings || []).length, inserted: (d.settings || []).length };
 
   return report;
 }
