@@ -343,8 +343,8 @@ export default function BarcodePage() {
         <div className="lg:col-span-2 flex flex-col gap-5">
 
           {/* Product search card */}
-          <div className="card space-y-4">
-            <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2 flex items-center gap-2">
+          <div className="card p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700/60 pb-3 flex items-center gap-2">
               <MagnifyingGlassIcon className="h-4 w-4" />
               Select Product
             </h2>
@@ -408,8 +408,8 @@ export default function BarcodePage() {
           </div>
 
           {/* Barcode generator card */}
-          <div className="card space-y-4">
-            <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2 flex items-center gap-2">
+          <div className="card p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700/60 pb-3 flex items-center gap-2">
               <QrCodeIcon className="h-4 w-4" />
               Barcode
             </h2>
@@ -480,8 +480,8 @@ export default function BarcodePage() {
           </div>
 
           {/* Bulk print card */}
-          <div className="card space-y-4">
-            <div className="flex items-center justify-between border-b border-surface-700 pb-2">
+          <div className="card p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-surface-700/60 pb-3">
               <h2 className="text-sm font-semibold text-surface-200 flex items-center gap-2">
                 <SquaresPlusIcon className="h-4 w-4" />
                 Bulk Print
@@ -565,8 +565,8 @@ export default function BarcodePage() {
 
         {/* ── RIGHT: Printer panel ── */}
         <div className="flex flex-col gap-4">
-          <div className="card space-y-4 sticky top-6">
-            <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2 flex items-center gap-2">
+          <div className="card p-5 space-y-4 sticky top-6">
+            <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700/60 pb-3 flex items-center gap-2">
               <PrinterIcon className="h-4 w-4" />
               Printer
             </h2>
