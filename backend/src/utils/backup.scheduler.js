@@ -87,6 +87,27 @@ async function runAutoBackup() {
 
         const filename = `auto-backup-company-${cid}-${new Date().toISOString().slice(0, 10)}.json`;
 
+        // Warn if product count dropped sharply vs previous snapshot
+        try {
+          const { rows: [prev] } = await query(
+            `SELECT row_counts->>'products' AS prev_products
+             FROM company_backups WHERE company_id=$1
+             ORDER BY created_at DESC LIMIT 1`,
+            [cid]
+          );
+          const prevCount = Number(prev?.prev_products ?? 0);
+          if (prevCount > 0 && counts.products === 0) {
+            logger.warn(
+              `[AutoBackup] ALERT company ${cid}: previous snapshot had ${prevCount} products ` +
+              `but DB now has 0 — investigate data loss immediately.`
+            );
+          } else if (prevCount > 10 && counts.products < prevCount * 0.5) {
+            logger.warn(
+              `[AutoBackup] WARN company ${cid}: products dropped from ${prevCount} to ${counts.products}.`
+            );
+          }
+        } catch (_) { /* comparison is best-effort */ }
+
         await query(
           `INSERT INTO company_backups (company_id, created_by, file_name, version, row_counts, data)
            VALUES ($1, NULL, $2, '2.0', $3::jsonb, $4::jsonb)`,

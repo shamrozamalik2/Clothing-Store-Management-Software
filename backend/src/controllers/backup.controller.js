@@ -115,12 +115,20 @@ async function sqliteBufferToData(buf) {
   return data;
 }
 
-// ── bulkInsert — ON CONFLICT DO UPDATE ensures zero rows skipped ──────────────
+// ── bulkInsert — UPSERT scoped to the owning company ─────────────────────────
+// The WHERE clause on DO UPDATE ensures we NEVER overwrite a row whose
+// company_id belongs to a different tenant — cross-company ID collisions
+// (which can happen if a backup from company A is restored into company B)
+// are silently skipped rather than stealing data from the other company.
 async function bulkInsert(client, table, cols, rows, mapper) {
   if (!rows?.length) return 0;
   let total = 0;
-  const CHUNK   = 500;
+  const CHUNK     = 500;
   const updateSet = cols.filter(c => c !== 'id').map(c => `${c}=EXCLUDED.${c}`).join(',');
+  const hasCompanyId = cols.includes('company_id');
+  const conflictClause = hasCompanyId
+    ? `ON CONFLICT (id) DO UPDATE SET ${updateSet} WHERE ${table}.company_id = EXCLUDED.company_id`
+    : `ON CONFLICT (id) DO UPDATE SET ${updateSet}`;
 
   for (let start = 0; start < rows.length; start += CHUNK) {
     const chunk = rows.slice(start, start + CHUNK);
@@ -129,8 +137,7 @@ async function bulkInsert(client, table, cols, rows, mapper) {
       .map((_, i) => `(${cols.map((__, j) => `$${i * n + j + 1}`).join(',')})`)
       .join(',');
     const res = await client.query(
-      `INSERT INTO ${table} (${cols.join(',')}) VALUES ${ph}
-       ON CONFLICT (id) DO UPDATE SET ${updateSet}`,
+      `INSERT INTO ${table} (${cols.join(',')}) VALUES ${ph} ${conflictClause}`,
       chunk.flatMap(mapper)
     );
     total += res.rowCount || 0;
