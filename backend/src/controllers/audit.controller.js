@@ -28,7 +28,7 @@ exports.list = async (req, res, next) => {
     const { rows } = await query(`
       SELECT a.*, u.name AS user_name, u.email AS user_email
       FROM audit_logs a
-      LEFT JOIN users u ON u.id = a.user_id
+      LEFT JOIN users u ON u.id = a.user_id AND u.company_id = a.company_id
       WHERE ${w}
       ORDER BY a.created_at DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}

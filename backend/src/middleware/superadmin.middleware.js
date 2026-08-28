@@ -2,7 +2,11 @@
 
 const jwt = require('jsonwebtoken');
 
-const SUPER_ADMIN_SECRET = process.env.SUPER_ADMIN_JWT_SECRET || process.env.JWT_SECRET;
+const SUPER_ADMIN_SECRET = (() => {
+  const s = process.env.SUPER_ADMIN_JWT_SECRET;
+  if (!s) throw new Error('[Config] Missing required environment variable: SUPER_ADMIN_JWT_SECRET');
+  return s;
+})();
 
 /**
  * Middleware: authenticate super admin JWT.

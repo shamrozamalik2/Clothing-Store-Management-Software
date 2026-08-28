@@ -523,6 +523,161 @@ async function performRestore(client, cid, d, userId) {
   }
   report['settings'] = { provided: (d.settings || []).length, inserted: (d.settings || []).length };
 
+  // ── 20. Employees (no unique constraint — insert fresh, build id map) ──────
+  const employeeMap = {};
+  for (const r of (d.employees || [])) {
+    const res = await client.query(
+      `INSERT INTO employees
+         (company_id,name,email,phone,address,designation,department,
+          base_salary,allowances,deductions,hire_date,is_active,notes,created_at,updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       RETURNING id`,
+      [cid, r.name, r.email ?? null, r.phone ?? null, r.address ?? null,
+       r.designation ?? null, r.department ?? null,
+       r.base_salary ?? 0, r.allowances ?? 0, r.deductions ?? 0,
+       r.hire_date ?? null, r.is_active ?? true, r.notes ?? null,
+       ts(r.created_at), ts(r.updated_at ?? r.created_at)]
+    );
+    employeeMap[r.id] = res.rows[0].id;
+  }
+  report['employees'] = { provided: (d.employees || []).length, inserted: Object.keys(employeeMap).length };
+
+  // ── 21. Salaries (unique: company_id, employee_id, month, year) ───────────
+  const salaryRows = (d.salaries || []).filter(r => employeeMap[r.employee_id]);
+  if (salaryRows.length) {
+    const CHUNK = 500;
+    let total = 0;
+    for (let start = 0; start < salaryRows.length; start += CHUNK) {
+      const chunk = salaryRows.slice(start, start + CHUNK);
+      const n = 14;
+      const ph = chunk.map((_, i) => `(${Array.from({ length: n }, (__, j) => `$${i * n + j + 1}`).join(',')})`).join(',');
+      const res = await client.query(
+        `INSERT INTO salaries
+           (company_id,employee_id,month,year,base_salary,allowances,deductions,
+            gross_salary,net_salary,status,paid_at,payment_method,notes,created_at)
+         VALUES ${ph}
+         ON CONFLICT (company_id,employee_id,month,year) DO NOTHING`,
+        chunk.flatMap(r => [
+          cid, employeeMap[r.employee_id], r.month, r.year,
+          r.base_salary ?? 0, r.allowances ?? 0, r.deductions ?? 0,
+          r.gross_salary ?? 0, r.net_salary ?? 0,
+          r.status ?? 'pending', r.paid_at ?? null,
+          r.payment_method ?? 'cash', r.notes ?? null, ts(r.created_at),
+        ])
+      );
+      total += res.rowCount || 0;
+    }
+    report['salaries'] = { provided: salaryRows.length, inserted: total };
+  } else {
+    report['salaries'] = { provided: 0, inserted: 0 };
+  }
+
+  // ── 22. Attendance (unique: company_id, employee_id, date) ───────────────
+  const attendRows = (d.attendance || []).filter(r => employeeMap[r.employee_id]);
+  if (attendRows.length) {
+    const CHUNK = 500;
+    let total = 0;
+    for (let start = 0; start < attendRows.length; start += CHUNK) {
+      const chunk = attendRows.slice(start, start + CHUNK);
+      const n = 8;
+      const ph = chunk.map((_, i) => `(${Array.from({ length: n }, (__, j) => `$${i * n + j + 1}`).join(',')})`).join(',');
+      const res = await client.query(
+        `INSERT INTO attendance
+           (company_id,employee_id,date,check_in,check_out,status,notes,created_at)
+         VALUES ${ph}
+         ON CONFLICT (company_id,employee_id,date) DO NOTHING`,
+        chunk.flatMap(r => [
+          cid, employeeMap[r.employee_id], r.date,
+          r.check_in ?? null, r.check_out ?? null,
+          r.status ?? 'present', r.notes ?? null, ts(r.created_at),
+        ])
+      );
+      total += res.rowCount || 0;
+    }
+    report['attendance'] = { provided: attendRows.length, inserted: total };
+  } else {
+    report['attendance'] = { provided: 0, inserted: 0 };
+  }
+
+  // ── 23. Bill of Materials (unique: company_id, product_id, raw_material_id) ─
+  const bomRows = (d.bill_of_materials || [])
+    .filter(r => productMap[r.product_id] && productMap[r.raw_material_id]);
+  if (bomRows.length) {
+    const CHUNK = 500;
+    let total = 0;
+    for (let start = 0; start < bomRows.length; start += CHUNK) {
+      const chunk = bomRows.slice(start, start + CHUNK);
+      const n = 6;
+      const ph = chunk.map((_, i) => `(${Array.from({ length: n }, (__, j) => `$${i * n + j + 1}`).join(',')})`).join(',');
+      const res = await client.query(
+        `INSERT INTO bill_of_materials
+           (company_id,product_id,raw_material_id,quantity_required,unit,created_at)
+         VALUES ${ph}
+         ON CONFLICT (company_id,product_id,raw_material_id)
+         DO UPDATE SET quantity_required=EXCLUDED.quantity_required, unit=EXCLUDED.unit`,
+        chunk.flatMap(r => [
+          cid, productMap[r.product_id], productMap[r.raw_material_id],
+          r.quantity_required ?? 1, r.unit ?? null, ts(r.created_at),
+        ])
+      );
+      total += res.rowCount || 0;
+    }
+    report['bill_of_materials'] = { provided: bomRows.length, inserted: total };
+  } else {
+    report['bill_of_materials'] = { provided: 0, inserted: 0 };
+  }
+
+  // ── 24. Production Batches (unique: company_id, reference) ───────────────
+  const batchRows = (d.production_batches || []).filter(r => productMap[r.product_id]);
+  const batchKeyMap = await insertNatural('production_batches', {
+    cols: ['company_id','product_id','reference','quantity_produced','production_cost',
+           'batch_date','status','notes','created_at'],
+    mapper: r => [
+      cid, productMap[r.product_id], r.reference ?? `IMPORT-BATCH-${r.id}`,
+      r.quantity_produced ?? 0, r.production_cost ?? 0,
+      r.batch_date ?? ts(r.created_at).slice(0, 10),
+      r.status ?? 'completed', r.notes ?? null, ts(r.created_at),
+    ],
+    conflictCols: 'company_id, reference',
+    onConflict: 'DO UPDATE SET quantity_produced=EXCLUDED.quantity_produced, status=EXCLUDED.status',
+    returnKey: 'reference',
+  }, batchRows.map(r => ({ ...r, _ref: r.reference ?? `IMPORT-BATCH-${r.id}` })));
+  const batchMap = {};
+  for (const r of batchRows) batchMap[r.id] = batchKeyMap[r.reference ?? `IMPORT-BATCH-${r.id}`];
+  const batchIds = new Set(Object.values(batchMap).filter(Boolean));
+
+  // ── 25. Production Batch Materials ────────────────────────────────────────
+  await insertChildren('production_batch_materials', {
+    cols: ['company_id','batch_id','product_id','product_name','quantity_used','unit_cost','total_cost','created_at'],
+    mapper: r => [
+      cid, batchMap[r.batch_id], r.product_id ? (productMap[r.product_id] ?? null) : null,
+      r.product_name ?? 'Material',
+      r.quantity_used ?? 0, r.unit_cost ?? 0, r.total_cost ?? 0, ts(r.created_at),
+    ],
+    parentIdCol: 'batch_id',
+    parentIds: batchIds,
+  }, (d.production_batch_materials || []).filter(r => batchMap[r.batch_id]));
+
+  // ── 26. Cart Holds (restore active holds; cart_data is JSONB) ─────────────
+  const holdRows = d.cart_holds || [];
+  if (holdRows.length) {
+    const CHUNK = 500;
+    let total = 0;
+    for (let start = 0; start < holdRows.length; start += CHUNK) {
+      const chunk = holdRows.slice(start, start + CHUNK);
+      const n = 4;
+      const ph = chunk.map((_, i) => `(${Array.from({ length: n }, (__, j) => `$${i * n + j + 1}`).join(',')})`).join(',');
+      const res = await client.query(
+        `INSERT INTO cart_holds (company_id,label,cart_data,created_at) VALUES ${ph}`,
+        chunk.flatMap(r => [cid, r.label ?? null, JSON.stringify(r.cart_data ?? {}), ts(r.created_at)])
+      );
+      total += res.rowCount || 0;
+    }
+    report['cart_holds'] = { provided: holdRows.length, inserted: total };
+  } else {
+    report['cart_holds'] = { provided: 0, inserted: 0 };
+  }
+
   return report;
 }
 
@@ -552,6 +707,13 @@ exports.exportBackup = async (req, res, next) => {
       { rows: stockAdjustmentItems },
       { rows: users },
       { rows: company },
+      { rows: employees },
+      { rows: salaries },
+      { rows: attendance },
+      { rows: bom },
+      { rows: productionBatches },
+      { rows: productionBatchMaterials },
+      { rows: cartHolds },
     ] = await Promise.all([
       query(`SELECT key,value,type,group_name,label FROM settings WHERE company_id=$1`, [cid]),
       query(`SELECT * FROM categories WHERE company_id=$1`, [cid]),
@@ -574,6 +736,13 @@ exports.exportBackup = async (req, res, next) => {
       query(`SELECT * FROM stock_adjustment_items WHERE company_id=$1`, [cid]),
       query(`SELECT id,name,email,role_id,branch_id,is_active,created_at FROM users WHERE company_id=$1`, [cid]),
       query(`SELECT id,name,slug,email,phone,plan,subscription_status,max_users,created_at FROM companies WHERE id=$1`, [cid]),
+      query(`SELECT * FROM employees WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM salaries  WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM attendance WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM bill_of_materials WHERE company_id=$1`, [cid]),
+      query(`SELECT * FROM production_batches WHERE company_id=$1`, [cid]),
+      query(`SELECT pbm.* FROM production_batch_materials pbm JOIN production_batches pb ON pb.id=pbm.batch_id WHERE pb.company_id=$1`, [cid]),
+      query(`SELECT * FROM cart_holds WHERE company_id=$1`, [cid]),
     ]);
 
     const backup = {
@@ -592,6 +761,11 @@ exports.exportBackup = async (req, res, next) => {
         expense_categories: expenseCategories.length, expenses: expenses.length,
         stock_adjustments: stockAdjustments.length,
         stock_adjustment_items: stockAdjustmentItems.length,
+        employees: employees.length, salaries: salaries.length,
+        attendance: attendance.length, bill_of_materials: bom.length,
+        production_batches: productionBatches.length,
+        production_batch_materials: productionBatchMaterials.length,
+        cart_holds: cartHolds.length,
       },
       data: {
         settings, categories, brands, suppliers,
@@ -602,6 +776,11 @@ exports.exportBackup = async (req, res, next) => {
         expense_categories: expenseCategories, expenses,
         stock_adjustments: stockAdjustments, stock_adjustment_items: stockAdjustmentItems,
         users,
+        employees, salaries, attendance,
+        bill_of_materials: bom,
+        production_batches: productionBatches,
+        production_batch_materials: productionBatchMaterials,
+        cart_holds: cartHolds,
       },
     };
 
