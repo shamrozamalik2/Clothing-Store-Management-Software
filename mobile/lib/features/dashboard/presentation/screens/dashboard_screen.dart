@@ -140,6 +140,12 @@ class _GradientAppBar extends StatelessWidget {
         ],
       ),
       actions: [
+        // Barcode scanner shortcut
+        IconButton(
+          icon:    const Icon(Icons.qr_code_scanner_rounded),
+          onPressed: () => context.push('/scanner'),
+          tooltip:  'Scan Product',
+        ),
         // Notification bell with unread badge
         Padding(
           padding: const EdgeInsets.only(right: 8),
@@ -537,10 +543,15 @@ class _QuickActions extends StatelessWidget {
   const _QuickActions();
 
   static const _actions = [
-    _Action('Stock',     Icons.inventory_2_rounded,    kGradAmber,   '/stock',     false),
-    _Action('Staff',     Icons.badge_rounded,          kGradPrimary, '/staff',     false),
-    _Action('Customers', Icons.person_pin_rounded,     kGradGreen,   '/customers', false),
-    _Action('Reports',   Icons.bar_chart_rounded,      kGradSky,     '/reports',   false),
+    _Action('Stock',     Icons.inventory_2_rounded,    kGradAmber,   '/stock',     false, false),
+    _Action('Staff',     Icons.badge_rounded,          kGradPrimary, '/staff',     false, false),
+    _Action('Customers', Icons.person_pin_rounded,     kGradGreen,   '/customers', false, false),
+    _Action('Reports',   Icons.bar_chart_rounded,      kGradSky,     '/reports',   false, false),
+  ];
+
+  static const _row2 = [
+    _Action('Scanner', Icons.qr_code_scanner_rounded, kGradViolet, '/scanner', false, true),
+    _Action('POS',     Icons.point_of_sale_rounded,   kGradPrimary, '/pos',   true,  false),
   ];
 
   @override
@@ -582,6 +593,12 @@ class _QuickActions extends StatelessWidget {
                 .map((a) => Expanded(child: _ActionTile(action: a)))
                 .toList(),
           ),
+          const SizedBox(height: 8),
+          Row(
+            children: _row2
+                .map((a) => Expanded(child: _ActionTile(action: a)))
+                .toList(),
+          ),
         ],
       ),
     );
@@ -589,12 +606,13 @@ class _QuickActions extends StatelessWidget {
 }
 
 class _Action {
-  const _Action(this.label, this.icon, this.colors, this.route, this.isPrimary);
+  const _Action(this.label, this.icon, this.colors, this.route, this.isPrimary, this.isPush);
   final String       label;
   final IconData     icon;
   final List<Color>  colors;
   final String       route;
   final bool         isPrimary;
+  final bool         isPush;
 }
 
 class _ActionTile extends StatelessWidget {
@@ -608,7 +626,7 @@ class _ActionTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: GestureDetector(
-        onTap: () => context.go(action.route),
+        onTap: () => action.isPush ? context.push(action.route) : context.go(action.route),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(

@@ -17,6 +17,7 @@ import '../../features/printer/presentation/screens/printer_screen.dart';
 // POS screens kept for deep-link access (not shown in main nav)
 import '../../features/pos/presentation/screens/pos_screen.dart';
 import '../../features/pos/presentation/screens/checkout_screen.dart';
+import '../../features/scanner/presentation/screens/barcode_scanner_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authProvider);
@@ -55,6 +56,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, state) => CheckoutScreen(cartExtra: state.extra),
           ),
         ],
+      ),
+      // Scanner opened as a full-screen modal (no shell nav)
+      GoRoute(
+        path: '/scanner',
+        pageBuilder: (_, __) => const MaterialPage(
+          fullscreenDialog: true,
+          child: BarcodeScannerScreen(),
+        ),
       ),
     ],
     errorBuilder: (_, state) => Scaffold(

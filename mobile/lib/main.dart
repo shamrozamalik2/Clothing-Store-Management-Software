@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/router/app_router.dart';
+import 'core/services/biometric_lock_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/storage/hive_storage.dart';
 import 'core/theme/app_theme.dart';
@@ -59,6 +60,7 @@ class SasGarmentsApp extends ConsumerWidget {
       darkTheme:                  AppTheme.dark(),
       themeMode:                  themeMode,
       routerConfig:               router,
+      builder: (ctx, child) => BiometricLockOverlay(child: child ?? const SizedBox()),
     );
   }
 }

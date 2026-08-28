@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/widgets/grad_widgets.dart';
 import '../providers/settings_provider.dart';
@@ -418,6 +420,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               await ref.read(authProvider.notifier).logout();
+              // ignore: use_build_context_synchronously
               if (mounted) context.go('/login');
             },
             child: const Text('Logout'),
@@ -447,30 +450,74 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 // Biometric tile — local_auth
 // ─────────────────────────────────────────────────────────────────────────────
 
+const _kBiometricKey = 'biometric_lock_enabled';
+
 class _BiometricTile extends ConsumerStatefulWidget {
   @override
   ConsumerState<_BiometricTile> createState() => _BiometricTileState();
 }
 
 class _BiometricTileState extends ConsumerState<_BiometricTile> {
-  bool _enabled = false;
+  final _auth      = LocalAuthentication();
+  bool _enabled    = false;
+  bool _available  = false;
+  bool _loading    = true;
 
   @override
   void initState() {
     super.initState();
-    _loadPref();
+    _init();
   }
 
-  Future<void> _loadPref() async {
-    // Read stored biometric preference (stored in Hive settings box)
-    // For simplicity use SharedPreferences
-    // ignore: depend_on_referenced_packages
-    // We do a lightweight read without importing hive here
-    setState(() => _enabled = false); // default off
+  Future<void> _init() async {
+    final supported = await _auth.isDeviceSupported();
+    final biometrics = supported
+        ? await _auth.getAvailableBiometrics()
+        : <BiometricType>[];
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getBool(_kBiometricKey) ?? false;
+
+    if (mounted) {
+      setState(() {
+        _available = biometrics.isNotEmpty;
+        _enabled   = _available && stored;
+        _loading   = false;
+      });
+    }
+  }
+
+  Future<void> _toggle(bool value) async {
+    if (!_available) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Biometrics not available on this device.'),
+      ));
+      return;
+    }
+
+    if (value) {
+      final ok = await _auth.authenticate(
+        localizedReason: 'Confirm biometric to enable app lock',
+        options: const AuthenticationOptions(biometricOnly: true),
+      );
+      if (!ok) return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kBiometricKey, value);
+    if (mounted) setState(() => _enabled = value);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const ListTile(
+        leading: SizedBox(
+          width: 24, height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        title: Text('Biometric Login'),
+      );
+    }
     return SwitchListTile.adaptive(
       secondary: ShaderMask(
         shaderCallback: (b) => const LinearGradient(
@@ -478,11 +525,15 @@ class _BiometricTileState extends ConsumerState<_BiometricTile> {
         ).createShader(b),
         child: const Icon(Icons.fingerprint_rounded, color: Colors.white),
       ),
-      title:     const Text('Biometric Login'),
-      subtitle:  const Text('Use fingerprint or face ID to unlock',
-          style: TextStyle(fontSize: 12)),
+      title:    const Text('Biometric Login'),
+      subtitle: Text(
+        _available
+            ? 'Lock app with fingerprint or face ID'
+            : 'Not available on this device',
+        style: const TextStyle(fontSize: 12),
+      ),
       value:     _enabled,
-      onChanged: (v) => setState(() => _enabled = v),
+      onChanged: _available ? _toggle : null,
     );
   }
 }
