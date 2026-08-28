@@ -419,8 +419,7 @@ export default function POSPage() {
       </div>
 
       {/* ── RIGHT: Cart Panel ─────────────────────────────────────────────── */}
-      <div className="w-80 xl:w-96 flex flex-col border-l border-surface-700/60"
-        style={{ background: 'linear-gradient(180deg, #0e0e1c 0%, #111126 100%)' }}>
+      <div className="pos-cart-panel w-80 xl:w-96 flex flex-col border-l border-surface-700/60">
 
         {/* Cart header */}
         <div className="relative px-4 py-3 border-b border-surface-700/50 overflow-hidden">

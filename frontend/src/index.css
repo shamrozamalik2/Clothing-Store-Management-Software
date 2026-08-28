@@ -484,6 +484,28 @@ html.dark {
 }
 
 /* ───────────────────────────────────────────────────────────
+   POS CART PANEL — always dark regardless of theme
+   Re-declares surface CSS vars to their dark-mode values so the
+   cart panel looks identical in light and dark themes.
+   ─────────────────────────────────────────────────────────── */
+.pos-cart-panel {
+  --s-50:  248 250 252;
+  --s-100: 241 245 249;
+  --s-200: 226 232 240;
+  --s-300: 203 213 225;
+  --s-400: 148 163 184;
+  --s-500: 100 116 139;
+  --s-600: 71 85 105;
+  --s-700: 51 65 85;
+  --s-800: 30 41 59;
+  --s-900: 15 23 42;
+  --s-950: 2 6 23;
+  --card:  30 41 59;
+  background: linear-gradient(180deg, #0f172a 0%, #0c1127 100%);
+  color: rgb(var(--s-100));
+}
+
+/* ───────────────────────────────────────────────────────────
    REDUCED MOTION — disable all animations
    ─────────────────────────────────────────────────────────── */
 
