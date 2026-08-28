@@ -276,7 +276,7 @@ export default function PurchaseFormPage() {
                 placeholder="0.00 = full credit" />
             </div>
 
-            <div className="card space-y-3">
+            <div className="card p-5 space-y-3">
               <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
                 Totals
               </h2>

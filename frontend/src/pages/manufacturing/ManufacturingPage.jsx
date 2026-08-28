@@ -127,7 +127,7 @@ function BOMTab() {
       </div>
 
       {/* BOM table */}
-      <div className="lg:col-span-2 card space-y-4">
+      <div className="lg:col-span-2 card p-5 space-y-4">
         {!selectedProductId ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3 text-surface-600">
             <BeakerIcon className="h-10 w-10" />
