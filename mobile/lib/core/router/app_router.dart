@@ -6,13 +6,16 @@ import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/shell/main_shell.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
-import '../../features/pos/presentation/screens/pos_screen.dart';
-import '../../features/pos/presentation/screens/checkout_screen.dart';
-import '../../features/products/presentation/screens/products_screen.dart';
-import '../../features/customers/presentation/screens/customers_screen.dart';
+import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../features/sales/presentation/screens/sales_screen.dart';
 import '../../features/reports/presentation/screens/reports_screen.dart';
+import '../../features/stock/presentation/screens/stock_screen.dart';
+import '../../features/staff/presentation/screens/staff_screen.dart';
+import '../../features/customers/presentation/screens/customers_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+// POS screens kept for deep-link access (not shown in main nav)
+import '../../features/pos/presentation/screens/pos_screen.dart';
+import '../../features/pos/presentation/screens/checkout_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authProvider);
@@ -24,30 +27,31 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loading  = auth is AuthLoading;
       final path     = state.matchedLocation;
 
-      if (loading)             return '/';
-      if (!loggedIn && path != '/login') return '/login';
-      if (loggedIn  && (path == '/login' || path == '/')) return '/dashboard';
+      if (loading)                              return '/';
+      if (!loggedIn && path != '/login')        return '/login';
+      if (loggedIn && (path == '/login' || path == '/')) return '/dashboard';
       return null;
     },
     routes: [
-      GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
+      GoRoute(path: '/',      builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       ShellRoute(
         builder: (ctx, state, child) => MainShell(child: child),
         routes: [
-          GoRoute(path: '/dashboard',  builder: (_, __) => const DashboardScreen()),
-          GoRoute(path: '/pos',        builder: (_, __) => const PosScreen()),
+          GoRoute(path: '/dashboard',     builder: (_, __) => const DashboardScreen()),
+          GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
+          GoRoute(path: '/sales',         builder: (_, __) => const SalesScreen()),
+          GoRoute(path: '/reports',       builder: (_, __) => const ReportsScreen()),
+          GoRoute(path: '/stock',         builder: (_, __) => const StockScreen()),
+          GoRoute(path: '/staff',         builder: (_, __) => const StaffScreen()),
+          GoRoute(path: '/customers',     builder: (_, __) => const CustomersScreen()),
+          GoRoute(path: '/settings',      builder: (_, __) => const SettingsScreen()),
+          // POS kept accessible for direct use if needed
+          GoRoute(path: '/pos',           builder: (_, __) => const PosScreen()),
           GoRoute(
             path: '/pos/checkout',
-            builder: (_, state) => CheckoutScreen(
-              cartExtra: state.extra,
-            ),
+            builder: (_, state) => CheckoutScreen(cartExtra: state.extra),
           ),
-          GoRoute(path: '/products',   builder: (_, __) => const ProductsScreen()),
-          GoRoute(path: '/customers',  builder: (_, __) => const CustomersScreen()),
-          GoRoute(path: '/sales',      builder: (_, __) => const SalesScreen()),
-          GoRoute(path: '/reports',    builder: (_, __) => const ReportsScreen()),
-          GoRoute(path: '/settings',   builder: (_, __) => const SettingsScreen()),
         ],
       ),
     ],

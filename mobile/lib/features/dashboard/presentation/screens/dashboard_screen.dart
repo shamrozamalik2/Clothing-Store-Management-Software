@@ -8,6 +8,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/grad_widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../data/models/dashboard_stats_model.dart';
 import '../providers/dashboard_provider.dart';
 import '../widgets/stat_card.dart';
@@ -20,6 +21,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(dashboardProvider);
     final user       = ref.watch(currentUserProvider);
+    final unread     = ref.watch(unreadCountProvider);
     final hour       = DateTime.now().hour;
     final greeting   = hour < 12
         ? 'Good Morning'
@@ -35,7 +37,7 @@ class DashboardScreen extends ConsumerWidget {
         child: CustomScrollView(
           slivers: [
             // ── Gradient App Bar ─────────────────────────────────────────────
-            _GradientAppBar(greeting: greeting, firstName: firstName),
+            _GradientAppBar(greeting: greeting, firstName: firstName, unread: unread),
 
             // ── Content ─────────────────────────────────────────────────────
             statsAsync.when(
@@ -45,6 +47,8 @@ class DashboardScreen extends ConsumerWidget {
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: 16),
                   _StatsRow(stats: stats),
+                  const SizedBox(height: 12),
+                  _PaymentBreakdown(stats: stats),
                   const SizedBox(height: 20),
                   _WeeklyChart(stats: stats),
                   const SizedBox(height: 20),
@@ -67,9 +71,14 @@ class DashboardScreen extends ConsumerWidget {
 // ── Gradient App Bar ──────────────────────────────────────────────────────────
 
 class _GradientAppBar extends StatelessWidget {
-  const _GradientAppBar({required this.greeting, required this.firstName});
+  const _GradientAppBar({
+    required this.greeting,
+    required this.firstName,
+    required this.unread,
+  });
   final String greeting;
   final String firstName;
+  final int    unread;
 
   @override
   Widget build(BuildContext context) {
@@ -114,14 +123,40 @@ class _GradientAppBar extends StatelessWidget {
         ],
       ),
       actions: [
-        // Gradient "New Sale" button in app bar
+        // Notification bell with unread badge
         Padding(
-          padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
-          child: GradSmallButton(
-            label:     'New Sale',
-            icon:      Icons.point_of_sale_rounded,
-            onPressed: () => context.go('/pos'),
-            colors:    kGradPrimary,
+          padding: const EdgeInsets.only(right: 8),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon:      const Icon(Icons.notifications_outlined),
+                onPressed: () => context.go('/notifications'),
+                tooltip:   'Notifications',
+              ),
+              if (unread > 0)
+                Positioned(
+                  right: 6,
+                  top:   6,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    padding:     const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color:        const Color(0xFFEF4444),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      unread > 9 ? '9+' : '$unread',
+                      style: const TextStyle(
+                        color:      Colors.white,
+                        fontSize:   9,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ],
@@ -198,6 +233,105 @@ class _StatsRow extends StatelessWidget {
             subtitle:  stats.lowStockCount > 0 ? 'Needs restock' : 'All good',
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Payment Breakdown ─────────────────────────────────────────────────────────
+
+class _PaymentBreakdown extends StatelessWidget {
+  const _PaymentBreakdown({required this.stats});
+  final DashboardStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    // Only show if there is any sales data
+    final total = stats.cashSales + stats.cardSales + stats.creditSales + stats.bankSales;
+    if (total == 0) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          _PmTile(
+            label:  'Cash',
+            amount: stats.cashSales,
+            icon:   Icons.payments_outlined,
+            color:  const Color(0xFF10B981),
+          ),
+          const SizedBox(width: 8),
+          _PmTile(
+            label:  'Card',
+            amount: stats.cardSales,
+            icon:   Icons.credit_card_rounded,
+            color:  const Color(0xFF6366F1),
+          ),
+          const SizedBox(width: 8),
+          _PmTile(
+            label:  'Credit',
+            amount: stats.creditSales,
+            icon:   Icons.account_balance_wallet_outlined,
+            color:  const Color(0xFFF59E0B),
+          ),
+          if (stats.bankSales > 0) ...[
+            const SizedBox(width: 8),
+            _PmTile(
+              label:  'Bank',
+              amount: stats.bankSales,
+              icon:   Icons.account_balance_outlined,
+              color:  const Color(0xFF0EA5E9),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PmTile extends StatelessWidget {
+  const _PmTile({
+    required this.label,
+    required this.amount,
+    required this.icon,
+    required this.color,
+  });
+  final String   label;
+  final double   amount;
+  final IconData icon;
+  final Color    color;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Expanded(
+      child: Container(
+        padding:    const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color:        color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border:       Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(height: 4),
+            Text(
+              formatCompact(amount),
+              style: tt.bodySmall?.copyWith(
+                color:      color,
+                fontWeight: FontWeight.w800,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              label,
+              style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant, fontSize: 9),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -386,10 +520,10 @@ class _QuickActions extends StatelessWidget {
   const _QuickActions();
 
   static const _actions = [
-    _Action('New Sale',  Icons.point_of_sale_rounded,  kGradPrimary, '/pos',       true),
-    _Action('Products',  Icons.inventory_2_rounded,    kGradSky,     '/products',  false),
-    _Action('Customers', Icons.people_rounded,         kGradGreen,   '/customers', false),
-    _Action('Reports',   Icons.bar_chart_rounded,      kGradAmber,   '/reports',   false),
+    _Action('Stock',     Icons.inventory_2_rounded,    kGradAmber,   '/stock',     false),
+    _Action('Staff',     Icons.badge_rounded,          kGradPrimary, '/staff',     false),
+    _Action('Customers', Icons.person_pin_rounded,     kGradGreen,   '/customers', false),
+    _Action('Reports',   Icons.bar_chart_rounded,      kGradSky,     '/reports',   false),
   ];
 
   @override

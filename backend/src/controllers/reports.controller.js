@@ -19,7 +19,7 @@ exports.dashboard = async (req, res, next) => {
     // 7-day window
     const weekAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const [todayRow, cogsRow, stockRow, recentRows, topRows, weekRows] = await Promise.all([
+    const [todayRow, cogsRow, stockRow, recentRows, topRows, weekRows, paymentRow] = await Promise.all([
       // today KPIs
       query(`
         SELECT
@@ -38,10 +38,12 @@ exports.dashboard = async (req, res, next) => {
         WHERE s.company_id=$1 AND s.status='completed' AND s.sale_date::date=$2
       `, [cid, today]),
 
-      // low stock count
+      // low stock + out-of-stock counts
       query(`
-        SELECT SUM(CASE WHEN track_inventory AND stock_quantity > 0
-                             AND stock_quantity <= low_stock_alert THEN 1 ELSE 0 END)::int AS low_stock_count
+        SELECT
+          SUM(CASE WHEN track_inventory AND stock_quantity > 0
+                        AND stock_quantity <= low_stock_alert THEN 1 ELSE 0 END)::int AS low_stock_count,
+          SUM(CASE WHEN track_inventory AND stock_quantity <= 0 THEN 1 ELSE 0 END)::int AS out_of_stock_count
         FROM products WHERE company_id=$1 AND is_active=TRUE
       `, [cid]),
 
@@ -82,21 +84,38 @@ exports.dashboard = async (req, res, next) => {
         GROUP BY sale_date::date
         ORDER BY sale_date::date ASC
       `, [cid, weekAgo, today]),
+
+      // today payment method breakdown
+      query(`
+        SELECT
+          COALESCE(SUM(CASE WHEN payment_method = 'cash'   THEN total_amount END), 0) AS cash_sales,
+          COALESCE(SUM(CASE WHEN payment_method = 'card'   THEN total_amount END), 0) AS card_sales,
+          COALESCE(SUM(CASE WHEN payment_method = 'credit' THEN total_amount END), 0) AS credit_sales,
+          COALESCE(SUM(CASE WHEN payment_method = 'bank'   THEN total_amount END), 0) AS bank_sales
+        FROM sales
+        WHERE company_id=$1 AND status='completed' AND sale_date::date = $2
+      `, [cid, today]),
     ]);
 
     const t    = todayRow.rows[0];
     const cogs = parseFloat(cogsRow.rows[0].cogs) || 0;
+    const pm   = paymentRow.rows[0];
 
     const todaySales = parseFloat(t.today_sales) || 0;
 
     res.json({
       success: true,
       data: {
-        today_sales:      todaySales,
-        today_orders:     t.today_orders || 0,
-        today_profit:     todaySales - cogs,
-        low_stock_count:  stockRow.rows[0].low_stock_count || 0,
-        pending_payments: parseFloat(t.pending_payments)  || 0,
+        today_sales:       todaySales,
+        today_orders:      t.today_orders || 0,
+        today_profit:      todaySales - cogs,
+        low_stock_count:   stockRow.rows[0].low_stock_count   || 0,
+        out_of_stock_count: stockRow.rows[0].out_of_stock_count || 0,
+        pending_payments:  parseFloat(t.pending_payments) || 0,
+        cash_sales:        parseFloat(pm.cash_sales)   || 0,
+        card_sales:        parseFloat(pm.card_sales)   || 0,
+        credit_sales:      parseFloat(pm.credit_sales) || 0,
+        bank_sales:        parseFloat(pm.bank_sales)   || 0,
         recent_sales:     recentRows.rows.map(r => ({
           ...r,
           total_amount: parseFloat(r.total_amount) || 0,

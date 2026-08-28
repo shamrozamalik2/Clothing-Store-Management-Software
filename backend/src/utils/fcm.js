@@ -102,10 +102,14 @@ async function notifySale(pool, companyId, saleData) {
         body:  `${saleData.customer_name || 'Walk-in'} • ₨${Number(saleData.total_amount).toFixed(0)} • ${saleData.items} item(s)`,
       },
       {
-        type:      'new_sale',
-        sale_id:   String(saleData.id),
-        reference: String(saleData.reference),
-        total:     String(saleData.total_amount),
+        type:           'new_sale',
+        sale_id:        String(saleData.id),
+        reference:      String(saleData.reference),
+        total:          String(saleData.total_amount),
+        item_count:     String(saleData.items),
+        customer_name:  String(saleData.customer_name || 'Walk-in'),
+        cashier_name:   String(saleData.cashier_name  || ''),
+        payment_method: String(saleData.payment_method || 'cash'),
       }
     );
   } catch {

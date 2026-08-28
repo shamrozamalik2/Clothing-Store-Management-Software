@@ -8,12 +8,14 @@ class HiveStorage {
       Hive.openBox<Map>(kBoxPendingSales),
       Hive.openBox(kBoxSettings),
       Hive.openBox<Map>(kBoxProducts),
+      Hive.openBox<String>(kBoxNotifications),
     ]);
   }
 
-  static Box<Map> get pendingSales => Hive.box<Map>(kBoxPendingSales);
-  static Box     get settings      => Hive.box(kBoxSettings);
-  static Box<Map> get products     => Hive.box<Map>(kBoxProducts);
+  static Box<Map>    get pendingSales  => Hive.box<Map>(kBoxPendingSales);
+  static Box         get settings      => Hive.box(kBoxSettings);
+  static Box<Map>    get products      => Hive.box<Map>(kBoxProducts);
+  static Box<String> get notifications => Hive.box<String>(kBoxNotifications);
 
   static Future<void> addPendingSale(Map<String, dynamic> sale) async {
     await pendingSales.add(sale);

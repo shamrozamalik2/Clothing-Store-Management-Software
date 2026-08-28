@@ -2,9 +2,13 @@ const String kAppName = 'SAS Garments';
 const String kDefaultApiUrl = 'https://api.probusinesscloud.com/api';
 
 // Hive box names
-const String kBoxPendingSales = 'pending_sales';
-const String kBoxSettings     = 'settings';
-const String kBoxProducts     = 'cached_products';
+const String kBoxPendingSales   = 'pending_sales';
+const String kBoxSettings       = 'settings';
+const String kBoxProducts       = 'cached_products';
+const String kBoxNotifications  = 'sale_notifications';
+
+// Max stored notifications
+const int kMaxNotifications = 100;
 
 // Pagination
 const int kDefaultPageSize = 20;

@@ -276,11 +276,13 @@ const create = async (req, res, next) => {
 
     // Push notification to admin(s)
     notifySale(pool, cid, {
-      id:            saleId,
-      reference:     sale.reference,
-      customer_name: sale.customer_name,
-      total_amount:  sale.total_amount,
-      items:         items_out.length,
+      id:             saleId,
+      reference:      sale.reference,
+      customer_name:  sale.customer_name,
+      cashier_name:   sale.cashier_name,
+      payment_method: sale.payment_method,
+      total_amount:   sale.total_amount,
+      items:          items_out.length,
     });
 
     return created(res, { ...sale, items: items_out }, 'Sale completed successfully.');
