@@ -19,6 +19,7 @@ import { settingsApi }   from '@api/settings.api';
 import { formatCurrency } from '@utils/format';
 import { printReceipt } from '@utils/printReceipt';
 import { cn } from '@utils/cn';
+import { formatQty } from '@utils/formatQty';
 import CustomerFormModal from '@pages/customers/components/CustomerFormModal';
 
 // ─── Cart reducer ─────────────────────────────────────────────────────────────
@@ -321,7 +322,7 @@ export default function POSPage() {
                           <p className="text-sm font-bold text-primary-400">{formatCurrency(p.sale_price)}</p>
                           {p.track_inventory && (
                             <p className={cn('text-xs', oos ? 'text-red-400' : 'text-surface-500')}>
-                              {oos ? 'Out of stock' : `${p.stock_quantity} left`}
+                              {oos ? 'Out of stock' : `${formatQty(p.stock_quantity)} left`}
                             </p>
                           )}
                         </div>
@@ -664,7 +665,7 @@ function ProductCard({ product, onAdd }) {
         {lowStock && (
           <div className="absolute top-2 left-2">
             <span className="text-[9px] font-bold text-amber-400 bg-black/60 border border-amber-500/30 px-1.5 py-0.5 rounded-full backdrop-blur-sm">
-              {product.stock_quantity} left
+              {formatQty(product.stock_quantity)} left
             </span>
           </div>
         )}

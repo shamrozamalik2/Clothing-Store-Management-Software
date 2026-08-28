@@ -25,6 +25,7 @@ import { productsApi } from '@api/products.api';
 import { salesApi } from '@api/sales.api';
 import { formatCurrency } from '@utils/format';
 import { cn } from '@utils/cn';
+import { formatQty } from '@utils/formatQty';
 
 /* ─── Gradient avatar ────────────────────────────────────────────────────── */
 function Avatar({ name, size = 'sm' }) {
@@ -251,7 +252,7 @@ export default function Header() {
                                   <p className="text-xs font-semibold text-surface-100 truncate">{p.name}</p>
                                   <p className={cn('text-[10px] mt-0.5',
                                     p.stock_quantity <= 0 ? 'text-red-400' : 'text-amber-400')}>
-                                    {p.stock_quantity <= 0 ? 'Out of stock' : `Only ${p.stock_quantity} left`}
+                                    {p.stock_quantity <= 0 ? 'Out of stock' : `Only ${formatQty(p.stock_quantity)} left`}
                                   </p>
                                 </div>
                               </button>

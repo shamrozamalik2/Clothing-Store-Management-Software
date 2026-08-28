@@ -22,6 +22,7 @@ import { productsApi } from '@api/products.api';
 import { reportsApi }  from '@api/reports.api';
 import { formatCurrency, formatDate } from '@utils/format';
 import { cn } from '@utils/cn';
+import { formatQty } from '@utils/formatQty';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -452,7 +453,7 @@ function StockAlerts({ lowStock, loading }) {
                       ? { background: 'rgba(239,68,68,0.15)', color: '#f87171' }
                       : { background: 'rgba(245,158,11,0.15)', color: '#fbbf24' }
                     }>
-                    {Number(p.stock_quantity) <= 0 ? 'Out' : `${p.stock_quantity} left`}
+                    {Number(p.stock_quantity) <= 0 ? 'Out' : `${formatQty(p.stock_quantity)} left`}
                   </span>
                 </div>
               ))}
