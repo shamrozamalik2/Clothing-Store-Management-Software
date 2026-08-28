@@ -415,18 +415,19 @@ exports.staffReport = async (req, res, next) => {
         u.id,
         u.name,
         u.email,
-        u.role,
+        r.name                            AS role,
         COUNT(s.id)::int                  AS sale_count,
         COALESCE(SUM(s.total_amount), 0)  AS revenue,
         COALESCE(SUM(s.paid_amount),  0)  AS collected
       FROM users u
+      LEFT JOIN roles r ON r.id = u.role_id
       LEFT JOIN sales s
         ON s.created_by = u.id
         AND s.company_id = $1
         AND s.status = 'completed'
         AND s.sale_date::date BETWEEN $2 AND $3
       WHERE u.company_id = $1
-      GROUP BY u.id, u.name, u.email, u.role
+      GROUP BY u.id, u.name, u.email, r.name
       ORDER BY revenue DESC
     `, [cid, from, to]);
 

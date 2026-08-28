@@ -2,16 +2,16 @@
 
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { authenticate, authorize } = require('../middleware/auth.middleware');
+const { authenticate, authorize, requirePermission } = require('../middleware/auth.middleware');
 const { list, getOne, create, updatePermissions } = require('../controllers/roles.controller');
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get('/', list);
-router.post('/', authorize('admin'), create);
-router.get('/:id', getOne);
+router.get('/',    requirePermission('users', 'view'), list);
+router.post('/',   authorize('admin'), create);
+router.get('/:id', requirePermission('users', 'view'), getOne);
 router.put('/:id/permissions',
   authorize('admin'),
   body('permissions').isObject().withMessage('Permissions must be an object.'),
