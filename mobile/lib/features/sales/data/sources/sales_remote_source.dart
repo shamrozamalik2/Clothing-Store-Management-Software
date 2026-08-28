@@ -8,16 +8,18 @@ class SalesRemoteSource {
   final ApiClient _api;
 
   Future<PaginatedResponse<SaleModel>> getSales({
-    int     page     = 1,
-    int     limit    = 20,
+    int     page       = 1,
+    int     limit      = 20,
     String? dateFrom,
     String? dateTo,
+    int?    customerId,
   }) async {
     final res = await _api.get(ApiEndpoints.sales, queryParameters: {
       'page':  page,
       'limit': limit,
-      if (dateFrom != null) 'date_from': dateFrom,
-      if (dateTo   != null) 'date_to':   dateTo,
+      if (dateFrom    != null) 'date_from':   dateFrom,
+      if (dateTo      != null) 'date_to':     dateTo,
+      if (customerId  != null) 'customer_id': customerId,
     });
     return PaginatedResponse.fromJson(
       res.data as Map<String, dynamic>,

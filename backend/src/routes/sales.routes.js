@@ -11,6 +11,7 @@ router.get   ('/',          requirePermission('sales', 'view'),   ctrl.list);
 router.get   ('/today',     requirePermission('sales', 'view'),   ctrl.todaySummary);
 router.get   ('/:id',       requirePermission('sales', 'view'),   ctrl.getOne);
 router.post  ('/',          requirePermission('pos',   'view'),   ctrl.create);
-router.patch ('/:id/void',  requirePermission('sales', 'delete'), ctrl.voidSale);
+router.patch ('/:id/void',            requirePermission('sales', 'delete'), ctrl.voidSale);
+router.patch ('/:id/collect-payment', requirePermission('sales', 'edit'),   ctrl.collectPayment);
 
 module.exports = router;

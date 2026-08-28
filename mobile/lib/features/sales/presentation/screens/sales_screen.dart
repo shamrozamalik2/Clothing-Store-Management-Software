@@ -2,12 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/api_endpoints.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/sale_model.dart';
 import '../providers/sales_provider.dart';
+import '../../../printer/presentation/providers/printer_provider.dart';
 import '../../../shell/main_shell.dart';
+
+final _shopNameProvider = Provider<String>((ref) {
+  final user = ref.watch(currentUserProvider);
+  return user?.companyName.isNotEmpty == true ? user!.companyName : 'SAS Garments';
+});
 
 // ── Date filter enum ─────────────────────────────────────────────────────────
 
@@ -386,6 +396,62 @@ class _SaleDetailSheetState extends ConsumerState<_SaleDetailSheet> {
     }
   }
 
+  Future<void> _printReceipt(BuildContext ctx) async {
+    if (_detail == null) return;
+    final printer = ref.read(printerProvider);
+    if (!printer.isConnected) {
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+        content: Text('No printer connected. Go to Printer tab first.'),
+      ));
+      return;
+    }
+    final shop = ref.read(_shopNameProvider);
+    await ref.read(printerProvider.notifier).printSaleReceipt(_detail!, shop);
+  }
+
+  void _shareWhatsApp() {
+    final sale = widget.sale;
+    final d    = _detail;
+    final lines = StringBuffer();
+    lines.writeln('*Receipt — ${sale.invoiceNo}*');
+    lines.writeln('Date: ${formatDateTime(sale.createdAt)}');
+    if (sale.customerName != null) lines.writeln('Customer: ${sale.customerName}');
+    lines.writeln('');
+    if (d != null) {
+      for (final item in d.items) {
+        lines.writeln('• ${item.productName}  ${item.quantity}x${formatCurrency(item.unitPrice)} = ${formatCurrency(item.total)}');
+      }
+      lines.writeln('');
+    }
+    if (sale.discountAmount > 0) lines.writeln('Discount: -${formatCurrency(sale.discountAmount)}');
+    lines.writeln('*Total: ${formatCurrency(sale.totalAmount)}*');
+    lines.writeln('Payment: ${sale.paymentMethod.toUpperCase()}');
+    lines.writeln('');
+    lines.writeln('Thank you for shopping!');
+
+    final encoded = Uri.encodeComponent(lines.toString());
+    launchUrl(Uri.parse('https://wa.me/?text=$encoded'),
+        mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _showCollectSheet(BuildContext ctx) async {
+    if (_detail == null) return;
+    await showModalBottomSheet(
+      context:            ctx,
+      isScrollControlled: true,
+      showDragHandle:     true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _CollectPaymentSheet(
+        sale: widget.sale,
+        onDone: () {
+          _loadDetail();
+          ref.invalidate(salesProvider);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs   = Theme.of(context).colorScheme;
@@ -462,6 +528,42 @@ class _SaleDetailSheetState extends ConsumerState<_SaleDetailSheet> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+
+                      // Action buttons row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ActionBtn(
+                              icon:    Icons.print_outlined,
+                              label:   'Print',
+                              color:   cs.primary,
+                              onTap:   () => _printReceipt(context),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _ActionBtn(
+                              icon:    Icons.chat_rounded,
+                              label:   'WhatsApp',
+                              color:   const Color(0xFF25D366),
+                              onTap:   () => _shareWhatsApp(),
+                            ),
+                          ),
+                          if (sale.paymentMethod == 'credit' && _detail != null) ...[
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _ActionBtn(
+                                icon:  Icons.payments_outlined,
+                                label: 'Collect',
+                                color: const Color(0xFFF59E0B),
+                                onTap: () => _showCollectSheet(context),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+
                       const SizedBox(height: 16),
                       const Divider(),
                       const SizedBox(height: 8),
@@ -481,21 +583,14 @@ class _SaleDetailSheetState extends ConsumerState<_SaleDetailSheet> {
                       const Divider(height: 24),
 
                       // Totals
-                      _TotalRow('Subtotal',       formatCurrency(sale.subtotal)),
+                      _TotalRow('Subtotal', formatCurrency(sale.subtotal)),
                       if (sale.discountAmount > 0)
-                        _TotalRow(
-                          'Discount',
-                          '- ${formatCurrency(sale.discountAmount)}',
-                          valueColor: const Color(0xFF10B981),
-                        ),
+                        _TotalRow('Discount', '- ${formatCurrency(sale.discountAmount)}',
+                            valueColor: const Color(0xFF10B981)),
                       if (sale.taxAmount > 0)
                         _TotalRow('Tax', formatCurrency(sale.taxAmount)),
                       const Divider(height: 16),
-                      _TotalRow(
-                        'Total',
-                        formatCurrency(sale.totalAmount),
-                        bold: true,
-                      ),
+                      _TotalRow('Total', formatCurrency(sale.totalAmount), bold: true),
                     ],
                   ),
       ),
@@ -690,6 +785,156 @@ class _ErrorState extends StatelessWidget {
             style: ElevatedButton.styleFrom(minimumSize: const Size(160, 44)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Action button used inside sale detail sheet ───────────────────────────────
+
+class _ActionBtn extends StatelessWidget {
+  const _ActionBtn({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+  final IconData     icon;
+  final String       label;
+  final Color        color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap:        onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding:    const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color:        color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border:       Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 4),
+            Text(label,
+                style: TextStyle(
+                    color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Collect credit payment sheet ──────────────────────────────────────────────
+
+class _CollectPaymentSheet extends ConsumerStatefulWidget {
+  const _CollectPaymentSheet({required this.sale, required this.onDone});
+  final SaleModel    sale;
+  final VoidCallback onDone;
+
+  @override
+  ConsumerState<_CollectPaymentSheet> createState() =>
+      _CollectPaymentSheetState();
+}
+
+class _CollectPaymentSheetState extends ConsumerState<_CollectPaymentSheet> {
+  final _ctrl   = TextEditingController();
+  String _method = 'cash';
+  bool   _saving = false;
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  Future<void> _submit() async {
+    final amount = double.tryParse(_ctrl.text.trim());
+    if (amount == null || amount <= 0) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(apiClientProvider).patch(
+        ApiEndpoints.saleCollectPayment(widget.sale.id),
+        data: {'amount': amount, 'payment_method': _method},
+      );
+      widget.onDone();
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Payment of ${formatCurrency(amount)} recorded.'),
+          backgroundColor: Colors.green.shade700,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final mq = MediaQuery.of(context);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Collect Payment', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('Invoice: ${widget.sale.invoiceNo}',
+                style: tt.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 20),
+            TextField(
+              controller:  _ctrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus:   true,
+              decoration: const InputDecoration(
+                labelText:  'Amount to collect',
+                prefixIcon: Icon(Icons.payments_outlined),
+                prefixText: 'PKR ',
+              ),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              value:      _method,
+              decoration: const InputDecoration(
+                labelText:  'Payment Method',
+                prefixIcon: Icon(Icons.credit_card_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'cash',  child: Text('Cash')),
+                DropdownMenuItem(value: 'card',  child: Text('Card')),
+                DropdownMenuItem(value: 'bank',  child: Text('Bank Transfer')),
+              ],
+              onChanged: (v) => setState(() => _method = v ?? 'cash'),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _submit,
+                child: _saving
+                    ? const SizedBox(height: 22, width: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                    : const Text('Record Payment'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

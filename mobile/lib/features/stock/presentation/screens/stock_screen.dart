@@ -6,6 +6,7 @@ import '../../../../core/widgets/grad_widgets.dart';
 import '../../../shell/main_shell.dart';
 import '../../data/models/stock_model.dart';
 import '../providers/stock_provider.dart';
+import 'stock_adjustment_sheet.dart';
 
 enum _StockFilter { all, lowStock, outOfStock }
 
@@ -135,7 +136,10 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                     else
                       ...filtered.map((item) => Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                        child:   _StockItemCard(item: item),
+                        child:   _StockItemCard(
+                          item:       item,
+                          onAdjusted: () => ref.invalidate(stockProvider),
+                        ),
                       )),
 
                     const SizedBox(height: 32),
@@ -283,8 +287,9 @@ class _FilterChip extends StatelessWidget {
 // ── Stock Item Card ───────────────────────────────────────────────────────────
 
 class _StockItemCard extends StatelessWidget {
-  const _StockItemCard({required this.item});
-  final LowStockItem item;
+  const _StockItemCard({required this.item, this.onAdjusted});
+  final LowStockItem  item;
+  final VoidCallback? onAdjusted;
 
   @override
   Widget build(BuildContext context) {
@@ -363,6 +368,30 @@ class _StockItemCard extends StatelessWidget {
               Text(
                 'Min: ${item.lowStockAlert}',
                 style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              const SizedBox(height: 4),
+              GestureDetector(
+                onTap: () => showModalBottomSheet(
+                  context:            context,
+                  isScrollControlled: true,
+                  showDragHandle:     true,
+                  shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                  builder: (_) => StockAdjustmentSheet(
+                    item:   item,
+                    onDone: onAdjusted,
+                  ),
+                ),
+                child: Container(
+                  padding:    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color:        cs.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text('Adjust',
+                      style: TextStyle(color: cs.primary, fontSize: 10,
+                          fontWeight: FontWeight.w600)),
+                ),
               ),
             ],
           ),

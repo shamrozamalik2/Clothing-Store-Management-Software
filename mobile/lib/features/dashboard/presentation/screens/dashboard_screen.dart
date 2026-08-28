@@ -8,6 +8,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/grad_widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../expenses/presentation/screens/quick_expense_sheet.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../data/models/dashboard_stats_model.dart';
 import '../providers/dashboard_provider.dart';
@@ -31,6 +32,22 @@ class DashboardScreen extends ConsumerWidget {
     final firstName  = user?.name.split(' ').first ?? 'there';
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => showModalBottomSheet(
+          context:            context,
+          isScrollControlled: true,
+          showDragHandle:     true,
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          builder: (_) => QuickExpenseSheet(
+            onSaved: () => ref.invalidate(dashboardProvider),
+          ),
+        ),
+        icon:  const Icon(Icons.receipt_long_outlined),
+        label: const Text('Expense'),
+        backgroundColor: const Color(0xFFF59E0B),
+        foregroundColor: Colors.white,
+      ),
       body: RefreshIndicator(
         color: const Color(0xFF6366F1),
         onRefresh: () async => ref.invalidate(dashboardProvider),

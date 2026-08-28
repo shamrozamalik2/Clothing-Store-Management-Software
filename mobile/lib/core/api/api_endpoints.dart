@@ -51,6 +51,15 @@ class ApiEndpoints {
   static const String users          = '/users';
   static const String fcmToken       = '/users/me/fcm-token';
 
+  // Expense categories
+  static const String expenseCategories  = '/expenses/categories';
+
+  // Stock adjustments
+  static const String stockAdjustments   = '/stock-adjustments';
+
+  // Collect credit payment on a sale
+  static String saleCollectPayment(int id) => '/sales/$id/collect-payment';
+
   // Returns
   static const String returns        = '/returns';
 

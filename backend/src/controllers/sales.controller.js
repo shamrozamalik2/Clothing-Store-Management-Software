@@ -384,4 +384,54 @@ const todaySummary = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { list, getOne, create, voidSale, todaySummary };
+// ─── collect credit payment ───────────────────────────────────────────────────
+
+const collectPayment = async (req, res, next) => {
+  try {
+    const cid = req.companyId;
+    const id  = parseInt(req.params.id, 10);
+    const amount = parseFloat(req.body.amount);
+    const method = req.body.payment_method || 'cash';
+
+    if (!amount || amount <= 0) {
+      return error(res, 'Amount must be greater than 0.', 400);
+    }
+
+    const { rows: [sale] } = await query(
+      'SELECT id, customer_id, due_amount FROM sales WHERE id=$1 AND company_id=$2',
+      [id, cid]
+    );
+    if (!sale) return error(res, 'Sale not found.', 404);
+
+    const due = parseFloat(sale.due_amount);
+    if (due <= 0) return error(res, 'This sale has no outstanding balance.', 409);
+
+    const pay = Math.min(amount, due);
+    const remaining = parseFloat((due - pay).toFixed(2));
+
+    await withTransaction(async (client) => {
+      await client.query(`
+        UPDATE sales
+        SET paid_amount = paid_amount + $1,
+            due_amount  = $2,
+            status      = CASE WHEN $2 = 0 THEN 'completed' ELSE status END,
+            updated_at  = NOW()
+        WHERE id=$3 AND company_id=$4
+      `, [pay, remaining, id, cid]);
+
+      if (sale.customer_id) {
+        await client.query(
+          'UPDATE customers SET current_balance = GREATEST(0, current_balance - $1), updated_at=NOW() WHERE id=$2 AND company_id=$3',
+          [pay, sale.customer_id, cid]
+        );
+      }
+    });
+
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'sales', id,
+      { due_amount: due }, { due_amount: remaining, payment_collected: pay });
+
+    return success(res, { collected: pay, remaining }, 'Payment recorded.');
+  } catch (err) { next(err); }
+};
+
+module.exports = { list, getOne, create, voidSale, todaySummary, collectPayment };

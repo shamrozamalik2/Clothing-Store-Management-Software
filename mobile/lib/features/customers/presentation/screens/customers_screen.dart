@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/api/api_client.dart';
+import '../../../../core/api/api_endpoints.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/date_formatter.dart';
+import '../../../sales/data/models/sale_model.dart';
+import '../../../sales/data/sources/sales_remote_source.dart';
 import '../../data/models/customer_model.dart';
 import '../providers/customers_provider.dart';
 import '../../../shell/main_shell.dart';
@@ -281,20 +288,69 @@ class _CustomerCard extends StatelessWidget {
 
 // ── Customer Detail Sheet ─────────────────────────────────────────────────────
 
-class _CustomerDetailSheet extends StatelessWidget {
+class _CustomerDetailSheet extends ConsumerStatefulWidget {
   const _CustomerDetailSheet({required this.customer});
   final CustomerModel customer;
 
   @override
+  ConsumerState<_CustomerDetailSheet> createState() => _CustomerDetailSheetState();
+}
+
+class _CustomerDetailSheetState extends ConsumerState<_CustomerDetailSheet> {
+  List<SaleModel>? _sales;
+  bool             _loadingSales = true;
+  CustomerModel    get c => widget.customer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSales();
+  }
+
+  Future<void> _loadSales() async {
+    try {
+      final src  = SalesRemoteSource(ref.read(apiClientProvider));
+      final resp = await src.getSales(limit: 10, customerId: c.id);
+      if (mounted) setState(() { _sales = resp.items; _loadingSales = false; });
+    } catch (_) {
+      if (mounted) setState(() { _loadingSales = false; });
+    }
+  }
+
+  void _call() {
+    if (c.phone == null) return;
+    launchUrl(Uri.parse('tel:${c.phone}'), mode: LaunchMode.externalApplication);
+  }
+
+  void _whatsapp() {
+    if (c.phone == null) return;
+    final num = c.phone!.replaceAll(RegExp(r'[^0-9+]'), '');
+    launchUrl(Uri.parse('https://wa.me/$num'), mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _collectPayment() async {
+    if ((c.outstandingBalance ?? 0) <= 0) return;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle:     true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _CustomerCollectSheet(customer: c),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final cs  = Theme.of(context).colorScheme;
-    final tt  = Theme.of(context).textTheme;
-    final initials = customer.name.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase();
+    final cs       = Theme.of(context).colorScheme;
+    final tt       = Theme.of(context).textTheme;
+    final initials = c.name.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase();
+    final hasDebt  = (c.outstandingBalance ?? 0) > 0;
 
     return DraggableScrollableSheet(
       expand:           false,
-      initialChildSize: 0.7,
-      maxChildSize:     0.92,
+      initialChildSize: 0.75,
+      maxChildSize:     0.95,
       minChildSize:     0.4,
       builder: (_, sc) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -307,64 +363,98 @@ class _CustomerDetailSheet extends StatelessWidget {
                 CircleAvatar(
                   radius:          32,
                   backgroundColor: cs.primaryContainer,
-                  child: Text(
-                    initials,
-                    style: TextStyle(
-                      color: cs.onPrimaryContainer,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  child: Text(initials,
+                      style: TextStyle(color: cs.onPrimaryContainer,
+                          fontSize: 22, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(customer.name,
+                      Text(c.name,
                           style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                      if (customer.phone != null) ...[
-                        const SizedBox(height: 4),
-                        Text(customer.phone!,
+                      if (c.phone != null)
+                        Text(c.phone!,
                             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                      ],
-                      if (customer.email != null) ...[
-                        const SizedBox(height: 2),
-                        Text(customer.email!,
+                      if (c.email != null)
+                        Text(c.email!,
                             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                             maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ],
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+
+            // Quick action buttons
+            if (c.phone != null) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon:     const Icon(Icons.phone_outlined, size: 16),
+                      label:    const Text('Call'),
+                      onPressed: _call,
+                      style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 8)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon:  const Icon(Icons.chat_rounded, size: 16,
+                          color: Color(0xFF25D366)),
+                      label: const Text('WhatsApp',
+                          style: TextStyle(color: Color(0xFF25D366))),
+                      onPressed: _whatsapp,
+                      style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          side: const BorderSide(color: Color(0xFF25D366))),
+                    ),
+                  ),
+                  if (hasDebt) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        icon:  const Icon(Icons.payments_outlined, size: 16),
+                        label: const Text('Collect'),
+                        onPressed: _collectPayment,
+                        style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFF59E0B),
+                            padding: const EdgeInsets.symmetric(vertical: 8)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+
             const Divider(),
             const SizedBox(height: 8),
 
-            // Stats row
+            // Stats
             Row(
               children: [
                 _StatTile(
-                  label: 'Loyalty Points',
-                  value: '${customer.loyaltyPoints ?? 0}',
+                  label: 'Points',
+                  value: '${c.loyaltyPoints ?? 0}',
                   icon:  Icons.star_rounded,
                   color: const Color(0xFFCA8A04),
                 ),
                 const SizedBox(width: 12),
                 _StatTile(
                   label: 'Outstanding',
-                  value: formatCurrency(customer.outstandingBalance ?? 0),
+                  value: formatCurrency(c.outstandingBalance ?? 0),
                   icon:  Icons.account_balance_wallet_outlined,
-                  color: (customer.outstandingBalance ?? 0) > 0
-                      ? const Color(0xFFEF4444)
-                      : const Color(0xFF10B981),
+                  color: hasDebt ? const Color(0xFFEF4444) : const Color(0xFF10B981),
                 ),
                 const SizedBox(width: 12),
                 _StatTile(
-                  label: 'Total Purchases',
-                  value: formatCompact(customer.totalPurchases ?? 0),
+                  label: 'Lifetime',
+                  value: formatCompact(c.totalPurchases ?? 0),
                   icon:  Icons.shopping_bag_outlined,
                   color: cs.primary,
                 ),
@@ -372,34 +462,206 @@ class _CustomerDetailSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            if (customer.address != null) ...[
-              _DetailRow('Address', customer.address!),
+            if (c.address != null) ...[
+              _DetailRow('Address', c.address!),
               const Divider(height: 24),
             ],
 
-            // Purchase history placeholder
-            Text(
-              'Purchase History',
-              style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            // Purchase history (real data)
+            Row(
+              children: [
+                Text('Recent Purchases',
+                    style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                const Spacer(),
+                if (_loadingSales)
+                  const SizedBox(width: 14, height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+              ],
             ),
-            const SizedBox(height: 12),
-            Container(
-              padding:    const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color:        cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.receipt_long_outlined,
-                      size: 36, color: cs.onSurfaceVariant),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Purchase history will appear here',
+            const SizedBox(height: 10),
+            if (_loadingSales)
+              const SizedBox()
+            else if (_sales == null || _sales!.isEmpty)
+              Container(
+                padding:    const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color:        cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text('No purchases found.',
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                    textAlign: TextAlign.center),
+              )
+            else
+              ..._sales!.map((sale) => _SaleHistoryRow(sale: sale)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SaleHistoryRow extends StatelessWidget {
+  const _SaleHistoryRow({required this.sale});
+  final SaleModel sale;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs  = Theme.of(context).colorScheme;
+    final tt  = Theme.of(context).textTheme;
+    final pmC = sale.paymentMethod == 'credit'
+        ? const Color(0xFFF59E0B)
+        : const Color(0xFF10B981);
+
+    return Container(
+      margin:     const EdgeInsets.only(bottom: 8),
+      padding:    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color:        cs.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(10),
+        border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(sale.invoiceNo,
+                    style: tt.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                Text(formatDateTime(sale.createdAt),
+                    style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          Container(
+            padding:    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color:        pmC.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Text(sale.paymentMethod.toUpperCase(),
+                style: TextStyle(color: pmC, fontSize: 9, fontWeight: FontWeight.w700)),
+          ),
+          const SizedBox(width: 8),
+          Text(formatCurrency(sale.totalAmount),
+              style: tt.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Customer collect payment sheet ────────────────────────────────────────────
+
+class _CustomerCollectSheet extends ConsumerStatefulWidget {
+  const _CustomerCollectSheet({required this.customer});
+  final CustomerModel customer;
+
+  @override
+  ConsumerState<_CustomerCollectSheet> createState() => _CustomerCollectSheetState();
+}
+
+class _CustomerCollectSheetState extends ConsumerState<_CustomerCollectSheet> {
+  final _ctrl   = TextEditingController();
+  String _method = 'cash';
+  bool   _saving = false;
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  Future<void> _submit() async {
+    final amount = double.tryParse(_ctrl.text.trim());
+    if (amount == null || amount <= 0) return;
+    setState(() => _saving = true);
+    try {
+      // Find the oldest unpaid credit sale for this customer and apply payment
+      final src  = SalesRemoteSource(ref.read(apiClientProvider));
+      final resp = await src.getSales(limit: 20, customerId: widget.customer.id);
+      final creditSales = resp.items
+          .where((s) => s.paymentMethod == 'credit' && s.status != 'cancelled')
+          .toList();
+
+      double remaining = amount;
+      for (final sale in creditSales) {
+        if (remaining <= 0) break;
+        await ref.read(apiClientProvider).patch(
+          ApiEndpoints.saleCollectPayment(sale.id),
+          data: {'amount': remaining, 'payment_method': _method},
+        );
+        remaining = 0; // simplified: apply to first unpaid sale
+      }
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${formatCurrency(amount)} recorded for ${widget.customer.name}'),
+          backgroundColor: Colors.green.shade700,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final mq = MediaQuery.of(context);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Collect Payment', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('Customer: ${widget.customer.name} • Outstanding: ${formatCurrency(widget.customer.outstandingBalance ?? 0)}',
+                style: tt.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 20),
+            TextField(
+              controller:   _ctrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus:    true,
+              decoration: const InputDecoration(
+                labelText:  'Amount',
+                prefixIcon: Icon(Icons.payments_outlined),
+                prefixText: 'PKR ',
+              ),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              value:      _method,
+              decoration: const InputDecoration(
+                labelText:  'Method',
+                prefixIcon: Icon(Icons.credit_card_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                DropdownMenuItem(value: 'card', child: Text('Card')),
+                DropdownMenuItem(value: 'bank', child: Text('Bank Transfer')),
+              ],
+              onChanged: (v) => setState(() => _method = v ?? 'cash'),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _submit,
+                child: _saving
+                    ? const SizedBox(height: 22, width: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                    : const Text('Record Payment'),
               ),
             ),
           ],

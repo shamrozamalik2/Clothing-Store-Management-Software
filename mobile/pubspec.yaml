@@ -53,6 +53,9 @@ dependencies:
   # Connectivity
   connectivity_plus: ^6.0.3
 
+  # Share / open URLs (WhatsApp receipts, phone call)
+  url_launcher: ^6.3.0
+
   # Bluetooth printing (ESC/POS thermal receipts)
   print_bluetooth_thermal: ^1.2.2
 
