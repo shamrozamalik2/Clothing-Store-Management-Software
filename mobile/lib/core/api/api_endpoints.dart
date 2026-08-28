@@ -49,6 +49,7 @@ class ApiEndpoints {
 
   // Users
   static const String users          = '/users';
+  static const String fcmToken       = '/users/me/fcm-token';
 
   // Returns
   static const String returns        = '/returns';

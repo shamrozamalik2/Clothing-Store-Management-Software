@@ -4,8 +4,10 @@ import '../../data/models/user_model.dart';
 import '../../data/sources/auth_remote_source.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../../../core/api/api_client.dart';
+// import '../../../../core/api/api_endpoints.dart'; // re-enable with FCM
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/constants/storage_keys.dart';
+// import '../../../../core/services/notification_service.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -23,9 +25,9 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 // ── State ─────────────────────────────────────────────────────────────────────
 
 sealed class AuthState {}
-class AuthLoading    extends AuthState {}
+class AuthLoading         extends AuthState {}
 class AuthUnauthenticated extends AuthState {}
-class AuthAuthenticated  extends AuthState {
+class AuthAuthenticated   extends AuthState {
   AuthAuthenticated(this.user);
   final UserEntity user;
 }
@@ -41,8 +43,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _tryRestore();
   }
 
-  final AuthRemoteSource _source;
+  final AuthRemoteSource     _source;
   final SecureStorageService _storage;
+  // ApiClient kept commented — re-add when FCM token registration is enabled
+  // final ApiClient _api;
 
   Future<void> _tryRestore() async {
     try {
@@ -55,10 +59,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
           jsonDecode(json) as Map<String, dynamic>,
         );
         state = AuthAuthenticated(user);
+        // Re-register FCM token silently after restore
+        _registerFcmToken();
         return;
       }
     } catch (_) {
-      // Storage hung, timed out, or has corrupted data — wipe and re-login
       try { await _storage.deleteAll().timeout(const Duration(seconds: 3)); } catch (_) {}
     }
     state = AuthUnauthenticated();
@@ -80,16 +85,39 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _storage.write(kKeyCompanySlug, slug);
       if (remember) await _storage.write(kKeyRememberLogin, 'true');
       state = AuthAuthenticated(result.user);
+      // Register FCM token so backend can send sale push notifications
+      _registerFcmToken();
     } catch (e) {
       state = AuthError(e.toString().replaceFirst('AppException(null): ', ''));
     }
   }
 
   Future<void> logout() async {
+    // Unregister FCM token before clearing session
+    _clearFcmToken();
     await _source.logout();
     await _storage.clearTokens();
     await _storage.delete(kKeyUser);
     state = AuthUnauthenticated();
+  }
+
+  // ── FCM token management ─────────────────────────────────────────────────
+
+  Future<void> _registerFcmToken() async {
+    // Uncomment when google-services.json is in place:
+    // try {
+    //   final token = await NotificationService.getToken();
+    //   if (token != null) {
+    //     await _api.post(ApiEndpoints.fcmToken, data: {'token': token});
+    //   }
+    // } catch (_) {}
+  }
+
+  Future<void> _clearFcmToken() async {
+    // Uncomment when FCM is enabled:
+    // try {
+    //   await _api.post(ApiEndpoints.fcmToken, data: {'token': ''});
+    // } catch (_) {}
   }
 
   UserEntity? get currentUser =>
