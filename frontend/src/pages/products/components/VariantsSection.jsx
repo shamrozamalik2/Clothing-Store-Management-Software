@@ -72,7 +72,7 @@ export default function VariantsSection({ variants = [], onChange }) {
           <p className="text-sm font-medium text-surface-200">Product Variants</p>
           <p className="text-xs text-surface-500">Add size/color variants with individual stock and pricing.</p>
         </div>
-        <Button variant="secondary" size="sm" icon={<PlusIcon className="h-3.5 w-3.5" />} onClick={openAdd}>
+        <Button type="button" variant="secondary" size="sm" icon={<PlusIcon className="h-3.5 w-3.5" />} onClick={openAdd}>
           Add Variant
         </Button>
       </div>
@@ -120,11 +120,11 @@ export default function VariantsSection({ variants = [], onChange }) {
                   </td>
                   <td className="px-2 py-2">
                     <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => openEdit(idx)}
+                      <button type="button" onClick={() => openEdit(idx)}
                         className="p-1 text-surface-500 hover:text-primary-400 transition-colors">
                         <PencilSquareIcon className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => remove(idx)}
+                      <button type="button" onClick={() => remove(idx)}
                         className="p-1 text-surface-500 hover:text-red-400 transition-colors">
                         <TrashIcon className="h-3.5 w-3.5" />
                       </button>
@@ -143,7 +143,7 @@ export default function VariantsSection({ variants = [], onChange }) {
           <p className="text-sm font-medium text-surface-200 mb-3">
             {editIdx !== null ? 'Edit Variant' : 'New Variant'}
           </p>
-          <form onSubmit={handleSubmit(save)}>
+          <div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <Input label="Size" placeholder="e.g. M, L, XL"
                 {...register('size')} />
@@ -165,12 +165,12 @@ export default function VariantsSection({ variants = [], onChange }) {
                 className="flex items-center gap-1 text-xs text-surface-400 hover:text-surface-200 transition-colors px-2 py-1">
                 <XMarkIcon className="h-3.5 w-3.5" /> Cancel
               </button>
-              <button type="submit"
+              <button type="button" onClick={handleSubmit(save)}
                 className="flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1">
                 <CheckIcon className="h-3.5 w-3.5" /> {editIdx !== null ? 'Update' : 'Add'}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
     </div>

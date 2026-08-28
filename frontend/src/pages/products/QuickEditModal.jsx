@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { XMarkIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom';
+import { XMarkIcon, PencilSquareIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { productsApi } from '@api/products.api';
@@ -31,8 +32,6 @@ export default function QuickEditModal({ product, onClose }) {
   const saveMut = useMutation({
     mutationFn: (data) => productsApi.update(product.id, {
       name:           data.name,
-      sale_price:     parseFloat(data.sale_price) || 0,
-      cost_price:     parseFloat(data.cost_price) || 0,
       stock_quantity: parseInt(data.stock_quantity, 10) || 0,
       is_active:      data.is_active,
     }),
@@ -96,18 +95,20 @@ export default function QuickEditModal({ product, onClose }) {
                       errors.name ? 'border-red-500' : 'border-surface-600')} />
                 </div>
 
-                {/* Prices */}
+                {/* Prices — locked after creation */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-1.5">Sale Price</label>
-                    <input type="number" step="0.01" min="0" {...register('sale_price')}
-                      className="w-full px-3 py-2 rounded-lg bg-surface-800 border border-surface-600 text-surface-100 text-sm focus:outline-none focus:border-primary-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-1.5">Cost Price</label>
-                    <input type="number" step="0.01" min="0" {...register('cost_price')}
-                      className="w-full px-3 py-2 rounded-lg bg-surface-800 border border-surface-600 text-surface-100 text-sm focus:outline-none focus:border-primary-500" />
-                  </div>
+                  {[
+                    { label: 'Sale Price', value: product.sale_price },
+                    { label: 'Cost Price', value: product.cost_price },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <label className="block text-xs font-semibold text-surface-400 uppercase tracking-wider mb-1.5">{label}</label>
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-900/60 border border-surface-700/50 text-surface-500 text-sm cursor-not-allowed select-none">
+                        <LockClosedIcon className="h-3 w-3 shrink-0" />
+                        <span className="font-mono">{value != null ? Number(value).toFixed(2) : '—'}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Stock */}
@@ -130,10 +131,10 @@ export default function QuickEditModal({ product, onClose }) {
 
                 {/* Footer */}
                 <div className="flex items-center justify-between pt-2 border-t border-surface-700/60">
-                  <a href={`/products/${product.id}/edit`}
+                  <Link to={`/products/${product.id}/edit`} onClick={close}
                     className="text-xs text-primary-400 hover:text-primary-300 transition-colors">
                     Full edit page →
-                  </a>
+                  </Link>
                   <div className="flex gap-2">
                     <button type="button" onClick={close}
                       className="px-4 py-2 rounded-lg border border-surface-600 text-surface-300 text-sm hover:bg-surface-700 transition-colors">
