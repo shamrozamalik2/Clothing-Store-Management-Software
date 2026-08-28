@@ -144,7 +144,7 @@ export default function PurchaseFormPage() {
           <div className="lg:col-span-2 flex flex-col gap-5">
 
             {/* Product search */}
-            <div className="card space-y-4">
+            <div className="card p-5 space-y-4">
               <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
                 Add Products
               </h2>
@@ -245,7 +245,7 @@ export default function PurchaseFormPage() {
 
           {/* Right — details + totals */}
           <div className="flex flex-col gap-5">
-            <div className="card space-y-4">
+            <div className="card p-5 space-y-4">
               <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
                 Purchase Details
               </h2>
@@ -261,7 +261,7 @@ export default function PurchaseFormPage() {
               </Select>
             </div>
 
-            <div className="card space-y-4">
+            <div className="card p-5 space-y-4">
               <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
                 Payment
               </h2>

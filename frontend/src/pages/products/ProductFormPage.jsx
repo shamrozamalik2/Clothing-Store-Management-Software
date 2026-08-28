@@ -158,7 +158,7 @@ export default function ProductFormPage() {
           <div className="lg:col-span-2 flex flex-col gap-5">
 
             {/* Basic info */}
-            <div className="card space-y-4">
+            <div className="card p-5 space-y-4">
               <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
                 Basic Information
               </h2>
@@ -210,7 +210,7 @@ export default function ProductFormPage() {
             </div>
 
             {/* Pricing */}
-            <div className="card space-y-4">
+            <div className="card p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-surface-700 pb-2">
                 <h2 className="text-sm font-semibold text-surface-200">Pricing</h2>
                 {isEditing && (
@@ -251,7 +251,7 @@ export default function ProductFormPage() {
             </div>
 
             {/* Inventory */}
-            <div className="card space-y-4">
+            <div className="card p-5 space-y-4">
               <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
                 Inventory
               </h2>
@@ -290,14 +290,14 @@ export default function ProductFormPage() {
             </div>
 
             {/* Variants */}
-            <div className="card">
+            <div className="card p-5">
               <VariantsSection variants={variants} onChange={setVariants} />
             </div>
           </div>
 
           {/* Right column — image + status */}
           <div className="flex flex-col gap-5">
-            <div className="card space-y-4">
+            <div className="card p-5 space-y-4">
               <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
                 Product Image
               </h2>
@@ -307,7 +307,7 @@ export default function ProductFormPage() {
               />
             </div>
 
-            <div className="card space-y-4">
+            <div className="card p-5 space-y-4">
               <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
                 Status
               </h2>
@@ -322,7 +322,7 @@ export default function ProductFormPage() {
               </div>
             </div>
 
-            <div className="card space-y-4">
+            <div className="card p-5 space-y-4">
               <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
                 Manufacturing Type
               </h2>

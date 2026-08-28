@@ -90,7 +90,7 @@ function BOMTab() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Finished good selector */}
-      <div className="card space-y-4">
+      <div className="card p-5 space-y-4">
         <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">Finished Products</h2>
         <p className="text-xs text-surface-500">Select a product to define its bill of materials.</p>
         <div className="flex flex-col gap-1">
@@ -248,7 +248,7 @@ function BatchTab() {
       </div>
 
       {showForm && (
-        <div className="card space-y-4">
+        <div className="card p-5 space-y-4">
           <h3 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">Record Production Batch</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>

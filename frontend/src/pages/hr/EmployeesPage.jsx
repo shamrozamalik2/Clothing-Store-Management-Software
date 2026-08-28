@@ -367,7 +367,7 @@ function AttendanceMarker({ employees, month, year }) {
   });
 
   return (
-    <div className="card space-y-4">
+    <div className="card p-5 space-y-4">
       <h3 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">Mark Attendance</h3>
       <div className="grid grid-cols-4 gap-3">
         <div>
