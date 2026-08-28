@@ -402,3 +402,40 @@ exports.purchasesSummary = async (req, res, next) => {
     res.json({ success: true, data: { period: { from, to }, totals, bySupplier, daily } });
   } catch (err) { next(err); }
 };
+
+// ─── staff report ─────────────────────────────────────────────────────────────
+
+exports.staffReport = async (req, res, next) => {
+  try {
+    const cid = req.companyId;
+    const { from, to } = getDateRange(req.query);
+
+    const { rows } = await query(`
+      SELECT
+        u.id,
+        u.name,
+        u.email,
+        u.role,
+        COUNT(s.id)::int                  AS sale_count,
+        COALESCE(SUM(s.total_amount), 0)  AS revenue,
+        COALESCE(SUM(s.paid_amount),  0)  AS collected
+      FROM users u
+      LEFT JOIN sales s
+        ON s.created_by = u.id
+        AND s.company_id = $1
+        AND s.status = 'completed'
+        AND s.sale_date::date BETWEEN $2 AND $3
+      WHERE u.company_id = $1
+      GROUP BY u.id, u.name, u.email, u.role
+      ORDER BY revenue DESC
+    `, [cid, from, to]);
+
+    const data = rows.map(r => ({
+      ...r,
+      revenue:   parseFloat(r.revenue)   || 0,
+      collected: parseFloat(r.collected) || 0,
+    }));
+
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};

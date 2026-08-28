@@ -104,7 +104,7 @@ export default function StockAdjustPage() {
                 <tr key={adj.id} className="hover:bg-surface-800/30 transition-colors">
                   <td className="px-4 py-3 font-mono font-medium text-surface-100">{adj.reference}</td>
                   <td className="px-4 py-3 text-surface-400 hidden md:table-cell">
-                    {new Date(adj.date).toLocaleDateString('en-PK')}
+                    {new Date(adj.created_at).toLocaleDateString('en-PK')}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <Badge variant={TYPE_VARIANTS[adj.type] ?? 'neutral'}>

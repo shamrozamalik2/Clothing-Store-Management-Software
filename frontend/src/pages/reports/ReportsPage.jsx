@@ -993,29 +993,18 @@ function PLTab({ params }) {
 
 function StaffTab({ params }) {
   const { data, isLoading } = useQuery({
-    queryKey: ['reports-staff-sales', params],
-    queryFn:  () => salesApi.list({ from: params.from, to: params.to, limit: 5000 }),
+    queryKey: ['reports-staff', params],
+    queryFn:  () => reportsApi.staff({ from: params.from, to: params.to }),
   });
 
-  const sales = data?.data ?? [];
-
-  const byStaff = sales.reduce((acc, s) => {
-    const name = s.cashier_name || 'Unknown';
-    if (!acc[name]) acc[name] = { name, count: 0, revenue: 0, collected: 0 };
-    acc[name].count++;
-    acc[name].revenue   += parseFloat(s.total_amount || 0);
-    acc[name].collected += parseFloat(s.paid_amount  || 0);
-    return acc;
-  }, {});
-
-  const rows = Object.values(byStaff).sort((a, b) => b.revenue - a.revenue);
+  const rows = data?.data ?? [];
   const maxRev = rows[0]?.revenue || 1;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="card p-5"><p className="text-xs text-surface-500 mb-1">Staff Members</p><p className="text-2xl font-black text-surface-100">{rows.length}</p></div>
-        <div className="card p-5"><p className="text-xs text-surface-500 mb-1">Total Sales</p><p className="text-2xl font-black text-surface-100">{sales.length}</p></div>
+        <div className="card p-5"><p className="text-xs text-surface-500 mb-1">Total Sales</p><p className="text-2xl font-black text-surface-100">{rows.reduce((s, r) => s + r.sale_count, 0)}</p></div>
         <div className="card p-5"><p className="text-xs text-surface-500 mb-1">Total Revenue</p><p className="text-2xl font-black text-green-400">{formatCurrency(rows.reduce((s, r) => s + r.revenue, 0))}</p></div>
       </div>
 
@@ -1048,7 +1037,7 @@ function StaffTab({ params }) {
                       <span className="text-sm font-medium text-surface-100">{r.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-surface-300">{r.count}</td>
+                  <td className="px-4 py-3 text-sm text-surface-300">{r.sale_count}</td>
                   <td className="px-4 py-3 text-sm font-semibold text-surface-100">{formatCurrency(r.revenue)}</td>
                   <td className="px-4 py-3 text-sm text-surface-300">{formatCurrency(r.collected)}</td>
                   <td className="px-4 py-3">

@@ -16,5 +16,6 @@ router.get('/top-products',      requirePermission('reports', 'view'), ctrl.topP
 router.get('/top-customers',     requirePermission('reports', 'view'), ctrl.topCustomers);
 router.get('/stock-valuation',   requirePermission('reports', 'view'), ctrl.stockValuation);
 router.get('/purchases-summary', requirePermission('reports', 'view'), ctrl.purchasesSummary);
+router.get('/staff',             requirePermission('reports', 'view'), ctrl.staffReport);
 
 module.exports = router;
