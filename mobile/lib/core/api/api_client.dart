@@ -1,9 +1,13 @@
+import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
+import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/app_constants.dart';
 import '../storage/secure_storage.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
+
+final _cookieJar = CookieJar();
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(ref.watch(secureStorageProvider));
@@ -19,6 +23,7 @@ class ApiClient {
     ));
 
     _dio.interceptors.addAll([
+      CookieManager(_cookieJar),
       AuthInterceptor(storage, _dio),
       ErrorInterceptor(),
       LogInterceptor(

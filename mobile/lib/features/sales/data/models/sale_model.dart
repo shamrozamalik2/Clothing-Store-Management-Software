@@ -25,15 +25,20 @@ class SaleModel {
   final String status;
   final String createdAt;
 
+  static double _d(dynamic v) =>
+      v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+  static int _i(dynamic v) =>
+      v is num ? v.toInt() : int.tryParse('$v') ?? 0;
+
   factory SaleModel.fromJson(Map<String, dynamic> j) => SaleModel(
-    id:             j['id']             as int? ?? 0,
-    invoiceNo:      j['invoice_no']?.toString() ?? '#${j['id']}',
-    customerId:     j['customer_id']    as int?,
+    id:             _i(j['id']),
+    invoiceNo:      j['invoice_no']?.toString() ?? j['reference']?.toString() ?? '#${j['id']}',
+    customerId:     j['customer_id'] != null ? _i(j['customer_id']) : null,
     customerName:   j['customer_name']?.toString(),
-    subtotal:       (j['subtotal']         as num?)?.toDouble() ?? 0,
-    discountAmount: (j['discount_amount']  as num?)?.toDouble() ?? 0,
-    taxAmount:      (j['tax_amount']       as num?)?.toDouble() ?? 0,
-    totalAmount:    (j['total_amount']     as num?)?.toDouble() ?? 0,
+    subtotal:       _d(j['subtotal']),
+    discountAmount: _d(j['discount_amount']),
+    taxAmount:      _d(j['tax_amount']),
+    totalAmount:    _d(j['total_amount']),
     paymentMethod:  j['payment_method']?.toString() ?? 'cash',
     status:         j['status']?.toString() ?? 'completed',
     createdAt:      j['created_at']?.toString() ?? '',
@@ -60,13 +65,13 @@ class SaleItemModel {
   final double total;
 
   factory SaleItemModel.fromJson(Map<String, dynamic> j) => SaleItemModel(
-    id:          j['id']          as int? ?? 0,
-    productId:   j['product_id']  as int? ?? 0,
+    id:          SaleModel._i(j['id']),
+    productId:   SaleModel._i(j['product_id']),
     productName: j['product_name']?.toString() ?? '',
-    quantity:    (j['quantity']   as num?)?.toInt()    ?? 0,
-    unitPrice:   (j['unit_price'] as num?)?.toDouble() ?? 0,
-    discount:    (j['discount']   as num?)?.toDouble() ?? 0,
-    total:       (j['total']      as num?)?.toDouble() ?? 0,
+    quantity:    SaleModel._i(j['quantity']),
+    unitPrice:   SaleModel._d(j['unit_price']),
+    discount:    SaleModel._d(j['discount']),
+    total:       SaleModel._d(j['total']),
   );
 }
 

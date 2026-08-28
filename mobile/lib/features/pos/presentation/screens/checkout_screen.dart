@@ -96,31 +96,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final cart = _resolveCart();
 
     final payload = <String, dynamic>{
-      'customerId': cart.customerId,
-      'customerName': cart.customerName,
+      if (cart.customerId != null) 'customer_id': cart.customerId,
+      'payment_method': _paymentMethod,
+      'paid_amount': cart.total,
+      if (cart.discountAmount > 0) 'discount_amount': cart.discountAmount,
+      if (cart.note.isNotEmpty) 'notes': cart.note,
       'items': cart.items
           .map((item) => {
-                'productId': item.productId,
-                'name': item.name,
-                'qty': item.quantity,
-                'price': item.price,
-                'costPrice': item.costPrice,
+                'product_id': int.tryParse(item.productId) ?? 0,
+                'quantity': item.quantity,
+                'unit_price': item.price,
                 'discount': item.discount,
-                'barcode': item.barcode,
-                'unit': item.unit,
-                'lineTotal': item.lineTotal,
               })
           .toList(),
-      'subtotal': cart.subtotal,
-      'discountPercent': cart.discountPercent,
-      'discountAmount': cart.discountAmount,
-      'taxPercent': cart.taxPercent,
-      'taxAmount': cart.taxAmount,
-      'total': cart.total,
-      'paymentMethod': _paymentMethod,
-      if (_paymentMethod == 'cash') 'cashReceived': _cashReceived,
-      if (_paymentMethod == 'cash') 'change': _change,
-      'note': cart.note,
     };
 
     try {
