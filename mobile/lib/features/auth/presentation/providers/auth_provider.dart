@@ -4,10 +4,10 @@ import '../../data/models/user_model.dart';
 import '../../data/sources/auth_remote_source.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../../../core/api/api_client.dart';
-// import '../../../../core/api/api_endpoints.dart'; // re-enable with FCM
+import '../../../../core/api/api_endpoints.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/constants/storage_keys.dart';
-// import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/notification_service.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -19,6 +19,7 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(
     ref.watch(authRemoteSourceProvider),
     ref.watch(secureStorageProvider),
+    ref.watch(apiClientProvider),
   );
 });
 
@@ -39,14 +40,13 @@ class AuthError extends AuthState {
 // ── Notifier ──────────────────────────────────────────────────────────────────
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._source, this._storage) : super(AuthLoading()) {
+  AuthNotifier(this._source, this._storage, this._api) : super(AuthLoading()) {
     _tryRestore();
   }
 
   final AuthRemoteSource     _source;
   final SecureStorageService _storage;
-  // ApiClient kept commented — re-add when FCM token registration is enabled
-  // final ApiClient _api;
+  final ApiClient            _api;
 
   Future<void> _tryRestore() async {
     try {
@@ -59,7 +59,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
           jsonDecode(json) as Map<String, dynamic>,
         );
         state = AuthAuthenticated(user);
-        // Re-register FCM token silently after restore
         _registerFcmToken();
         return;
       }
@@ -85,7 +84,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _storage.write(kKeyCompanySlug, slug);
       if (remember) await _storage.write(kKeyRememberLogin, 'true');
       state = AuthAuthenticated(result.user);
-      // Register FCM token so backend can send sale push notifications
       _registerFcmToken();
     } catch (e) {
       state = AuthError(e.toString().replaceFirst('AppException(null): ', ''));
@@ -93,7 +91,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
-    // Unregister FCM token before clearing session
     _clearFcmToken();
     await _source.logout();
     await _storage.clearTokens();
@@ -104,20 +101,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // ── FCM token management ─────────────────────────────────────────────────
 
   Future<void> _registerFcmToken() async {
-    // Uncomment when google-services.json is in place:
-    // try {
-    //   final token = await NotificationService.getToken();
-    //   if (token != null) {
-    //     await _api.post(ApiEndpoints.fcmToken, data: {'token': token});
-    //   }
-    // } catch (_) {}
+    try {
+      final token = await NotificationService.getToken();
+      if (token != null) {
+        await _api.post(ApiEndpoints.fcmToken, data: {'token': token});
+      }
+    } catch (_) {}
   }
 
   Future<void> _clearFcmToken() async {
-    // Uncomment when FCM is enabled:
-    // try {
-    //   await _api.post(ApiEndpoints.fcmToken, data: {'token': ''});
-    // } catch (_) {}
+    try {
+      await _api.post(ApiEndpoints.fcmToken, data: {'token': ''});
+    } catch (_) {}
   }
 
   UserEntity? get currentUser =>
