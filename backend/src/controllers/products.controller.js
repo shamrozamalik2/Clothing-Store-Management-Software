@@ -191,10 +191,10 @@ const create = async (req, res, next) => {
         const varSku = await uniqueSku(cid, `${sku}-${v.size || v.color || 'VAR'}`);
         await client.query(`
           INSERT INTO product_variants
-            (product_id, sku, barcode, size, color, cost_price, sale_price, stock_quantity, is_active)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE)
+            (company_id, product_id, sku, barcode, size, color, cost_price, sale_price, stock_quantity, is_active)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE)
         `, [
-          pid, varSku, v.barcode?.trim() || null,
+          cid, pid, varSku, v.barcode?.trim() || null,
           v.size || null, v.color || null,
           parseFloat(v.cost_price) || parseFloat(cost_price) || 0,
           parseFloat(v.sale_price) || parseFloat(sale_price) || 0,
@@ -398,11 +398,11 @@ const upsertVariant = async (req, res, next) => {
       const varSku = await uniqueSku(cid, `${product.sku}-${size || color || 'VAR'}`);
       const { rows: [newVar] } = await query(`
         INSERT INTO product_variants
-          (product_id, sku, barcode, size, color, cost_price, sale_price, stock_quantity, is_active)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE)
+          (company_id, product_id, sku, barcode, size, color, cost_price, sale_price, stock_quantity, is_active)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE)
         RETURNING *
       `, [
-        productId, varSku, barcode?.trim() || null,
+        cid, productId, varSku, barcode?.trim() || null,
         size || null, color || null,
         parseFloat(cost_price) || product.cost_price,
         parseFloat(sale_price) || product.sale_price,
