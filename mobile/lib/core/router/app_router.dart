@@ -14,10 +14,37 @@ import '../../features/staff/presentation/screens/staff_screen.dart';
 import '../../features/customers/presentation/screens/customers_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/printer/presentation/screens/printer_screen.dart';
-// POS screens kept for deep-link access (not shown in main nav)
 import '../../features/pos/presentation/screens/pos_screen.dart';
 import '../../features/pos/presentation/screens/checkout_screen.dart';
 import '../../features/scanner/presentation/screens/barcode_scanner_screen.dart';
+
+// ── Page transition helpers ───────────────────────────────────────────────────
+
+Page<void> _fadePage(Widget child) => CustomTransitionPage<void>(
+  child: child,
+  transitionsBuilder: (_, animation, __, child) => FadeTransition(
+    opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+    child: child,
+  ),
+  transitionDuration: const Duration(milliseconds: 200),
+);
+
+Page<void> _slidePage(Widget child) => CustomTransitionPage<void>(
+  child: child,
+  transitionsBuilder: (_, animation, __, child) {
+    final slide = Tween<Offset>(
+      begin: const Offset(0.06, 0),
+      end:   Offset.zero,
+    ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+      child:   SlideTransition(position: slide, child: child),
+    );
+  },
+  transitionDuration: const Duration(milliseconds: 250),
+);
+
+// ── Router ────────────────────────────────────────────────────────────────────
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authProvider);
@@ -29,35 +56,51 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loading  = auth is AuthLoading;
       final path     = state.matchedLocation;
 
-      if (loading)                              return '/';
-      if (!loggedIn && path != '/login')        return '/login';
-      if (loggedIn && (path == '/login' || path == '/')) return '/dashboard';
+      if (loading)                                              return '/';
+      if (!loggedIn && path != '/login')                       return '/login';
+      if (loggedIn && (path == '/login' || path == '/'))       return '/dashboard';
       return null;
     },
     routes: [
-      GoRoute(path: '/',      builder: (_, __) => const SplashScreen()),
-      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(
+        path:        '/',
+        pageBuilder: (_, __) => _fadePage(const SplashScreen()),
+      ),
+      GoRoute(
+        path:        '/login',
+        pageBuilder: (_, __) => _fadePage(const LoginScreen()),
+      ),
       ShellRoute(
         builder: (ctx, state, child) => MainShell(child: child),
         routes: [
-          GoRoute(path: '/dashboard',     builder: (_, __) => const DashboardScreen()),
-          GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
-          GoRoute(path: '/sales',         builder: (_, __) => const SalesScreen()),
-          GoRoute(path: '/reports',       builder: (_, __) => const ReportsScreen()),
-          GoRoute(path: '/stock',         builder: (_, __) => const StockScreen()),
-          GoRoute(path: '/staff',         builder: (_, __) => const StaffScreen()),
-          GoRoute(path: '/customers',     builder: (_, __) => const CustomersScreen()),
-          GoRoute(path: '/settings',      builder: (_, __) => const SettingsScreen()),
-          GoRoute(path: '/printer',       builder: (_, __) => const PrinterScreen()),
-          // POS kept accessible for direct use if needed
-          GoRoute(path: '/pos',           builder: (_, __) => const PosScreen()),
+          GoRoute(path: '/dashboard',
+              pageBuilder: (_, __) => _slidePage(const DashboardScreen())),
+          GoRoute(path: '/notifications',
+              pageBuilder: (_, __) => _slidePage(const NotificationsScreen())),
+          GoRoute(path: '/sales',
+              pageBuilder: (_, __) => _slidePage(const SalesScreen())),
+          GoRoute(path: '/reports',
+              pageBuilder: (_, __) => _slidePage(const ReportsScreen())),
+          GoRoute(path: '/stock',
+              pageBuilder: (_, __) => _slidePage(const StockScreen())),
+          GoRoute(path: '/staff',
+              pageBuilder: (_, __) => _slidePage(const StaffScreen())),
+          GoRoute(path: '/customers',
+              pageBuilder: (_, __) => _slidePage(const CustomersScreen())),
+          GoRoute(path: '/settings',
+              pageBuilder: (_, __) => _slidePage(const SettingsScreen())),
+          GoRoute(path: '/printer',
+              pageBuilder: (_, __) => _slidePage(const PrinterScreen())),
+          GoRoute(path: '/pos',
+              pageBuilder: (_, __) => _slidePage(const PosScreen())),
           GoRoute(
-            path: '/pos/checkout',
-            builder: (_, state) => CheckoutScreen(cartExtra: state.extra),
+            path:        '/pos/checkout',
+            pageBuilder: (_, state) => _slidePage(
+                CheckoutScreen(cartExtra: state.extra)),
           ),
         ],
       ),
-      // Scanner opened as a full-screen modal (no shell nav)
+      // Scanner: full-screen modal with fade-in
       GoRoute(
         path: '/scanner',
         pageBuilder: (_, __) => const MaterialPage(
