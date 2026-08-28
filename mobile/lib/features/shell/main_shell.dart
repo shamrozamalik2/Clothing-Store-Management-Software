@@ -22,6 +22,7 @@ const _kMainNavItems = [
   _NavItem('/stock',          Icons.inventory_2_rounded,      Icons.inventory_2_outlined,     'Stock'),
   _NavItem('/staff',          Icons.badge_rounded,            Icons.badge_outlined,           'Staff'),
   _NavItem('/customers',      Icons.person_pin_rounded,       Icons.person_pin_outlined,      'Customers'),
+  _NavItem('/printer',        Icons.print_rounded,            Icons.print_outlined,           'Printer'),
 ];
 
 const _kSettingsItem =

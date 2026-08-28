@@ -13,6 +13,7 @@ import '../../features/stock/presentation/screens/stock_screen.dart';
 import '../../features/staff/presentation/screens/staff_screen.dart';
 import '../../features/customers/presentation/screens/customers_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/printer/presentation/screens/printer_screen.dart';
 // POS screens kept for deep-link access (not shown in main nav)
 import '../../features/pos/presentation/screens/pos_screen.dart';
 import '../../features/pos/presentation/screens/checkout_screen.dart';
@@ -46,6 +47,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/staff',         builder: (_, __) => const StaffScreen()),
           GoRoute(path: '/customers',     builder: (_, __) => const CustomersScreen()),
           GoRoute(path: '/settings',      builder: (_, __) => const SettingsScreen()),
+          GoRoute(path: '/printer',       builder: (_, __) => const PrinterScreen()),
           // POS kept accessible for direct use if needed
           GoRoute(path: '/pos',           builder: (_, __) => const PosScreen()),
           GoRoute(
