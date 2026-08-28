@@ -138,6 +138,7 @@ const create = async (req, res, next) => {
     if (!errs.isEmpty()) return error(res, 'Validation failed', 422, errs.array());
 
     const cid = req.companyId;
+    if (!cid) return error(res, 'Authentication error: company not identified.', 403);
     const {
       name, sku: skuInput, barcode,
       category_id, brand_id, description,

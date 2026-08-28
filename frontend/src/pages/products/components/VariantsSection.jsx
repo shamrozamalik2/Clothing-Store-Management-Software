@@ -1,68 +1,68 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
 import { PlusIcon, PencilSquareIcon, TrashIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import Input from '@components/ui/Input';
 import Button from '@components/ui/Button';
 import Badge from '@components/common/Badge';
 import { cn } from '@utils/cn';
 
-/**
- * Inline variant editor used in ProductFormPage.
- * `variants` = array in form state. `onChange` propagates changes back.
- * Works in create mode (local only) and edit mode (also fires API mutations).
- */
+const EMPTY = { size: '', color: '', sku_suffix: '', price_adjustment: '', stock_quantity: '', low_stock_alert: '5' };
+
 export default function VariantsSection({ variants = [], onChange }) {
   const [showForm, setShowForm] = useState(false);
   const [editIdx, setEditIdx]   = useState(null);
+  const [form, setForm]         = useState(EMPTY);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
-    defaultValues: { size: '', color: '', sku_suffix: '', price_adjustment: 0, stock_quantity: 0, low_stock_alert: 5 },
-  });
+  function set(field) {
+    return (e) => setForm(f => ({ ...f, [field]: e.target.value }));
+  }
 
   function openAdd() {
-    reset({ size: '', color: '', sku_suffix: '', price_adjustment: 0, stock_quantity: 0, low_stock_alert: 5 });
+    setForm(EMPTY);
     setEditIdx(null);
     setShowForm(true);
   }
 
   function openEdit(idx) {
     const v = variants[idx];
-    reset({
+    setForm({
       size:             v.size ?? '',
       color:            v.color ?? '',
       sku_suffix:       v.sku_suffix ?? '',
-      price_adjustment: v.price_adjustment ?? 0,
-      stock_quantity:   v.stock_quantity ?? 0,
-      low_stock_alert:  v.low_stock_alert ?? 5,
+      price_adjustment: v.price_adjustment ?? '',
+      stock_quantity:   v.stock_quantity ?? '',
+      low_stock_alert:  v.low_stock_alert ?? '5',
     });
     setEditIdx(idx);
     setShowForm(true);
   }
 
-  function save(data) {
+  function save() {
     const parsed = {
-      ...data,
-      price_adjustment: parseFloat(data.price_adjustment) || 0,
-      stock_quantity:   parseInt(data.stock_quantity) || 0,
-      low_stock_alert:  parseInt(data.low_stock_alert) || 5,
+      size:             form.size.trim() || null,
+      color:            form.color.trim() || null,
+      sku_suffix:       form.sku_suffix.trim() || null,
+      price_adjustment: parseFloat(form.price_adjustment) || 0,
+      stock_quantity:   parseInt(form.stock_quantity, 10) || 0,
+      low_stock_alert:  parseInt(form.low_stock_alert, 10) || 5,
     };
     if (editIdx !== null) {
-      const next = variants.map((v, i) => i === editIdx ? { ...v, ...parsed } : v);
-      onChange(next);
+      onChange(variants.map((v, i) => i === editIdx ? { ...v, ...parsed } : v));
     } else {
       onChange([...variants, parsed]);
     }
     setShowForm(false);
-    reset();
-  }
-
-  function remove(idx) {
-    onChange(variants.filter((_, i) => i !== idx));
+    setForm(EMPTY);
+    setEditIdx(null);
   }
 
   function cancel() {
     setShowForm(false);
-    reset();
+    setForm(EMPTY);
+    setEditIdx(null);
+  }
+
+  function remove(idx) {
+    onChange(variants.filter((_, i) => i !== idx));
   }
 
   return (
@@ -137,39 +137,35 @@ export default function VariantsSection({ variants = [], onChange }) {
         </div>
       )}
 
-      {/* Inline form */}
+      {/* Inline form — plain local state, no nested useForm */}
       {showForm && (
         <div className="rounded-lg border border-primary-500/40 bg-primary-500/5 p-4">
           <p className="text-sm font-medium text-surface-200 mb-3">
             {editIdx !== null ? 'Edit Variant' : 'New Variant'}
           </p>
-          <div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <Input label="Size" placeholder="e.g. M, L, XL"
-                {...register('size')} />
-              <Input label="Color" placeholder="e.g. Red, Navy"
-                {...register('color')} />
-              <Input label="SKU Suffix" placeholder="e.g. -RED-M"
-                {...register('sku_suffix')} />
-              <Input label="Price Adjustment (₨)" type="number" step="0.01"
-                error={errors.price_adjustment?.message}
-                {...register('price_adjustment')} />
-              <Input label="Stock Qty" type="number" min="0"
-                error={errors.stock_quantity?.message}
-                {...register('stock_quantity')} />
-              <Input label="Low Stock Alert" type="number" min="0"
-                {...register('low_stock_alert')} />
-            </div>
-            <div className="flex items-center justify-end gap-2 mt-3">
-              <button type="button" onClick={cancel}
-                className="flex items-center gap-1 text-xs text-surface-400 hover:text-surface-200 transition-colors px-2 py-1">
-                <XMarkIcon className="h-3.5 w-3.5" /> Cancel
-              </button>
-              <button type="button" onClick={handleSubmit(save)}
-                className="flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1">
-                <CheckIcon className="h-3.5 w-3.5" /> {editIdx !== null ? 'Update' : 'Add'}
-              </button>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Input label="Size" placeholder="e.g. M, L, XL"
+              value={form.size} onChange={set('size')} />
+            <Input label="Color" placeholder="e.g. Red, Navy"
+              value={form.color} onChange={set('color')} />
+            <Input label="SKU Suffix" placeholder="e.g. -RED-M"
+              value={form.sku_suffix} onChange={set('sku_suffix')} />
+            <Input label="Price Adjustment (₨)" type="number" step="0.01"
+              value={form.price_adjustment} onChange={set('price_adjustment')} />
+            <Input label="Stock Qty" type="number" min="0"
+              value={form.stock_quantity} onChange={set('stock_quantity')} />
+            <Input label="Low Stock Alert" type="number" min="0"
+              value={form.low_stock_alert} onChange={set('low_stock_alert')} />
+          </div>
+          <div className="flex items-center justify-end gap-2 mt-3">
+            <button type="button" onClick={cancel}
+              className="flex items-center gap-1 text-xs text-surface-400 hover:text-surface-200 transition-colors px-2 py-1">
+              <XMarkIcon className="h-3.5 w-3.5" /> Cancel
+            </button>
+            <button type="button" onClick={save}
+              className="flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors px-2 py-1">
+              <CheckIcon className="h-3.5 w-3.5" /> {editIdx !== null ? 'Update' : 'Add'}
+            </button>
           </div>
         </div>
       )}
