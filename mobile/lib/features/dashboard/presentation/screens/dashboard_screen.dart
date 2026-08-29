@@ -13,7 +13,6 @@ import '../../../notifications/presentation/providers/notifications_provider.dar
 import '../../data/models/dashboard_stats_model.dart';
 import '../providers/dashboard_provider.dart';
 import '../widgets/stat_card.dart';
-import '../../../shell/main_shell.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -53,7 +52,7 @@ class DashboardScreen extends ConsumerWidget {
         onRefresh: () async => ref.invalidate(dashboardProvider),
         child: CustomScrollView(
           slivers: [
-            // ── Gradient App Bar ─────────────────────────────────────────────
+            // ── App Bar ──────────────────────────────────────────────────────
             _GradientAppBar(greeting: greeting, firstName: firstName, unread: unread),
 
             // ── Content ─────────────────────────────────────────────────────
@@ -62,6 +61,8 @@ class DashboardScreen extends ConsumerWidget {
               error:   (e, _) => SliverToBoxAdapter(child: _ErrorCard(error: e.toString())),
               data:    (stats) => SliverList(
                 delegate: SliverChildListDelegate([
+                  const SizedBox(height: 12),
+                  _CompanyBanner(userName: user?.name ?? 'Owner'),
                   const SizedBox(height: 16),
                   _StatsRow(stats: stats),
                   const SizedBox(height: 12),
@@ -102,15 +103,12 @@ class _GradientAppBar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return SliverAppBar(
-      floating:        true,
-      snap:            true,
-      expandedHeight:  0,
-      backgroundColor: cs.surfaceContainer,
-      surfaceTintColor: Colors.transparent,
-      leading: IconButton(
-        icon: const Icon(Icons.menu_rounded),
-        onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
-      ),
+      floating:             true,
+      snap:                 true,
+      expandedHeight:       0,
+      backgroundColor:      cs.surfaceContainer,
+      surfaceTintColor:     Colors.transparent,
+      automaticallyImplyLeading: false,
       title: Row(
         children: [
           Column(
@@ -197,6 +195,104 @@ class _GradientAppBar extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Company Banner ────────────────────────────────────────────────────────────
+
+class _CompanyBanner extends StatelessWidget {
+  const _CompanyBanner({required this.userName});
+  final String userName;
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end:   Alignment.bottomRight,
+            colors: [Color(0xFF4338CA), Color(0xFF6366F1), Color(0xFF818CF8)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color:      const Color(0xFF4F46E5).withValues(alpha: 0.30),
+              blurRadius: 20,
+              offset:     const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'ACTIVE',
+                          style: tt.labelSmall?.copyWith(
+                            color:      Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize:   9,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'SAS Garments',
+                    style: tt.titleLarge?.copyWith(
+                      color:       Colors.white,
+                      fontWeight:  FontWeight.w800,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    userName,
+                    style: tt.bodyMedium?.copyWith(
+                      color:      Colors.white.withValues(alpha: 0.80),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width:  52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.20),
+                border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+              ),
+              child: const Icon(
+                Icons.storefront_rounded,
+                color: Colors.white,
+                size:  26,
+              ),
+            ),
+          ],
         ),
       ),
     );
