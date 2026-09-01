@@ -13,9 +13,9 @@ const int kMaxNotifications = 100;
 // Pagination
 const int kDefaultPageSize = 20;
 
-// Timeouts
-const Duration kConnectTimeout = Duration(seconds: 15);
-const Duration kReceiveTimeout = Duration(seconds: 30);
+// Timeouts — receiveTimeout is 90s to survive Render.com free-tier cold starts
+const Duration kConnectTimeout = Duration(seconds: 30);
+const Duration kReceiveTimeout = Duration(seconds: 90);
 
 // Receipt widths
 const int kPrinterWidth58mm = 32;
