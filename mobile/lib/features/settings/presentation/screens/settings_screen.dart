@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/widgets/grad_widgets.dart';
 import '../providers/settings_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
@@ -276,47 +278,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
 
-          // ── Preferences ────────────────────────────────────────────────────
-          const _SectionLabel('Preferences'),
-          Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: ShaderMask(
-                    shaderCallback: (b) => const LinearGradient(
-                      colors: kGradElectric,
-                    ).createShader(b),
-                    child: const Icon(Icons.print_rounded, color: Colors.white),
-                  ),
-                  title:   const Text('Printer Settings'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () {
-                    // /settings/printer is a placeholder route
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Printer settings coming soon')),
-                    );
-                  },
-                ),
-                Divider(
-                  indent: 56, endIndent: 0, height: 1,
-                  color: cs.outlineVariant.withValues(alpha: 0.5),
-                ),
-                ListTile(
-                  leading: ShaderMask(
-                    shaderCallback: (b) => const LinearGradient(
-                      colors: kGradAmber,
-                    ).createShader(b),
-                    child: const Icon(Icons.notifications_outlined, color: Colors.white),
-                  ),
-                  title:   const Text('Notifications'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => _showNotificationsSheet(context),
-                ),
-              ],
-            ),
-          ),
-
           // ── Security ───────────────────────────────────────────────────────
           const _SectionLabel('Security'),
           Card(
@@ -430,13 +391,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showNotificationsSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (_) => const _NotificationsSheet(),
-    );
-  }
-
   void _showPinSetupSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context:    context,
@@ -497,7 +451,7 @@ class _BiometricTileState extends ConsumerState<_BiometricTile> {
     if (value) {
       final ok = await _auth.authenticate(
         localizedReason: 'Confirm biometric to enable app lock',
-        options: const AuthenticationOptions(biometricOnly: true),
+        options: const AuthenticationOptions(biometricOnly: false),
       );
       if (!ok) return;
     }
@@ -539,58 +493,6 @@ class _BiometricTileState extends ConsumerState<_BiometricTile> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Notifications bottom sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _NotificationsSheet extends StatefulWidget {
-  const _NotificationsSheet();
-
-  @override
-  State<_NotificationsSheet> createState() => _NotificationsSheetState();
-}
-
-class _NotificationsSheetState extends State<_NotificationsSheet> {
-  bool _salesAlerts   = true;
-  bool _stockAlerts   = true;
-  bool _systemUpdates = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Notifications',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 16),
-          SwitchListTile.adaptive(
-            title:    const Text('Sales Alerts'),
-            value:    _salesAlerts,
-            onChanged: (v) => setState(() => _salesAlerts = v),
-            contentPadding: EdgeInsets.zero,
-          ),
-          SwitchListTile.adaptive(
-            title:    const Text('Low Stock Alerts'),
-            value:    _stockAlerts,
-            onChanged: (v) => setState(() => _stockAlerts = v),
-            contentPadding: EdgeInsets.zero,
-          ),
-          SwitchListTile.adaptive(
-            title:    const Text('System Updates'),
-            value:    _systemUpdates,
-            onChanged: (v) => setState(() => _systemUpdates = v),
-            contentPadding: EdgeInsets.zero,
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // PIN setup bottom sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -602,9 +504,11 @@ class _PinSetupSheet extends StatefulWidget {
 }
 
 class _PinSetupSheetState extends State<_PinSetupSheet> {
-  final _pinCtrl    = TextEditingController();
+  final _pinCtrl     = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  final _storage     = const FlutterSecureStorage();
   String? _error;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -655,15 +559,19 @@ class _PinSetupSheetState extends State<_PinSetupSheet> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
-            Text(_error!,
-                style: TextStyle(color: cs.error, fontSize: 12)),
+            Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
           ],
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: _save,
-              child: const Text('Save PIN'),
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Save PIN'),
             ),
           ),
         ],
@@ -671,7 +579,7 @@ class _PinSetupSheetState extends State<_PinSetupSheet> {
     );
   }
 
-  void _save() {
+  Future<void> _save() async {
     final pin     = _pinCtrl.text.trim();
     final confirm = _confirmCtrl.text.trim();
     if (pin.length < 4) {
@@ -682,11 +590,20 @@ class _PinSetupSheetState extends State<_PinSetupSheet> {
       setState(() => _error = 'PINs do not match');
       return;
     }
-    // TODO: persist PIN via SecureStorage using kKeyPinCode
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('PIN saved successfully')),
-    );
+    setState(() => _saving = true);
+    try {
+      await _storage.write(key: kKeyPinCode, value: pin);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PIN saved successfully')),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Failed to save PIN. Try again.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 }
 
