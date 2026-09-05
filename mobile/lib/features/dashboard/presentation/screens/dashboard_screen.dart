@@ -30,23 +30,18 @@ class DashboardScreen extends ConsumerWidget {
             : 'Good Evening';
     final firstName  = user?.name.split(' ').first ?? 'there';
 
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showModalBottomSheet(
-          context:            context,
-          isScrollControlled: true,
-          showDragHandle:     true,
-          shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-          builder: (_) => QuickExpenseSheet(
-            onSaved: () => ref.invalidate(dashboardProvider),
-          ),
-        ),
-        icon:  const Icon(Icons.receipt_long_outlined),
-        label: const Text('Expense'),
-        backgroundColor: const Color(0xFFF59E0B),
-        foregroundColor: Colors.white,
+    void showExpenseSheet() => showModalBottomSheet(
+      context:            context,
+      isScrollControlled: true,
+      showDragHandle:     true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => QuickExpenseSheet(
+        onSaved: () => ref.invalidate(dashboardProvider),
       ),
+    );
+
+    return Scaffold(
       body: RefreshIndicator(
         color: const Color(0xFF6366F1),
         onRefresh: () async => ref.invalidate(dashboardProvider),
@@ -62,7 +57,10 @@ class DashboardScreen extends ConsumerWidget {
               data:    (stats) => SliverList(
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: 12),
-                  _CompanyBanner(userName: user?.name ?? 'Owner'),
+                  _CompanyBanner(
+                    companyName: user?.companyName ?? 'My Store',
+                    userName:    user?.name ?? 'Owner',
+                  ),
                   const SizedBox(height: 16),
                   _StatsRow(stats: stats),
                   const SizedBox(height: 12),
@@ -70,7 +68,7 @@ class DashboardScreen extends ConsumerWidget {
                   const SizedBox(height: 20),
                   _WeeklyChart(stats: stats),
                   const SizedBox(height: 20),
-                  const _QuickActions(),
+                  _QuickActions(onExpenseTap: showExpenseSheet),
                   const SizedBox(height: 20),
                   _RecentSales(stats: stats),
                   const SizedBox(height: 20),
@@ -204,7 +202,8 @@ class _GradientAppBar extends StatelessWidget {
 // ── Company Banner ────────────────────────────────────────────────────────────
 
 class _CompanyBanner extends StatelessWidget {
-  const _CompanyBanner({required this.userName});
+  const _CompanyBanner({required this.companyName, required this.userName});
+  final String companyName;
   final String userName;
 
   @override
@@ -214,18 +213,18 @@ class _CompanyBanner extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end:   Alignment.bottomRight,
-            colors: [Color(0xFF4338CA), Color(0xFF6366F1), Color(0xFF818CF8)],
+            colors: [Color(0xFF3730A3), Color(0xFF4F46E5), Color(0xFF6366F1)],
           ),
           boxShadow: [
             BoxShadow(
-              color:      const Color(0xFF4F46E5).withValues(alpha: 0.30),
-              blurRadius: 20,
+              color:      const Color(0xFF4F46E5).withValues(alpha: 0.35),
+              blurRadius: 24,
               offset:     const Offset(0, 6),
             ),
           ],
@@ -236,41 +235,36 @@ class _CompanyBanner extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'ACTIVE',
-                          style: tt.labelSmall?.copyWith(
-                            color:      Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize:   9,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'ACTIVE',
+                      style: tt.labelSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w700,
+                        fontSize:   9,
+                        letterSpacing: 0.8,
                       ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
-                    'SAS Garments',
-                    style: tt.titleLarge?.copyWith(
+                    companyName,
+                    style: tt.titleMedium?.copyWith(
                       color:       Colors.white,
                       fontWeight:  FontWeight.w800,
                       letterSpacing: -0.3,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     userName,
-                    style: tt.bodyMedium?.copyWith(
-                      color:      Colors.white.withValues(alpha: 0.80),
+                    style: tt.bodySmall?.copyWith(
+                      color:      Colors.white.withValues(alpha: 0.75),
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -278,19 +272,15 @@ class _CompanyBanner extends StatelessWidget {
               ),
             ),
             Container(
-              width:  52,
-              height: 52,
+              width:  44,
+              height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.20),
+                color: Colors.white.withValues(alpha: 0.18),
                 border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+                    color: Colors.white.withValues(alpha: 0.30), width: 1.5),
               ),
-              child: const Icon(
-                Icons.storefront_rounded,
-                color: Colors.white,
-                size:  26,
-              ),
+              child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 22),
             ),
           ],
         ),
@@ -636,19 +626,8 @@ class _WeeklyChart extends StatelessWidget {
 // ── Quick Actions ─────────────────────────────────────────────────────────────
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions();
-
-  static const _actions = [
-    _Action('Stock',     Icons.inventory_2_rounded,    kGradAmber,   '/stock',     false, false),
-    _Action('Staff',     Icons.badge_rounded,          kGradPrimary, '/staff',     false, false),
-    _Action('Customers', Icons.person_pin_rounded,     kGradGreen,   '/customers', false, false),
-    _Action('Reports',   Icons.bar_chart_rounded,      kGradSky,     '/reports',   false, false),
-  ];
-
-  static const _row2 = [
-    _Action('Scanner', Icons.qr_code_scanner_rounded, kGradViolet, '/scanner', false, true),
-    _Action('POS',     Icons.point_of_sale_rounded,   kGradPrimary, '/pos',   true,  false),
-  ];
+  const _QuickActions({required this.onExpenseTap});
+  final VoidCallback onExpenseTap;
 
   @override
   Widget build(BuildContext context) {
@@ -684,16 +663,60 @@ class _QuickActions extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: _actions
-                .map((a) => Expanded(child: _ActionTile(action: a)))
-                .toList(),
-          ),
+          // Row 1 — 3 tiles
+          Row(children: [
+            _Tile(icon: Icons.inventory_2_rounded,  label: 'Stock',     grad: kGradAmber,   onTap: () => context.go('/stock')),
+            const SizedBox(width: 8),
+            _Tile(icon: Icons.badge_rounded,         label: 'Staff',     grad: kGradPrimary, onTap: () => context.go('/staff')),
+            const SizedBox(width: 8),
+            _Tile(icon: Icons.person_pin_rounded,    label: 'Customers', grad: kGradGreen,   onTap: () => context.go('/customers')),
+          ]),
           const SizedBox(height: 8),
-          Row(
-            children: _row2
-                .map((a) => Expanded(child: _ActionTile(action: a)))
-                .toList(),
+          // Row 2 — 3 tiles
+          Row(children: [
+            _Tile(icon: Icons.bar_chart_rounded,        label: 'Reports',  grad: kGradSky,     onTap: () => context.go('/reports')),
+            const SizedBox(width: 8),
+            _Tile(icon: Icons.qr_code_scanner_rounded,  label: 'Scanner',  grad: kGradViolet,  onTap: () => context.push('/scanner')),
+            const SizedBox(width: 8),
+            _Tile(icon: Icons.receipt_long_outlined,    label: 'Expense',  grad: kGradAmber,   onTap: onExpenseTap),
+          ]),
+          const SizedBox(height: 8),
+          // POS — full-width primary button
+          GestureDetector(
+            onTap: () => context.go('/pos'),
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end:   Alignment.centerRight,
+                  colors: [Color(0xFF3730A3), Color(0xFF4F46E5), Color(0xFF6366F1)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color:      const Color(0xFF4F46E5).withValues(alpha: 0.32),
+                    blurRadius: 16,
+                    offset:     const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.point_of_sale_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Open POS',
+                    style: tt.labelLarge?.copyWith(
+                      color:      Colors.white,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -701,75 +724,61 @@ class _QuickActions extends StatelessWidget {
   }
 }
 
-class _Action {
-  const _Action(this.label, this.icon, this.colors, this.route, this.isPrimary, this.isPush);
-  final String       label;
-  final IconData     icon;
-  final List<Color>  colors;
-  final String       route;
-  final bool         isPrimary;
-  final bool         isPush;
-}
-
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.action});
-  final _Action action;
+class _Tile extends StatelessWidget {
+  const _Tile({
+    required this.icon,
+    required this.label,
+    required this.grad,
+    required this.onTap,
+  });
+  final IconData         icon;
+  final String           label;
+  final List<Color>      grad;
+  final VoidCallback     onTap;
 
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+    final cs = Theme.of(context).colorScheme;
+    return Expanded(
       child: GestureDetector(
-        onTap: () => action.isPush ? context.push(action.route) : context.go(action.route),
+        onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
+            color:        cs.surfaceContainer,
             borderRadius: BorderRadius.circular(14),
-            gradient: action.isPrimary
-                ? const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end:   Alignment.bottomRight,
-                    colors: kGradPrimary,
-                  )
-                : LinearGradient(
-                    begin: Alignment.topLeft,
-                    end:   Alignment.bottomRight,
-                    colors: [
-                      action.colors[0].withValues(alpha: 0.14),
-                      action.colors[1].withValues(alpha: 0.08),
-                    ],
-                  ),
-            border: Border.all(
-              color: action.isPrimary
-                  ? Colors.transparent
-                  : action.colors[0].withValues(alpha: 0.22),
-            ),
-            boxShadow: action.isPrimary
-                ? [
-                    BoxShadow(
-                      color:      action.colors[0].withValues(alpha: 0.28),
-                      blurRadius: 12,
-                      offset:     const Offset(0, 4),
-                    ),
-                  ]
-                : [],
+            border: Border.all(color: grad[0].withValues(alpha: 0.18)),
+            boxShadow: [
+              BoxShadow(
+                color:      grad[0].withValues(alpha: 0.06),
+                blurRadius: 8,
+                offset:     const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                action.icon,
-                color: action.isPrimary ? Colors.white : action.colors[0],
-                size:  24,
+              Container(
+                width:  36,
+                height: 36,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end:   Alignment.bottomRight,
+                    colors: [grad[0].withValues(alpha: 0.15), grad[1].withValues(alpha: 0.08)],
+                  ),
+                ),
+                child: Icon(icon, color: grad[0], size: 18),
               ),
               const SizedBox(height: 6),
               Text(
-                action.label,
+                label,
                 style: tt.labelSmall?.copyWith(
-                  color:      action.isPrimary ? Colors.white : action.colors[0],
-                  fontWeight: FontWeight.w700,
+                  color:      cs.onSurface,
+                  fontWeight: FontWeight.w600,
                   fontSize:   10,
                 ),
                 textAlign: TextAlign.center,
