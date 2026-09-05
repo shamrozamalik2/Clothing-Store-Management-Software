@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../products/data/models/product_model.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/grad_widgets.dart';
 
 // ---------------------------------------------------------------------------
 // ProductGrid
@@ -27,13 +28,25 @@ class ProductGrid extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inventory_2_outlined,
-                size: 64, color: Theme.of(context).colorScheme.outlineVariant),
-            const SizedBox(height: 12),
+            const GradIconBox(
+              icon: Icons.inventory_2_rounded,
+              colors: kGradPrimary,
+              size: 64,
+              iconSize: 30,
+              borderRadius: 18,
+            ),
+            const SizedBox(height: 14),
             Text(
               'No products found',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Try a different search or category',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
           ],
@@ -71,64 +84,96 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
+    return Container(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: kGradPrimary[0].withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => onTap(product),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ---- Image / placeholder -----------------------------------
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _ProductImage(imageUrl: product.imageUrl),
-                  // Stock badge (top-right)
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: _StockBadge(qty: product.stockQuantity),
+        child: Material(
+          color: cs.surfaceContainer,
+          child: InkWell(
+            onTap: () => onTap(product),
+            splashColor: kGradPrimary[0].withValues(alpha: 0.08),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Top gradient accent bar
+                Container(
+                  height: 2,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: kGradPrimary,
+                    ),
                   ),
-                ],
-              ),
-            ),
-            // ---- Info --------------------------------------------------
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    product.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                ),
+                // Image / placeholder
+                Expanded(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _ProductImage(imageUrl: product.imageUrl),
+                      // Stock badge (top-right)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: _StockBadge(qty: product.stockQuantity),
+                      ),
+                    ],
+                  ),
+                ),
+                // Info section
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.3),
+                      ),
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        product.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           height: 1.3,
                         ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    formatCurrency(product.sellingPrice),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.bold,
+                      ),
+                      const SizedBox(height: 4),
+                      ShaderMask(
+                        shaderCallback: (bounds) => const LinearGradient(
+                          colors: kGradPrimary,
+                        ).createShader(bounds),
+                        child: Text(
+                          formatCurrency(product.sellingPrice),
+                          style: tt.bodyMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -165,11 +210,19 @@ class _Placeholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Icon(
-        Icons.inventory_2_outlined,
-        size: 40,
-        color: Theme.of(context).colorScheme.outlineVariant,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E1B3A), Color(0xFF312E81)],
+        ),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.inventory_2_rounded,
+          size: 36,
+          color: Color(0x606366F1),
+        ),
       ),
     );
   }
@@ -186,17 +239,25 @@ class _StockBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool low = qty > 0 && qty <= 5;
-    final Color bg = qty == 0
-        ? Colors.red.withValues(alpha: 0.85)
+
+    final List<Color> colors = qty == 0
+        ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
         : low
-            ? Colors.orange.withValues(alpha: 0.9)
-            : Colors.green.withValues(alpha: 0.85);
+            ? [const Color(0xFFF59E0B), const Color(0xFFF97316)]
+            : [const Color(0xFF10B981), const Color(0xFF059669)];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        color: bg,
+        gradient: LinearGradient(colors: colors),
         borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: colors[0].withValues(alpha: 0.4),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Text(
         qty == 0
@@ -276,59 +337,54 @@ class _ShimmerCardState extends State<_ShimmerCard>
     return AnimatedBuilder(
       animation: _anim,
       builder: (context, _) {
-        return Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
+        return Container(
+          decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              gradient: LinearGradient(
-                begin: Alignment(_anim.value, 0),
-                end: Alignment(_anim.value + 1, 0),
-                colors: [base, highlight, base],
-              ),
+            gradient: LinearGradient(
+              begin: Alignment(_anim.value, 0),
+              end: Alignment(_anim.value + 1, 0),
+              colors: [base, highlight, base],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: base,
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(14),
-                      ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(height: 2, color: base),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: base,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(2),
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: base,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: base,
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 12,
-                        width: 60,
-                        decoration: BoxDecoration(
-                          color: base,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 12,
+                      width: 60,
+                      decoration: BoxDecoration(
+                        color: base,
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
