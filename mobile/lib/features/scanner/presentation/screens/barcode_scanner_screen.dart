@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
@@ -145,8 +146,15 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
         children: [
           // Camera feed
           MobileScanner(
-            controller: _controller,
-            onDetect:   _onDetect,
+            controller:   _controller,
+            onDetect:     _onDetect,
+            errorBuilder: (context, error, child) {
+              final denied = error.errorCode == MobileScannerErrorCode.permissionDenied;
+              return _CameraPermissionError(
+                permanent: denied,
+                onRetry: () => _controller.start(),
+              );
+            },
           ),
 
           // Overlay — scanning frame
@@ -482,6 +490,91 @@ class _ErrorResult extends StatelessWidget {
                 style: TextStyle(color: cs.error)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Camera permission error overlay ──────────────────────────────────────────
+
+class _CameraPermissionError extends StatelessWidget {
+  const _CameraPermissionError({required this.permanent, required this.onRetry});
+  final bool         permanent;
+  final VoidCallback onRetry;
+
+  Future<void> _openSettings() async {
+    // android-app://com.android.settings opens device settings
+    final uri = Uri.parse('package:com.probusiness.sas_garments_mobile');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      await launchUrl(Uri.parse('app-settings:'));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width:  72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+                child: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: Colors.white54,
+                  size:  36,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Camera Access Required',
+                style: TextStyle(
+                  color:      Colors.white,
+                  fontSize:   18,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                permanent
+                    ? 'Camera permission was denied.\nGo to Settings → Apps → ProBusiness → Permissions → Camera and enable it.'
+                    : 'Allow camera access to scan barcodes.',
+                style: const TextStyle(color: Colors.white60, fontSize: 13, height: 1.5),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+              if (permanent)
+                FilledButton.icon(
+                  onPressed: _openSettings,
+                  icon:  const Icon(Icons.settings_rounded),
+                  label: const Text('Open Settings'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    minimumSize:     const Size(200, 48),
+                  ),
+                )
+              else
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon:  const Icon(Icons.refresh_rounded),
+                  label: const Text('Grant Permission'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    minimumSize:     const Size(200, 48),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
