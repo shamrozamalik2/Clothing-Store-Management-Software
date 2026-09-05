@@ -2,21 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/widgets/grad_widgets.dart';
 import '../../core/widgets/pbc_logo.dart';
 import '../notifications/presentation/providers/notifications_provider.dart';
 
-const _kSeed = Color(0xFF4F46E5);
-
-// ── Bottom nav tabs (4 pinned + More) ────────────────────────────────────────
+// ── Bottom nav tabs ────────────────────────────────────────────────────────────
 
 const _kBottomTabs = [
-  _NavItem('/dashboard',  Icons.home_rounded,          Icons.home_outlined,          'Home'),
-  _NavItem('/pos',        Icons.point_of_sale_rounded,  Icons.point_of_sale_outlined, 'POS'),
-  _NavItem('/sales',      Icons.receipt_long_rounded,   Icons.receipt_long_outlined,  'Sales'),
-  _NavItem('/stock',      Icons.inventory_2_rounded,    Icons.inventory_2_outlined,   'Stock'),
+  _NavItem('/dashboard',  Icons.home_rounded,           Icons.home_outlined,           'Home'),
+  _NavItem('/pos',        Icons.point_of_sale_rounded,   Icons.point_of_sale_outlined,  'POS'),
+  _NavItem('/sales',      Icons.receipt_long_rounded,    Icons.receipt_long_outlined,   'Sales'),
+  _NavItem('/stock',      Icons.inventory_2_rounded,     Icons.inventory_2_outlined,    'Stock'),
 ];
 
-// Items shown in the "More" sheet
 const _kMoreItems = [
   _NavItem('/reports',       Icons.bar_chart_rounded,       Icons.bar_chart_outlined,       'Reports'),
   _NavItem('/staff',         Icons.badge_rounded,            Icons.badge_outlined,            'Staff'),
@@ -26,7 +24,7 @@ const _kMoreItems = [
   _NavItem('/settings',      Icons.settings_rounded,         Icons.settings_outlined,         'Settings'),
 ];
 
-// ── PBC navy colours — tablet rail only ──────────────────────────────────────
+// ── Tablet rail colours ───────────────────────────────────────────────────────
 const _kNavyBg      = Color(0xFF0C1427);
 const _kNavyBorder  = Color(0x1AFFFFFF);
 const _kNavyDivider = Color(0x1AFFFFFF);
@@ -65,7 +63,7 @@ class MainShell extends ConsumerWidget {
     return Scaffold(
       key:  scaffoldKey,
       body: child,
-      bottomNavigationBar: _BottomNavBar(
+      bottomNavigationBar: _PremiumBottomNav(
         selectedIndex: _tabIndex(currentPath),
         unread:        unread,
         currentPath:   currentPath,
@@ -74,10 +72,10 @@ class MainShell extends ConsumerWidget {
   }
 }
 
-// ── Bottom Navigation Bar ─────────────────────────────────────────────────────
+// ── Premium Bottom Navigation Bar ─────────────────────────────────────────────
 
-class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar({
+class _PremiumBottomNav extends StatelessWidget {
+  const _PremiumBottomNav({
     required this.selectedIndex,
     required this.unread,
     required this.currentPath,
@@ -102,42 +100,130 @@ class _BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs     = Theme.of(context).colorScheme;
+    final dark   = Theme.of(context).brightness == Brightness.dark;
     final hasBadge = unread > 0;
-    final badgeLabel = unread > 9 ? '9+' : '$unread';
 
     return Container(
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5))),
-      ),
-      child: NavigationBar(
-        selectedIndex:         selectedIndex.clamp(0, 4),
-        onDestinationSelected: (i) => _onTap(context, i),
-        backgroundColor:       cs.surfaceContainer,
-        surfaceTintColor:      Colors.transparent,
-        elevation:             0,
-        indicatorColor:        _kSeed.withValues(alpha: 0.12),
-        height:                64,
-        labelBehavior:         NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: [
-          ..._kBottomTabs.map((t) => NavigationDestination(
-            icon:         Icon(t.inactiveIcon),
-            selectedIcon: Icon(t.activeIcon, color: _kSeed),
-            label:        t.label,
-          )),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: hasBadge,
-              label:          Text(badgeLabel),
-              child:          const Icon(Icons.more_horiz_rounded),
-            ),
-            selectedIcon: Badge(
-              isLabelVisible: hasBadge,
-              label:          Text(badgeLabel),
-              child:          const Icon(Icons.more_horiz_rounded, color: _kSeed),
-            ),
-            label: 'More',
+        color: cs.surfaceContainer,
+        border: Border(
+          top: BorderSide(
+            color: cs.outlineVariant.withValues(alpha: dark ? 0.25 : 0.5),
+            width: 0.5,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color:      Colors.black.withValues(alpha: dark ? 0.35 : 0.06),
+            blurRadius: 24,
+            offset:     const Offset(0, -6),
           ),
         ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 64,
+          child: Row(
+            children: [
+              // 4 main tabs
+              for (int i = 0; i < _kBottomTabs.length; i++)
+                _NavBtn(
+                  item:     _kBottomTabs[i],
+                  selected: selectedIndex == i,
+                  onTap:    () => _onTap(context, i),
+                ),
+              // More tab with badge
+              _NavBtn(
+                item:     const _NavItem('/more', Icons.more_horiz_rounded, Icons.more_horiz_rounded, 'More'),
+                selected: selectedIndex == 4,
+                badge:    hasBadge ? unread : 0,
+                onTap:    () => _onTap(context, 4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Individual Nav Button ─────────────────────────────────────────────────────
+
+class _NavBtn extends StatelessWidget {
+  const _NavBtn({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+    this.badge = 0,
+  });
+
+  final _NavItem item;
+  final bool     selected;
+  final VoidCallback onTap;
+  final int      badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs   = Theme.of(context).colorScheme;
+
+    return Expanded(
+      child: GestureDetector(
+        behavior:  HitTestBehavior.opaque,
+        onTap:     onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon with gradient pill when selected
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve:    Curves.easeInOut,
+              padding: EdgeInsets.symmetric(
+                horizontal: selected ? 14 : 10,
+                vertical:   4,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: selected
+                    ? const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end:   Alignment.bottomRight,
+                        colors: kGradPrimary,
+                      )
+                    : null,
+              ),
+              child: badge > 0
+                  ? Badge(
+                      isLabelVisible: true,
+                      label:          Text(badge > 9 ? '9+' : '$badge'),
+                      child: Icon(
+                        selected ? item.activeIcon : item.inactiveIcon,
+                        size:  22,
+                        color: selected ? Colors.white : cs.onSurfaceVariant,
+                      ),
+                    )
+                  : Icon(
+                      selected ? item.activeIcon : item.inactiveIcon,
+                      size:  22,
+                      color: selected ? Colors.white : cs.onSurfaceVariant,
+                    ),
+            ),
+            const SizedBox(height: 3),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 220),
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize:   10,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                color:      selected
+                    ? const Color(0xFF6366F1)
+                    : cs.onSurfaceVariant,
+                letterSpacing: selected ? 0.1 : 0,
+              ),
+              child: Text(item.label),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -190,13 +276,18 @@ class _MoreSheet extends StatelessWidget {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 120),
                   decoration: BoxDecoration(
-                    color: selected
-                        ? _kSeed.withValues(alpha: 0.10)
-                        : cs.surfaceContainerHighest.withValues(alpha: 0.55),
+                    gradient: selected
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end:   Alignment.bottomRight,
+                            colors: [Color(0x1A4F46E5), Color(0x1A7C3AED)],
+                          )
+                        : null,
+                    color: selected ? null : cs.surfaceContainerHighest.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: selected
-                          ? _kSeed.withValues(alpha: 0.3)
+                          ? const Color(0xFF4F46E5).withValues(alpha: 0.3)
                           : cs.outlineVariant.withValues(alpha: 0.4),
                     ),
                   ),
@@ -208,7 +299,7 @@ class _MoreSheet extends StatelessWidget {
                         label: Text(unread > 9 ? '9+' : '$unread'),
                         child: Icon(
                           selected ? item.activeIcon : item.inactiveIcon,
-                          color: selected ? _kSeed : cs.onSurfaceVariant,
+                          color: selected ? const Color(0xFF6366F1) : cs.onSurfaceVariant,
                           size:  24,
                         ),
                       ),
@@ -216,7 +307,7 @@ class _MoreSheet extends StatelessWidget {
                       Text(
                         item.label,
                         style: tt.labelSmall?.copyWith(
-                          color:      selected ? _kSeed : cs.onSurface,
+                          color:      selected ? const Color(0xFF6366F1) : cs.onSurface,
                           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                         ),
                         textAlign: TextAlign.center,
