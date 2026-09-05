@@ -69,18 +69,34 @@ class BarcodeScannerScreen extends ConsumerStatefulWidget {
 }
 
 class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
-  final _controller = MobileScannerController(
+  late MobileScannerController _controller;
+
+  String _lastCode = '';
+  bool   _torchOn  = false;
+  bool   _paused   = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = _makeController();
+  }
+
+  MobileScannerController _makeController() => MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
-
-  String _lastCode   = '';
-  bool   _torchOn    = false;
-  bool   _paused     = false;
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  // Dispose and recreate the controller — needed after a permission error
+  Future<void> _restartController() async {
+    final old = _controller;
+    final next = _makeController();
+    if (mounted) setState(() => _controller = next);
+    await old.dispose();
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -152,7 +168,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
               final denied = error.errorCode == MobileScannerErrorCode.permissionDenied;
               return _CameraPermissionError(
                 permanent: denied,
-                onRetry: () => _controller.start(),
+                onRetry:   _restartController,
               );
             },
           ),
@@ -499,8 +515,8 @@ class _ErrorResult extends StatelessWidget {
 
 class _CameraPermissionError extends StatelessWidget {
   const _CameraPermissionError({required this.permanent, required this.onRetry});
-  final bool         permanent;
-  final VoidCallback onRetry;
+  final bool             permanent;
+  final Future<void> Function() onRetry;
 
   Future<void> _openSettings() async {
     // android-app://com.android.settings opens device settings
