@@ -28,6 +28,7 @@ final salesAnalysisProvider =
     params['to']   = custom.to;
   }
 
-  final res = await api.get('/reports/sales-analysis', queryParameters: params);
-  return SalesAnalysis.fromJson(res.data['data'] as Map<String, dynamic>);
+  final res  = await api.get('/reports/sales-analysis', queryParameters: params);
+  final data = (res.data as Map<String, dynamic>)['data'] as Map<String, dynamic>? ?? {};
+  return SalesAnalysis.fromJson(data);
 });
