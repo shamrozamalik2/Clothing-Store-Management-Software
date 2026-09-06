@@ -115,6 +115,45 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {}
   }
 
+  Future<void> updateProfileName(String name) async {
+    final user = currentUser;
+    if (user == null) return;
+    await _api.patch(ApiEndpoints.updateMyProfile, data: {'name': name});
+    final updated = UserModel(
+      id:          user.id,
+      name:        name,
+      email:       user.email,
+      companyId:   user.companyId,
+      companySlug: user.companySlug,
+      companyName: user.companyName,
+      roleName:    user.roleName,
+      permissions: user.permissions,
+      avatar:      user.avatar,
+      phone:       user.phone,
+    );
+    await _storage.write(kKeyUser, jsonEncode(updated.toJson()));
+    state = AuthAuthenticated(updated);
+  }
+
+  Future<void> updateCompanyName(String companyName) async {
+    final user = currentUser;
+    if (user == null) return;
+    final updated = UserModel(
+      id:          user.id,
+      name:        user.name,
+      email:       user.email,
+      companyId:   user.companyId,
+      companySlug: user.companySlug,
+      companyName: companyName,
+      roleName:    user.roleName,
+      permissions: user.permissions,
+      avatar:      user.avatar,
+      phone:       user.phone,
+    );
+    await _storage.write(kKeyUser, jsonEncode(updated.toJson()));
+    state = AuthAuthenticated(updated);
+  }
+
   UserEntity? get currentUser =>
       state is AuthAuthenticated ? (state as AuthAuthenticated).user : null;
 }

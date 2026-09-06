@@ -41,26 +41,66 @@ class _StockScreenState extends ConsumerState<StockScreen> {
   @override
   Widget build(BuildContext context) {
     final stockAsync = ref.watch(stockProvider);
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(stockProvider),
         child: CustomScrollView(
           slivers: [
+            // ── App Bar ──────────────────────────────────────────────────
             SliverAppBar(
-              floating:  true,
-              snap:      true,
-              leading:   IconButton(
+              floating:         true,
+              snap:             true,
+              backgroundColor:  cs.surface,
+              surfaceTintColor: Colors.transparent,
+              elevation:        0,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(
+                  height: 1,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: kGradAmber),
+                  ),
+                ),
+              ),
+              leading: IconButton(
                 icon:      const Icon(Icons.menu_rounded),
                 onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
               ),
-              title:   const Text('Stock Monitor'),
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const GradIconBox(
+                    icon:         Icons.inventory_2_rounded,
+                    colors:       kGradAmber,
+                    size:         32,
+                    iconSize:     16,
+                    borderRadius: 9,
+                  ),
+                  const SizedBox(width: 10),
+                  ShaderMask(
+                    shaderCallback: (b) => const LinearGradient(
+                      colors: kGradAmber,
+                    ).createShader(b),
+                    child: const Text(
+                      'Stock Monitor',
+                      style: TextStyle(
+                        color:      Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize:   18,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               actions: [
-                IconButton(
-                  icon:      const Icon(Icons.refresh_rounded),
-                  onPressed: () => ref.invalidate(stockProvider),
+                _AppBarAction(
+                  icon:  Icons.refresh_rounded,
+                  onTap: () => ref.invalidate(stockProvider),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 8),
               ],
             ),
 
@@ -85,10 +125,10 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                       child: TextField(
                         decoration: InputDecoration(
-                          hintText:      'Search by name or SKU…',
-                          prefixIcon:    const Icon(Icons.search_rounded, size: 20),
-                          filled:        true,
-                          border:        OutlineInputBorder(
+                          hintText:    'Search by name or SKU…',
+                          prefixIcon:  const Icon(Icons.search_rounded, size: 20),
+                          filled:      true,
+                          border:      OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide:   BorderSide.none,
                           ),
@@ -100,29 +140,36 @@ class _StockScreenState extends ConsumerState<StockScreen> {
 
                     // Filter chips
                     SizedBox(
-                      height: 48,
+                      height: 52,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         children: [
                           _FilterChip(
-                            label:    'All Alerts (${report.lowStockItems.length})',
-                            active:   _filter == _StockFilter.all,
-                            onTap:    () => setState(() => _filter = _StockFilter.all),
+                            label:  'All Alerts (${report.lowStockItems.length})',
+                            active: _filter == _StockFilter.all,
+                            grads:  kGradPrimary,
+                            onTap:  () => setState(() => _filter = _StockFilter.all),
                           ),
                           const SizedBox(width: 8),
                           _FilterChip(
-                            label:    'Low Stock (${report.summary.lowStock})',
-                            active:   _filter == _StockFilter.lowStock,
-                            color:    const Color(0xFFF59E0B),
-                            onTap:    () => setState(() => _filter = _StockFilter.lowStock),
+                            label:  'Low Stock (${report.summary.lowStock})',
+                            active: _filter == _StockFilter.lowStock,
+                            grads:  kGradAmber,
+                            onTap:  () => setState(
+                                () => _filter = _StockFilter.lowStock),
                           ),
                           const SizedBox(width: 8),
                           _FilterChip(
-                            label:    'Out of Stock (${report.summary.outOfStock})',
-                            active:   _filter == _StockFilter.outOfStock,
-                            color:    const Color(0xFFEF4444),
-                            onTap:    () => setState(() => _filter = _StockFilter.outOfStock),
+                            label:  'Out of Stock (${report.summary.outOfStock})',
+                            active: _filter == _StockFilter.outOfStock,
+                            grads:  [
+                              const Color(0xFFEF4444),
+                              const Color(0xFFF87171),
+                            ],
+                            onTap:  () => setState(
+                                () => _filter = _StockFilter.outOfStock),
                           ),
                         ],
                       ),
@@ -149,6 +196,33 @@ class _StockScreenState extends ConsumerState<StockScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── AppBar action button ──────────────────────────────────────────────────────
+
+class _AppBarAction extends StatelessWidget {
+  const _AppBarAction({required this.icon, required this.onTap});
+  final IconData     icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36, height: 36,
+        decoration: BoxDecoration(
+          color:        kGradAmber[0].withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border:       Border.all(
+            color: kGradAmber[0].withValues(alpha: 0.2),
+          ),
+        ),
+        child: Icon(icon, size: 18,
+            color: Theme.of(context).colorScheme.onSurface),
       ),
     );
   }
@@ -202,40 +276,68 @@ class _SumCard extends StatelessWidget {
     required this.icon,
     required this.grad,
   });
-  final String       label;
-  final String       value;
-  final IconData     icon;
-  final List<Color>  grad;
+  final String      label;
+  final String      value;
+  final IconData    icon;
+  final List<Color> grad;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     return Container(
-      padding:    const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color:        cs.surfaceContainer,
         borderRadius: BorderRadius.circular(14),
-        border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width:  32,
-            height: 32,
-            decoration: BoxDecoration(
-              gradient:     LinearGradient(colors: grad),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: Colors.white, size: 16),
+        boxShadow: [
+          BoxShadow(
+            color:      grad[0].withValues(alpha: 0.07),
+            blurRadius: 8,
+            offset:     const Offset(0, 3),
           ),
-          const SizedBox(height: 6),
-          Text(value,
-              style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
-          Text(label,
-              style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-              textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            color:  cs.surfaceContainer,
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: grad),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                child: Column(
+                  children: [
+                    GradIconBox(
+                      icon:         icon,
+                      colors:       grad,
+                      size:         32,
+                      iconSize:     16,
+                      borderRadius: 8,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(value,
+                        style: tt.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800)),
+                    Text(label,
+                        style: tt.labelSmall?.copyWith(
+                            color: cs.onSurfaceVariant),
+                        textAlign: TextAlign.center,
+                        maxLines:  1,
+                        overflow:  TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -247,36 +349,39 @@ class _FilterChip extends StatelessWidget {
   const _FilterChip({
     required this.label,
     required this.active,
+    required this.grads,
     required this.onTap,
-    this.color,
   });
   final String       label;
   final bool         active;
+  final List<Color>  grads;
   final VoidCallback onTap;
-  final Color?       color;
 
   @override
   Widget build(BuildContext context) {
-    final cs     = Theme.of(context).colorScheme;
-    final accent = color ?? cs.primary;
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        padding:  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        duration: const Duration(milliseconds: 150),
+        padding:  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color:        active ? accent.withValues(alpha: 0.12) : Colors.transparent,
+          gradient: active ? LinearGradient(colors: grads) : null,
+          color:    active ? null : cs.surfaceContainer,
           borderRadius: BorderRadius.circular(20),
-          border:       Border.all(
-            color: active ? accent : cs.outlineVariant.withValues(alpha: 0.5),
+          border: Border.all(
+            color: active
+                ? Colors.transparent
+                : cs.outlineVariant.withValues(alpha: 0.5),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color:      active ? accent : cs.onSurfaceVariant,
+            color:      active ? Colors.white : cs.onSurfaceVariant,
             fontSize:   12,
-            fontWeight: active ? FontWeight.w700 : FontWeight.normal,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+            fontFamily: 'Inter',
           ),
         ),
       ),
@@ -293,109 +398,156 @@ class _StockItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs       = Theme.of(context).colorScheme;
-    final tt       = Theme.of(context).textTheme;
-    final oos      = item.isOutOfStock;
-    final accent   = oos ? const Color(0xFFEF4444) : const Color(0xFFF59E0B);
-    final grad     = oos
+    final cs   = Theme.of(context).colorScheme;
+    final tt   = Theme.of(context).textTheme;
+    final oos  = item.isOutOfStock;
+    final grad = oos
         ? [const Color(0xFFEF4444), const Color(0xFFF87171)]
         : kGradAmber;
 
     return Container(
-      padding:    const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color:        cs.surfaceContainer,
         borderRadius: BorderRadius.circular(14),
-        border:       Border.all(color: accent.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color:      grad[0].withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset:     const Offset(0, 3),
+          ),
+        ],
       ),
-      child: Row(
-        children: [
-          // Status indicator
-          Container(
-            width:      40,
-            height:     40,
-            decoration: BoxDecoration(
-              gradient:     LinearGradient(colors: grad),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              oos ? Icons.remove_shopping_cart_outlined : Icons.warning_amber_rounded,
-              color: Colors.white,
-              size:  20,
-            ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            color:  cs.surfaceContainer,
+            border: Border.all(color: grad[0].withValues(alpha: 0.25)),
           ),
-          const SizedBox(width: 12),
-
-          // Product info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name,
-                    style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(
-                  'SKU: ${item.sku}'
-                  '${item.categoryName != null ? '  •  ${item.categoryName}' : ''}',
-                  style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Stock level
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Column(
             children: [
+              // Top accent bar
               Container(
-                padding:    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                height: 2,
                 decoration: BoxDecoration(
-                  color:        accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                  border:       Border.all(color: accent.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  oos ? 'OUT' : '${item.stockQuantity} left',
-                  style: TextStyle(
-                    color:      accent,
-                    fontSize:   12,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  gradient: LinearGradient(colors: grad),
                 ),
               ),
-              const SizedBox(height: 3),
-              Text(
-                'Min: ${item.lowStockAlert}',
-                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-              ),
-              const SizedBox(height: 4),
-              GestureDetector(
-                onTap: () => showModalBottomSheet(
-                  context:            context,
-                  isScrollControlled: true,
-                  showDragHandle:     true,
-                  shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-                  builder: (_) => StockAdjustmentSheet(
-                    item:   item,
-                    onDone: onAdjusted,
-                  ),
-                ),
-                child: Container(
-                  padding:    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color:        cs.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text('Adjust',
-                      style: TextStyle(color: cs.primary, fontSize: 10,
-                          fontWeight: FontWeight.w600)),
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    // Status icon
+                    GradIconBox(
+                      icon:   oos
+                          ? Icons.remove_shopping_cart_outlined
+                          : Icons.warning_amber_rounded,
+                      colors: grad,
+                      size:         40,
+                      iconSize:     20,
+                      borderRadius: 11,
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Product info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.name,
+                              style: tt.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(
+                            'SKU: ${item.sku}'
+                            '${item.categoryName != null ? '  •  ${item.categoryName}' : ''}',
+                            style: tt.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Stock level + adjust
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Stock qty badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: [
+                              grad[0].withValues(alpha: 0.15),
+                              grad[1].withValues(alpha: 0.08),
+                            ]),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: grad[0].withValues(alpha: 0.35)),
+                          ),
+                          child: ShaderMask(
+                            shaderCallback: (b) =>
+                                LinearGradient(colors: grad).createShader(b),
+                            child: Text(
+                              oos ? 'OUT' : '${item.stockQuantity} left',
+                              style: const TextStyle(
+                                color:      Colors.white,
+                                fontSize:   12,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Min: ${item.lowStockAlert}',
+                          style: tt.labelSmall?.copyWith(
+                              color: cs.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 6),
+                        // Adjust button
+                        GestureDetector(
+                          onTap: () => showModalBottomSheet(
+                            context:            context,
+                            isScrollControlled: true,
+                            showDragHandle:     true,
+                            shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(20))),
+                            builder: (_) => StockAdjustmentSheet(
+                              item:   item,
+                              onDone: onAdjusted,
+                            ),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                  colors: kGradPrimary),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Adjust',
+                              style: TextStyle(
+                                color:      Colors.white,
+                                fontSize:   10,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -421,10 +573,12 @@ class _StockShimmer extends StatelessWidget {
                 3,
                 (_) => Expanded(
                   child: Container(
-                    height: 78,
+                    height: 90,
                     margin: const EdgeInsets.symmetric(horizontal: 5),
                     decoration: BoxDecoration(
-                      color: cs.surface, borderRadius: BorderRadius.circular(14)),
+                      color:        cs.surface,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
@@ -433,7 +587,7 @@ class _StockShimmer extends StatelessWidget {
             ...List.generate(
               6,
               (_) => Container(
-                height: 72,
+                height: 78,
                 margin: const EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
                   color:        cs.surface,
@@ -457,10 +611,16 @@ class _EmptyFilterState extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     return Column(
       children: [
-        Icon(Icons.check_circle_outline_rounded, size: 48,
-            color: const Color(0xFF10B981)),
+        const GradIconBox(
+          icon:         Icons.check_circle_outline_rounded,
+          colors:       kGradGreen,
+          size:         64,
+          iconSize:     32,
+          borderRadius: 18,
+        ),
         const SizedBox(height: 12),
-        Text('All good!', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        Text('All good!',
+            style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         Text('No products match this filter.',
             style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
@@ -482,15 +642,23 @@ class _ErrorState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline_rounded, size: 48, color: cs.error),
+          GradIconBox(
+            icon:         Icons.error_outline_rounded,
+            colors:       [cs.error, cs.error.withValues(alpha: 0.6)],
+            size:         64,
+            iconSize:     32,
+            borderRadius: 18,
+          ),
           const SizedBox(height: 12),
           Text('Failed to load stock data',
               style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: onRetry,
-            icon:  const Icon(Icons.refresh),
-            label: const Text('Retry'),
+          GradButton(
+            label:       'Retry',
+            icon:        Icons.refresh_rounded,
+            onPressed:   onRetry,
+            height:      48,
+            borderRadius: 12,
           ),
         ],
       ),

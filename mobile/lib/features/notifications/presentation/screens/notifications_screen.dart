@@ -22,15 +22,37 @@ class NotificationsScreen extends ConsumerWidget {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            floating:  true,
-            snap:      true,
-            leading:   IconButton(
+            floating:          true,
+            snap:              true,
+            backgroundColor:   cs.surface,
+            surfaceTintColor:  Colors.transparent,
+            elevation:         0,
+            leading: IconButton(
               icon:      const Icon(Icons.menu_rounded),
               onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
             ),
             title: Row(
               children: [
-                const Text('Notifications'),
+                const GradIconBox(
+                  icon:         Icons.notifications_rounded,
+                  colors:       kGradPrimary,
+                  size:         32,
+                  iconSize:     16,
+                  borderRadius: 9,
+                ),
+                const SizedBox(width: 10),
+                ShaderMask(
+                  shaderCallback: (b) =>
+                      const LinearGradient(colors: kGradPrimary).createShader(b),
+                  child: const Text(
+                    'Notifications',
+                    style: TextStyle(
+                      color:      Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize:   18,
+                    ),
+                  ),
+                ),
                 if (unread > 0) ...[
                   const SizedBox(width: 8),
                   Container(
@@ -55,17 +77,39 @@ class NotificationsScreen extends ConsumerWidget {
               if (notifications.isNotEmpty) ...[
                 if (unread > 0)
                   TextButton(
-                    onPressed: () => ref.read(notificationsProvider.notifier).markAllRead(),
-                    child: const Text('Mark all read'),
+                    onPressed: () =>
+                        ref.read(notificationsProvider.notifier).markAllRead(),
+                    style: TextButton.styleFrom(
+                      foregroundColor: kGradPrimary[0],
+                    ),
+                    child: const Text('Mark all read',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
-                IconButton(
-                  icon:      const Icon(Icons.delete_sweep_outlined),
-                  tooltip:   'Clear all',
-                  onPressed: () => _confirmClear(context, ref),
+                Container(
+                  margin:     const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    color:        kGradPrimary[0].withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: IconButton(
+                    icon:      Icon(Icons.delete_sweep_outlined,
+                        color: kGradPrimary[0]),
+                    tooltip:   'Clear all',
+                    onPressed: () => _confirmClear(context, ref),
+                  ),
                 ),
               ],
               const SizedBox(width: 4),
             ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(
+                height: 1,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(colors: kGradPrimary),
+                ),
+              ),
+            ),
           ),
 
           if (notifications.isEmpty)
@@ -81,17 +125,18 @@ class NotificationsScreen extends ConsumerWidget {
                     return Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                       child: Text(
-                        '${notifications.length} notification${notifications.length == 1 ? '' : 's'}',
-                        style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        '${notifications.length} '
+                        'notification${notifications.length == 1 ? '' : 's'}',
+                        style:
+                            tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                       ),
                     );
                   }
                   final n = notifications[i - 1];
                   return _NotificationTile(
                     notification: n,
-                    onTap: () => ref
-                        .read(notificationsProvider.notifier)
-                        .markRead(n.id),
+                    onTap: () =>
+                        ref.read(notificationsProvider.notifier).markRead(n.id),
                   );
                 },
                 childCount: notifications.length + 1,
@@ -136,135 +181,174 @@ class _NotificationTile extends StatelessWidget {
     required this.onTap,
   });
   final SaleNotification notification;
-  final VoidCallback onTap;
+  final VoidCallback     onTap;
+
+  static List<Color> _pmGrad(String pm) {
+    switch (pm.toLowerCase()) {
+      case 'cash':   return kGradGreen;
+      case 'card':   return kGradViolet;
+      case 'credit': return kGradAmber;
+      case 'bank':   return kGradSky;
+      default:       return kGradPrimary;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final n  = notification;
+    final cs     = Theme.of(context).colorScheme;
+    final tt     = Theme.of(context).textTheme;
+    final n      = notification;
+    final pmGrad = _pmGrad(n.paymentMethod);
 
-    final pmColors = {
-      'cash':   const Color(0xFF10B981),
-      'card':   const Color(0xFF6366F1),
-      'credit': const Color(0xFFF59E0B),
-      'bank':   const Color(0xFF0EA5E9),
-    };
-    final pmColor = pmColors[n.paymentMethod.toLowerCase()] ?? cs.secondary;
-
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        margin:  const EdgeInsets.fromLTRB(16, 0, 16, 8),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: n.isRead
+              ? cs.outlineVariant.withValues(alpha: 0.4)
+              : kGradPrimary[0].withValues(alpha: 0.3),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Material(
           color: n.isRead
               ? cs.surfaceContainer
-              : cs.primaryContainer.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: n.isRead
-                ? cs.outlineVariant.withValues(alpha: 0.4)
-                : cs.primary.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Icon
-            Container(
-              width:  40,
-              height: 40,
-              decoration: BoxDecoration(
-                gradient:     const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end:   Alignment.bottomRight,
-                  colors: kGradGreen,
+              : cs.primaryContainer.withValues(alpha: 0.25),
+          child: InkWell(
+            onTap: onTap,
+            child: Column(
+              children: [
+                // Top gradient bar
+                Container(
+                  height:     2,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: kGradGreen),
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Icon
+                      const GradIconBox(
+                        icon:         Icons.shopping_bag_rounded,
+                        colors:       kGradGreen,
+                        size:         40,
+                        iconSize:     20,
+                        borderRadius: 11,
+                      ),
+                      const SizedBox(width: 12),
 
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
+                      // Content
                       Expanded(
-                        child: Text(
-                          n.invoiceNo,
-                          style: tt.bodyMedium?.copyWith(
-                            fontWeight: n.isRead ? FontWeight.w500 : FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      if (!n.isRead)
-                        Container(
-                          width:  8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFF6366F1),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${n.customerName}  •  ${n.itemCount} item${n.itemCount == 1 ? '' : 's'}',
-                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  if (n.cashierName.isNotEmpty) ...[
-                    const SizedBox(height: 1),
-                    Text(
-                      'Cashier: ${n.cashierName}',
-                      style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ],
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      // Payment chip
-                      Container(
-                        padding:    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color:        pmColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                          border:       Border.all(color: pmColor.withValues(alpha: 0.3)),
-                        ),
-                        child: Text(
-                          n.paymentMethod.toUpperCase(),
-                          style: TextStyle(
-                            color: pmColor, fontSize: 10, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      const Spacer(),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            formatCurrency(n.total),
-                            style: tt.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color:      const Color(0xFF10B981),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    n.invoiceNo,
+                                    style: tt.bodyMedium?.copyWith(
+                                      fontWeight: n.isRead
+                                          ? FontWeight.w500
+                                          : FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                if (!n.isRead)
+                                  Container(
+                                    width:  8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      shape:    BoxShape.circle,
+                                      gradient: LinearGradient(
+                                          colors: kGradPrimary),
+                                    ),
+                                  ),
+                              ],
                             ),
-                          ),
-                          Text(
-                            _formatRelative(n.receivedAt),
-                            style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                          ),
-                        ],
+                            const SizedBox(height: 2),
+                            Text(
+                              '${n.customerName}  •  '
+                              '${n.itemCount} item${n.itemCount == 1 ? '' : 's'}',
+                              style: tt.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            if (n.cashierName.isNotEmpty) ...[
+                              const SizedBox(height: 1),
+                              Text(
+                                'Cashier: ${n.cashierName}',
+                                style: tt.labelSmall
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                            ],
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                // Payment chip — gradient tinted
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: pmGrad[0].withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                        color: pmGrad[0]
+                                            .withValues(alpha: 0.3)),
+                                  ),
+                                  child: ShaderMask(
+                                    shaderCallback: (b) =>
+                                        LinearGradient(colors: pmGrad)
+                                            .createShader(b),
+                                    child: Text(
+                                      n.paymentMethod.toUpperCase(),
+                                      style: const TextStyle(
+                                        color:      Colors.white,
+                                        fontSize:   10,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const Spacer(),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    ShaderMask(
+                                      shaderCallback: (b) =>
+                                          const LinearGradient(
+                                                  colors: kGradGreen)
+                                              .createShader(b),
+                                      child: Text(
+                                        formatCurrency(n.total),
+                                        style: tt.bodyMedium?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          color:      Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatRelative(n.receivedAt),
+                                      style: tt.labelSmall
+                                          ?.copyWith(color: cs.onSurfaceVariant),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -290,7 +374,13 @@ class _EmptyState extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.notifications_none_rounded, size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+        const GradIconBox(
+          icon:         Icons.notifications_none_rounded,
+          colors:       kGradPrimary,
+          size:         72,
+          iconSize:     36,
+          borderRadius: 20,
+        ),
         const SizedBox(height: 16),
         Text('No notifications yet',
             style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),

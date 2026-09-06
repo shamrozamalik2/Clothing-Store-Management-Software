@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../../core/widgets/grad_widgets.dart';
 import '../../../sales/data/models/sale_model.dart';
 import '../../../sales/data/sources/sales_remote_source.dart';
 import '../../data/models/customer_model.dart';
@@ -43,6 +43,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs           = Theme.of(context).colorScheme;
     final customersAsync = ref.watch(customersProvider);
 
     return Scaffold(
@@ -50,56 +51,127 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         onRefresh: () async => ref.invalidate(customersProvider),
         child: CustomScrollView(
           slivers: [
-            // ── App Bar ──────────────────────────────────────────────────
+            // ── App Bar ───────────────────────────────────────────────────
             SliverAppBar(
-              floating:  true,
-              snap:      true,
-              leading:   IconButton(
-                icon: const Icon(Icons.menu_rounded),
-                onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
+              floating:         true,
+              snap:             true,
+              backgroundColor:  cs.surface,
+              surfaceTintColor: Colors.transparent,
+              elevation:        0,
+              leading: IconButton(
+                icon:      const Icon(Icons.menu_rounded),
+                onPressed: () =>
+                    MainShell.scaffoldKey.currentState?.openDrawer(),
               ),
-              title:     const Text('Customers'),
-              actions:   [
-                IconButton(
-                  icon:    Icon(_searchVisible ? Icons.close : Icons.search),
-                  onPressed: _toggleSearch,
-                  tooltip: _searchVisible ? 'Close search' : 'Search',
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const GradIconBox(
+                    icon:         Icons.people_rounded,
+                    colors:       kGradSky,
+                    size:         32,
+                    iconSize:     16,
+                    borderRadius: 9,
+                  ),
+                  const SizedBox(width: 10),
+                  ShaderMask(
+                    blendMode:      BlendMode.srcIn,
+                    shaderCallback: (b) =>
+                        const LinearGradient(colors: kGradSky).createShader(b),
+                    child: const Text(
+                      'Customers',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 18),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                GestureDetector(
+                  onTap: _toggleSearch,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    margin: const EdgeInsets.only(right: 8),
+                    width:  36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      gradient: _searchVisible
+                          ? const LinearGradient(colors: kGradSky)
+                          : null,
+                      color: _searchVisible
+                          ? null
+                          : kGradSky[0].withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: kGradSky[0].withValues(alpha: 0.2)),
+                    ),
+                    child: Icon(
+                      _searchVisible ? Icons.close : Icons.search_rounded,
+                      color: _searchVisible ? Colors.white : kGradSky[0],
+                      size: 20,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 4),
               ],
               bottom: _searchVisible
                   ? PreferredSize(
-                      preferredSize: const Size.fromHeight(64),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        child: TextField(
-                          controller: _searchController,
-                          autofocus:  true,
-                          decoration: InputDecoration(
-                            hintText:   'Search by name, phone, email…',
-                            prefixIcon: const Icon(Icons.search, size: 20),
-                            isDense:    true,
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear, size: 18),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      ref.read(customerSearchProvider.notifier).state = '';
-                                    },
-                                  )
-                                : null,
+                      preferredSize: const Size.fromHeight(65),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                            child: TextField(
+                              controller: _searchController,
+                              autofocus:  true,
+                              decoration: InputDecoration(
+                                hintText:   'Search by name, phone, email…',
+                                prefixIcon: const Icon(Icons.search, size: 20),
+                                isDense:    true,
+                                suffixIcon:
+                                    _searchController.text.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear,
+                                                size: 18),
+                                            onPressed: () {
+                                              _searchController.clear();
+                                              ref
+                                                  .read(customerSearchProvider
+                                                      .notifier)
+                                                  .state = '';
+                                            },
+                                          )
+                                        : null,
+                              ),
+                              onChanged: (v) => ref
+                                  .read(customerSearchProvider.notifier)
+                                  .state = v,
+                            ),
                           ),
-                          onChanged: (v) =>
-                              ref.read(customerSearchProvider.notifier).state = v,
-                        ),
+                          Container(
+                            height: 1,
+                            decoration: const BoxDecoration(
+                                gradient:
+                                    LinearGradient(colors: kGradSky)),
+                          ),
+                        ],
                       ),
                     )
-                  : null,
+                  : PreferredSize(
+                      preferredSize: const Size.fromHeight(1),
+                      child: Container(
+                        height: 1,
+                        decoration: const BoxDecoration(
+                            gradient: LinearGradient(colors: kGradSky)),
+                      ),
+                    ),
             ),
 
             // ── Customer list ────────────────────────────────────────────
             customersAsync.when(
-              loading: () => const SliverToBoxAdapter(child: _CustomerShimmer()),
+              loading: () =>
+                  const SliverToBoxAdapter(child: _CustomerShimmer()),
               error: (e, _) => SliverToBoxAdapter(
                 child: _ErrorState(
                   message: e.toString(),
@@ -109,12 +181,14 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
               data: (response) => response.items.isEmpty
                   ? const SliverToBoxAdapter(child: _EmptyState())
                   : SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                      padding:
+                          const EdgeInsets.fromLTRB(16, 8, 16, 100),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (ctx, i) => _CustomerCard(
                             customer: response.items[i],
-                            onTap: () => _showCustomerDetail(ctx, response.items[i]),
+                            onTap: () => _showCustomerDetail(
+                                ctx, response.items[i]),
                           ),
                           childCount: response.items.length,
                         ),
@@ -168,117 +242,134 @@ class _CustomerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs     = Theme.of(context).colorScheme;
-    final tt     = Theme.of(context).textTheme;
-    final initials = customer.name.isNotEmpty
-        ? customer.name.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase()
-        : 'C';
+    final cs       = Theme.of(context).colorScheme;
+    final tt       = Theme.of(context).textTheme;
     final hasBalance = (customer.outstandingBalance ?? 0) > 0;
 
-    return Card(
-      elevation: 0,
-      margin:    const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
-      child: InkWell(
-        onTap:        onTap,
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Avatar
-              CircleAvatar(
-                radius:          26,
-                backgroundColor: cs.primaryContainer,
-                child: Text(
-                  initials,
-                  style: TextStyle(
-                    color:      cs.onPrimaryContainer,
-                    fontWeight: FontWeight.w700,
-                    fontSize:   16,
+        child: Material(
+          color: cs.surfaceContainer,
+          child: InkWell(
+            onTap: onTap,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 2,
+                  decoration: const BoxDecoration(
+                      gradient: LinearGradient(colors: kGradSky)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      GradAvatar(
+                        name:   customer.name,
+                        radius: 26,
+                        colors: kGradSky,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              customer.name,
+                              style: tt.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            if (customer.phone != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                customer.phone!,
+                                style: tt.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant),
+                              ),
+                            ],
+                            if (customer.email != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                customer.email!,
+                                style: tt.labelSmall?.copyWith(
+                                    color: cs.onSurfaceVariant),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (customer.loyaltyPoints != null) ...[
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.star_rounded,
+                                    size: 14,
+                                    color: Color(0xFFFFD700)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${customer.loyaltyPoints} pts',
+                                  style: tt.labelSmall?.copyWith(
+                                    color:      const Color(0xFFCA8A04),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                          if (hasBalance)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444)
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                    color: const Color(0xFFEF4444)
+                                        .withValues(alpha: 0.25)),
+                              ),
+                              child: Text(
+                                formatCurrency(
+                                    customer.outstandingBalance!),
+                                style: tt.labelSmall?.copyWith(
+                                  color:      const Color(0xFFEF4444),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          if (!hasBalance &&
+                              (customer.totalPurchases ?? 0) > 0)
+                            ShaderMask(
+                              blendMode:      BlendMode.srcIn,
+                              shaderCallback: (b) =>
+                                  const LinearGradient(
+                                          colors: kGradGreen)
+                                      .createShader(b),
+                              child: Text(
+                                formatCompact(customer.totalPurchases!),
+                                style: tt.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              // Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      customer.name,
-                      style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    if (customer.phone != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        customer.phone!,
-                        style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                    ],
-                    if (customer.email != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        customer.email!,
-                        style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              // Loyalty + balance
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (customer.loyaltyPoints != null) ...[
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.star_rounded,
-                            size: 14, color: Color(0xFFFFD700)),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${customer.loyaltyPoints} pts',
-                          style: tt.labelSmall?.copyWith(
-                            color:      const Color(0xFFCA8A04),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-                  if (hasBalance)
-                    Container(
-                      padding:    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color:        const Color(0xFFEF4444).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        formatCurrency(customer.outstandingBalance!),
-                        style: tt.labelSmall?.copyWith(
-                          color:      const Color(0xFFEF4444),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  if (!hasBalance && (customer.totalPurchases ?? 0) > 0)
-                    Text(
-                      formatCompact(customer.totalPurchases!),
-                      style: tt.labelSmall?.copyWith(
-                        color:      cs.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -293,10 +384,12 @@ class _CustomerDetailSheet extends ConsumerStatefulWidget {
   final CustomerModel customer;
 
   @override
-  ConsumerState<_CustomerDetailSheet> createState() => _CustomerDetailSheetState();
+  ConsumerState<_CustomerDetailSheet> createState() =>
+      _CustomerDetailSheetState();
 }
 
-class _CustomerDetailSheetState extends ConsumerState<_CustomerDetailSheet> {
+class _CustomerDetailSheetState
+    extends ConsumerState<_CustomerDetailSheet> {
   List<SaleModel>? _sales;
   bool             _loadingSales = true;
   CustomerModel    get c => widget.customer;
@@ -311,41 +404,49 @@ class _CustomerDetailSheetState extends ConsumerState<_CustomerDetailSheet> {
     try {
       final src  = SalesRemoteSource(ref.read(apiClientProvider));
       final resp = await src.getSales(limit: 10, customerId: c.id);
-      if (mounted) setState(() { _sales = resp.items; _loadingSales = false; });
+      if (mounted) {
+        setState(() {
+          _sales        = resp.items;
+          _loadingSales = false;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() { _loadingSales = false; });
+      if (mounted) setState(() => _loadingSales = false);
     }
   }
 
   void _call() {
     if (c.phone == null) return;
-    launchUrl(Uri.parse('tel:${c.phone}'), mode: LaunchMode.externalApplication);
+    launchUrl(Uri.parse('tel:${c.phone}'),
+        mode: LaunchMode.externalApplication);
   }
 
   void _whatsapp() {
     if (c.phone == null) return;
-    final num = c.phone!.replaceAll(RegExp(r'[^0-9+]'), '');
-    launchUrl(Uri.parse('https://wa.me/$num'), mode: LaunchMode.externalApplication);
+    final num =
+        c.phone!.replaceAll(RegExp(r'[^0-9+]'), '');
+    launchUrl(Uri.parse('https://wa.me/$num'),
+        mode: LaunchMode.externalApplication);
   }
 
   Future<void> _collectPayment() async {
     if ((c.outstandingBalance ?? 0) <= 0) return;
     await showModalBottomSheet(
-      context: context,
+      context:            context,
       isScrollControlled: true,
       showDragHandle:     true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => _CustomerCollectSheet(customer: c),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs       = Theme.of(context).colorScheme;
-    final tt       = Theme.of(context).textTheme;
-    final initials = c.name.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase();
-    final hasDebt  = (c.outstandingBalance ?? 0) > 0;
+    final cs      = Theme.of(context).colorScheme;
+    final tt      = Theme.of(context).textTheme;
+    final hasDebt = (c.outstandingBalance ?? 0) > 0;
 
     return DraggableScrollableSheet(
       expand:           false,
@@ -360,27 +461,33 @@ class _CustomerDetailSheetState extends ConsumerState<_CustomerDetailSheet> {
             // Header
             Row(
               children: [
-                CircleAvatar(
-                  radius:          32,
-                  backgroundColor: cs.primaryContainer,
-                  child: Text(initials,
-                      style: TextStyle(color: cs.onPrimaryContainer,
-                          fontSize: 22, fontWeight: FontWeight.w700)),
-                ),
+                GradAvatar(name: c.name, radius: 32, colors: kGradSky),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(c.name,
-                          style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      ShaderMask(
+                        blendMode:      BlendMode.srcIn,
+                        shaderCallback: (b) =>
+                            const LinearGradient(colors: kGradSky)
+                                .createShader(b),
+                        child: Text(
+                          c.name,
+                          style: tt.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ),
                       if (c.phone != null)
                         Text(c.phone!,
-                            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                            style: tt.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant)),
                       if (c.email != null)
                         Text(c.email!,
-                            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                            style: tt.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
@@ -394,36 +501,69 @@ class _CustomerDetailSheetState extends ConsumerState<_CustomerDetailSheet> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      icon:     const Icon(Icons.phone_outlined, size: 16),
-                      label:    const Text('Call'),
+                      icon:  const Icon(Icons.phone_outlined, size: 16),
+                      label: const Text('Call'),
                       onPressed: _call,
                       style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 8)),
+                        padding:         const EdgeInsets.symmetric(vertical: 8),
+                        foregroundColor: kGradSky[0],
+                        side: BorderSide(
+                            color: kGradSky[0].withValues(alpha: 0.4)),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: OutlinedButton.icon(
-                      icon:  const Icon(Icons.chat_rounded, size: 16,
-                          color: Color(0xFF25D366)),
+                      icon: const Icon(Icons.chat_rounded,
+                          size: 16, color: Color(0xFF25D366)),
                       label: const Text('WhatsApp',
                           style: TextStyle(color: Color(0xFF25D366))),
                       onPressed: _whatsapp,
                       style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          side: const BorderSide(color: Color(0xFF25D366))),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        side: const BorderSide(color: Color(0xFF25D366)),
+                      ),
                     ),
                   ),
                   if (hasDebt) ...[
                     const SizedBox(width: 10),
                     Expanded(
-                      child: FilledButton.icon(
-                        icon:  const Icon(Icons.payments_outlined, size: 16),
-                        label: const Text('Collect'),
-                        onPressed: _collectPayment,
-                        style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFFF59E0B),
-                            padding: const EdgeInsets.symmetric(vertical: 8)),
+                      child: GestureDetector(
+                        onTap: _collectPayment,
+                        child: Container(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                                colors: kGradAmber),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: kGradAmber[0]
+                                    .withValues(alpha: 0.25),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.payments_outlined,
+                                  size: 16, color: Colors.white),
+                              SizedBox(width: 6),
+                              Text(
+                                'Collect',
+                                style: TextStyle(
+                                  color:      Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize:   13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -439,24 +579,26 @@ class _CustomerDetailSheetState extends ConsumerState<_CustomerDetailSheet> {
             Row(
               children: [
                 _StatTile(
-                  label: 'Points',
-                  value: '${c.loyaltyPoints ?? 0}',
-                  icon:  Icons.star_rounded,
-                  color: const Color(0xFFCA8A04),
+                  label:  'Points',
+                  value:  '${c.loyaltyPoints ?? 0}',
+                  icon:   Icons.star_rounded,
+                  colors: kGradAmber,
                 ),
                 const SizedBox(width: 12),
                 _StatTile(
-                  label: 'Outstanding',
-                  value: formatCurrency(c.outstandingBalance ?? 0),
-                  icon:  Icons.account_balance_wallet_outlined,
-                  color: hasDebt ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                  label:  'Outstanding',
+                  value:  formatCurrency(c.outstandingBalance ?? 0),
+                  icon:   Icons.account_balance_wallet_outlined,
+                  colors: hasDebt
+                      ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                      : kGradGreen,
                 ),
                 const SizedBox(width: 12),
                 _StatTile(
-                  label: 'Lifetime',
-                  value: formatCompact(c.totalPurchases ?? 0),
-                  icon:  Icons.shopping_bag_outlined,
-                  color: cs.primary,
+                  label:  'Lifetime',
+                  value:  formatCompact(c.totalPurchases ?? 0),
+                  icon:   Icons.shopping_bag_outlined,
+                  colors: kGradSky,
                 ),
               ],
             ),
@@ -467,15 +609,41 @@ class _CustomerDetailSheetState extends ConsumerState<_CustomerDetailSheet> {
               const Divider(height: 24),
             ],
 
-            // Purchase history (real data)
+            // Purchase history
             Row(
               children: [
-                Text('Recent Purchases',
-                    style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const GradIconBox(
+                      icon:         Icons.receipt_long_rounded,
+                      colors:       kGradPrimary,
+                      size:         22,
+                      iconSize:     11,
+                      borderRadius: 6,
+                    ),
+                    const SizedBox(width: 7),
+                    ShaderMask(
+                      blendMode:      BlendMode.srcIn,
+                      shaderCallback: (b) =>
+                          const LinearGradient(colors: kGradPrimary)
+                              .createShader(b),
+                      child: Text(
+                        'Recent Purchases',
+                        style: tt.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
                 const Spacer(),
                 if (_loadingSales)
-                  const SizedBox(width: 14, height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(
+                    width:  14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: kGradPrimary[0]),
+                  ),
               ],
             ),
             const SizedBox(height: 10),
@@ -483,13 +651,15 @@ class _CustomerDetailSheetState extends ConsumerState<_CustomerDetailSheet> {
               const SizedBox()
             else if (_sales == null || _sales!.isEmpty)
               Container(
-                padding:    const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color:        cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                  color:        cs.surfaceContainerHighest
+                      .withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text('No purchases found.',
-                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    style: tt.bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
                     textAlign: TextAlign.center),
               )
             else
@@ -507,46 +677,81 @@ class _SaleHistoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs  = Theme.of(context).colorScheme;
-    final tt  = Theme.of(context).textTheme;
-    final pmC = sale.paymentMethod == 'credit'
-        ? const Color(0xFFF59E0B)
-        : const Color(0xFF10B981);
+    final cs    = Theme.of(context).colorScheme;
+    final tt    = Theme.of(context).textTheme;
+    final pmGrad = sale.paymentMethod == 'credit'
+        ? kGradAmber
+        : kGradGreen;
+    final pmC   = pmGrad[0];
 
     return Container(
-      margin:     const EdgeInsets.only(bottom: 8),
-      padding:    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color:        cs.surfaceContainerHighest.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(10),
         border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(sale.invoiceNo,
-                    style: tt.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-                Text(formatDateTime(sale.createdAt),
-                    style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-              ],
-            ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Material(
+          color: cs.surfaceContainer,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 2,
+                decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: pmGrad)),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 9),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(sale.invoiceNo,
+                              style: tt.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w600)),
+                          Text(formatDateTime(sale.createdAt),
+                              style: tt.labelSmall?.copyWith(
+                                  color: cs.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color:        pmC.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        sale.paymentMethod.toUpperCase(),
+                        style: TextStyle(
+                            color:      pmC,
+                            fontSize:   9,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ShaderMask(
+                      blendMode:      BlendMode.srcIn,
+                      shaderCallback: (b) =>
+                          LinearGradient(colors: pmGrad).createShader(b),
+                      child: Text(
+                        formatCurrency(sale.totalAmount),
+                        style: tt.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          Container(
-            padding:    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color:        pmC.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: Text(sale.paymentMethod.toUpperCase(),
-                style: TextStyle(color: pmC, fontSize: 9, fontWeight: FontWeight.w700)),
-          ),
-          const SizedBox(width: 8),
-          Text(formatCurrency(sale.totalAmount),
-              style: tt.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
-        ],
+        ),
       ),
     );
   }
@@ -559,50 +764,55 @@ class _CustomerCollectSheet extends ConsumerStatefulWidget {
   final CustomerModel customer;
 
   @override
-  ConsumerState<_CustomerCollectSheet> createState() => _CustomerCollectSheetState();
+  ConsumerState<_CustomerCollectSheet> createState() =>
+      _CustomerCollectSheetState();
 }
 
-class _CustomerCollectSheetState extends ConsumerState<_CustomerCollectSheet> {
-  final _ctrl   = TextEditingController();
+class _CustomerCollectSheetState
+    extends ConsumerState<_CustomerCollectSheet> {
+  final _ctrl    = TextEditingController();
   String _method = 'cash';
   bool   _saving = false;
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _submit() async {
     final amount = double.tryParse(_ctrl.text.trim());
     if (amount == null || amount <= 0) return;
     setState(() => _saving = true);
     try {
-      // Find the oldest unpaid credit sale for this customer and apply payment
       final src  = SalesRemoteSource(ref.read(apiClientProvider));
-      final resp = await src.getSales(limit: 20, customerId: widget.customer.id);
+      final resp =
+          await src.getSales(limit: 20, customerId: widget.customer.id);
       final creditSales = resp.items
-          .where((s) => s.paymentMethod == 'credit' && s.status != 'cancelled')
+          .where((s) =>
+              s.paymentMethod == 'credit' && s.status != 'cancelled')
           .toList();
 
-      double remaining = amount;
       for (final sale in creditSales) {
-        if (remaining <= 0) break;
         await ref.read(apiClientProvider).patch(
           ApiEndpoints.saleCollectPayment(sale.id),
-          data: {'amount': remaining, 'payment_method': _method},
+          data: {'amount': amount, 'payment_method': _method},
         );
-        remaining = 0; // simplified: apply to first unpaid sale
+        break; // simplified: apply to first unpaid sale
       }
 
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${formatCurrency(amount)} recorded for ${widget.customer.name}'),
+          content: Text(
+              '${formatCurrency(amount)} recorded for ${widget.customer.name}'),
           backgroundColor: Colors.green.shade700,
         ));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Failed: $e'),
+          content:         Text('Failed: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
@@ -614,6 +824,7 @@ class _CustomerCollectSheetState extends ConsumerState<_CustomerCollectSheet> {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
     final mq = MediaQuery.of(context);
 
     return Padding(
@@ -621,13 +832,38 @@ class _CustomerCollectSheetState extends ConsumerState<_CustomerCollectSheet> {
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize:       MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Collect Payment', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text('Customer: ${widget.customer.name} • Outstanding: ${formatCurrency(widget.customer.outstandingBalance ?? 0)}',
-                style: tt.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            Row(
+              children: [
+                const GradIconBox(
+                  icon:         Icons.payments_rounded,
+                  colors:       kGradAmber,
+                  size:         38,
+                  iconSize:     19,
+                  borderRadius: 11,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Collect Payment',
+                          style: tt.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        '${widget.customer.name}  •  Due: ${formatCurrency(widget.customer.outstandingBalance ?? 0)}',
+                        style: tt.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                        maxLines:  1,
+                        overflow:  TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
             TextField(
               controller:   _ctrl,
@@ -640,29 +876,32 @@ class _CustomerCollectSheetState extends ConsumerState<_CustomerCollectSheet> {
               ),
             ),
             const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              value:      _method,
+            InputDecorator(
               decoration: const InputDecoration(
                 labelText:  'Method',
                 prefixIcon: Icon(Icons.credit_card_outlined),
+                isDense:    true,
               ),
-              items: const [
-                DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                DropdownMenuItem(value: 'card', child: Text('Card')),
-                DropdownMenuItem(value: 'bank', child: Text('Bank Transfer')),
-              ],
-              onChanged: (v) => setState(() => _method = v ?? 'cash'),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value:    _method,
+                  isDense:  true,
+                  items: const [
+                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                    DropdownMenuItem(value: 'card', child: Text('Card')),
+                    DropdownMenuItem(value: 'bank', child: Text('Bank Transfer')),
+                  ],
+                  onChanged: (v) => setState(() => _method = v ?? 'cash'),
+                ),
+              ),
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _submit,
-                child: _saving
-                    ? const SizedBox(height: 22, width: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                    : const Text('Record Payment'),
-              ),
+            GradButton(
+              label:    'Record Payment',
+              icon:     Icons.check_circle_outline_rounded,
+              onPressed: _submit,
+              loading:  _saving,
+              colors:   kGradAmber,
             ),
           ],
         ),
@@ -672,12 +911,16 @@ class _CustomerCollectSheetState extends ConsumerState<_CustomerCollectSheet> {
 }
 
 class _StatTile extends StatelessWidget {
-  const _StatTile(
-      {required this.label, required this.value, required this.icon, required this.color});
-  final String   label;
-  final String   value;
-  final IconData icon;
-  final Color    color;
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.colors,
+  });
+  final String      label;
+  final String      value;
+  final IconData    icon;
+  final List<Color> colors;
 
   @override
   Widget build(BuildContext context) {
@@ -685,26 +928,39 @@ class _StatTile extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     return Expanded(
       child: Container(
-        padding:    const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color:        color.withValues(alpha: 0.08),
+          color:        colors[0].withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
-          border:       Border.all(color: color.withValues(alpha: 0.2)),
+          border:       Border.all(color: colors[0].withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 18),
+            GradIconBox(
+              icon:         icon,
+              colors:       colors,
+              size:         32,
+              iconSize:     16,
+              borderRadius: 9,
+            ),
             const SizedBox(height: 6),
-            Text(
-              value,
-              style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w700, color: color),
-              maxLines: 1, overflow: TextOverflow.ellipsis,
+            ShaderMask(
+              blendMode:      BlendMode.srcIn,
+              shaderCallback: (b) =>
+                  LinearGradient(colors: colors).createShader(b),
+              child: Text(
+                value,
+                style: tt.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             Text(
               label,
-              style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant, fontSize: 9),
+              style: tt.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant, fontSize: 9),
               textAlign: TextAlign.center,
-              maxLines: 1,
+              maxLines:  1,
             ),
           ],
         ),
@@ -726,7 +982,8 @@ class _DetailRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Text(label, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          Text(label,
+              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
           const Spacer(),
           Flexible(
             child: Text(value,
@@ -746,16 +1003,18 @@ class _CreateCustomerSheet extends ConsumerStatefulWidget {
   final VoidCallback onCreated;
 
   @override
-  ConsumerState<_CreateCustomerSheet> createState() => _CreateCustomerSheetState();
+  ConsumerState<_CreateCustomerSheet> createState() =>
+      _CreateCustomerSheetState();
 }
 
-class _CreateCustomerSheetState extends ConsumerState<_CreateCustomerSheet> {
-  final _formKey    = GlobalKey<FormState>();
-  final _nameCtrl   = TextEditingController();
-  final _emailCtrl  = TextEditingController();
-  final _phoneCtrl  = TextEditingController();
-  final _addrCtrl   = TextEditingController();
-  bool  _saving     = false;
+class _CreateCustomerSheetState
+    extends ConsumerState<_CreateCustomerSheet> {
+  final _formKey   = GlobalKey<FormState>();
+  final _nameCtrl  = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _addrCtrl  = TextEditingController();
+  bool  _saving    = false;
 
   @override
   void dispose() {
@@ -772,7 +1031,7 @@ class _CreateCustomerSheetState extends ConsumerState<_CreateCustomerSheet> {
     try {
       final source = ref.read(customersSourceProvider);
       await source.createCustomer({
-        'name':    _nameCtrl.text.trim(),
+        'name': _nameCtrl.text.trim(),
         if (_emailCtrl.text.isNotEmpty) 'email':   _emailCtrl.text.trim(),
         if (_phoneCtrl.text.isNotEmpty) 'phone':   _phoneCtrl.text.trim(),
         if (_addrCtrl.text.isNotEmpty)  'address': _addrCtrl.text.trim(),
@@ -781,12 +1040,10 @@ class _CreateCustomerSheetState extends ConsumerState<_CreateCustomerSheet> {
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create customer: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:         Text('Failed to create customer: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -795,8 +1052,9 @@ class _CreateCustomerSheetState extends ConsumerState<_CreateCustomerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final tt  = Theme.of(context).textTheme;
-    final mq  = MediaQuery.of(context);
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final mq = MediaQuery.of(context);
 
     return Padding(
       padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
@@ -806,22 +1064,43 @@ class _CreateCustomerSheetState extends ConsumerState<_CreateCustomerSheet> {
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize:       MainAxisSize.min,
             children: [
-              Text(
-                'New Customer',
-                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              Row(
+                children: [
+                  const GradIconBox(
+                    icon:         Icons.person_add_rounded,
+                    colors:       kGradSky,
+                    size:         38,
+                    iconSize:     19,
+                    borderRadius: 11,
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('New Customer',
+                          style: tt.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700)),
+                      Text('Fill in the details below',
+                          style: tt.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant)),
+                    ],
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
               TextFormField(
-                controller: _nameCtrl,
+                controller:         _nameCtrl,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
                   labelText:  'Full Name',
                   prefixIcon: Icon(Icons.person_outline),
                 ),
                 validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                    (v == null || v.trim().isEmpty)
+                        ? 'Name is required'
+                        : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
@@ -842,32 +1121,29 @@ class _CreateCustomerSheetState extends ConsumerState<_CreateCustomerSheet> {
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return null;
-                  final emailRe = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                  return emailRe.hasMatch(v.trim()) ? null : 'Enter a valid email';
+                  final emailRe =
+                      RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                  return emailRe.hasMatch(v.trim())
+                      ? null
+                      : 'Enter a valid email';
                 },
               ),
               const SizedBox(height: 14),
               TextFormField(
-                controller:  _addrCtrl,
-                maxLines:    2,
+                controller: _addrCtrl,
+                maxLines:   2,
                 decoration: const InputDecoration(
                   labelText:  'Address (optional)',
                   prefixIcon: Icon(Icons.location_on_outlined),
                 ),
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
-                      ? const SizedBox(
-                          height: 22,
-                          width:  22,
-                          child:  CircularProgressIndicator(strokeWidth: 2.5),
-                        )
-                      : const Text('Create Customer'),
-                ),
+              GradButton(
+                label:    'Create Customer',
+                icon:     Icons.person_add_rounded,
+                onPressed: _save,
+                loading:  _saving,
+                colors:   kGradSky,
               ),
             ],
           ),
@@ -894,8 +1170,8 @@ class _CustomerShimmer extends StatelessWidget {
           children: List.generate(
             8,
             (_) => Container(
-              height:     76,
-              margin:     const EdgeInsets.only(bottom: 10),
+              height: 76,
+              margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
                 color:        cs.surface,
                 borderRadius: BorderRadius.circular(14),
@@ -920,7 +1196,13 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.people_outlined, size: 56, color: cs.onSurfaceVariant),
+          const GradIconBox(
+            icon:         Icons.people_outlined,
+            colors:       kGradSky,
+            size:         72,
+            iconSize:     36,
+            borderRadius: 20,
+          ),
           const SizedBox(height: 16),
           Text('No customers found',
               style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
@@ -957,17 +1239,19 @@ class _ErrorState extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             message,
-            style:     tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            style:    tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
             maxLines:  3,
             overflow:  TextOverflow.ellipsis,
           ),
           const SizedBox(height: 20),
-          ElevatedButton.icon(
+          GradButton(
+            label:    'Retry',
+            icon:     Icons.refresh_rounded,
             onPressed: onRetry,
-            icon:  const Icon(Icons.refresh),
-            label: const Text('Retry'),
-            style: ElevatedButton.styleFrom(minimumSize: const Size(160, 44)),
+            colors:   kGradSky,
+            height:   44,
+            borderRadius: 12,
           ),
         ],
       ),

@@ -62,15 +62,41 @@ router.patch('/:id/reset-password',
 router.patch('/:id/toggle-status', authorize('admin'), param('id').isInt(), toggleStatus);
 router.post('/me/avatar', upload.single('avatar'), updateAvatar);
 
-// FCM token registration (called by mobile app after login)
+// Update own profile (name / phone) — no special permission required
+router.patch('/me/profile', async (req, res, next) => {
+  try {
+    const { name, phone } = req.body;
+    const sets   = [];
+    const values = [];
+    let   idx    = 1;
+    if (name  !== undefined && name.trim())  { sets.push(`name=$${idx++}`);  values.push(name.trim()); }
+    if (phone !== undefined)                 { sets.push(`phone=$${idx++}`); values.push(phone || null); }
+    if (!sets.length) {
+      return res.status(422).json({ success: false, message: 'Nothing to update.' });
+    }
+    values.push(req.user.id);
+    await require('../config/database').query(
+      `UPDATE users SET ${sets.join(', ')} WHERE id=$${idx}`,
+      values,
+    );
+    return res.json({ success: true, message: 'Profile updated.' });
+  } catch (err) { next(err); }
+});
+
+// FCM token registration (called by mobile app after login / on refresh)
+// Send empty string or null to clear the token on logout.
 router.post('/me/fcm-token', async (req, res, next) => {
   try {
     const { token } = req.body;
-    if (!token) return res.status(422).json({ success: false, message: 'token is required.' });
+    if (token === undefined) {
+      return res.status(422).json({ success: false, message: 'token field is required.' });
+    }
+    // Empty string → store NULL so the user is excluded from push queries.
+    const safeToken = token || null;
     await require('../config/database').query(
-      'UPDATE users SET fcm_token=$1 WHERE id=$2', [token, req.user.id]
+      'UPDATE users SET fcm_token=$1 WHERE id=$2', [safeToken, req.user.id]
     );
-    return res.json({ success: true, message: 'FCM token registered.' });
+    return res.json({ success: true, message: safeToken ? 'FCM token registered.' : 'FCM token cleared.' });
   } catch (err) { next(err); }
 });
 

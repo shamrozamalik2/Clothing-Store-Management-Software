@@ -5,6 +5,7 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/grad_widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../sales/data/models/sale_model.dart';
 import '../../../sales/data/sources/sales_remote_source.dart';
@@ -86,51 +87,158 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen> {
   @override
   Widget build(BuildContext context) {
     final printer = ref.watch(printerProvider);
-    final theme   = Theme.of(context);
+    final cs      = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title:   const Text('Bluetooth Printer'),
-        leading: IconButton(
-          icon:     const Icon(Icons.menu),
-          onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
-        ),
-        actions: [
-          if (printer.isPrinting)
-            const Padding(
-              padding: EdgeInsets.all(14),
-              child:   SizedBox(width: 20, height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2)),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            floating:         true,
+            snap:             true,
+            backgroundColor:  cs.surface,
+            surfaceTintColor: Colors.transparent,
+            elevation:        0,
+            leading: IconButton(
+              icon:      const Icon(Icons.menu_rounded),
+              onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
             ),
-          IconButton(
-            icon:     const Icon(Icons.bluetooth_searching),
-            tooltip:  'Scan for devices',
-            onPressed: printer.isScanning
-                ? null
-                : () => ref.read(printerProvider.notifier).scanDevices(),
+            title: Row(
+              children: [
+                const GradIconBox(
+                  icon:         Icons.print_rounded,
+                  colors:       kGradSky,
+                  size:         32,
+                  iconSize:     16,
+                  borderRadius: 9,
+                ),
+                const SizedBox(width: 10),
+                ShaderMask(
+                  shaderCallback: (b) =>
+                      const LinearGradient(colors: kGradSky).createShader(b),
+                  child: const Text(
+                    'Bluetooth Printer',
+                    style: TextStyle(
+                      color:      Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize:   18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              if (printer.isPrinting)
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: kGradSky[0],
+                    ),
+                  ),
+                ),
+              Container(
+                margin:     const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color:        kGradSky[0].withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: IconButton(
+                  icon:      Icon(Icons.bluetooth_searching, color: kGradSky[0]),
+                  tooltip:   'Scan for devices',
+                  onPressed: printer.isScanning
+                      ? null
+                      : () => ref.read(printerProvider.notifier).scanDevices(),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(
+                height: 1,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(colors: kGradSky),
+                ),
+              ),
+            ),
           ),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ConnectionCard(printer: printer, onTest: _testPrint),
+                  const SizedBox(height: 16),
+                  _DeviceList(
+                    printer:      printer,
+                    onConnect:    _connect,
+                    onDisconnect: () =>
+                        ref.read(printerProvider.notifier).disconnect(),
+                  ),
+                  if (printer.isConnected) ...[
+                    const SizedBox(height: 24),
+                    const _SectionHeader(
+                      icon:   Icons.receipt_long_rounded,
+                      colors: kGradPrimary,
+                      label:  "Today's Sales — Reprint Receipt",
+                    ),
+                    const SizedBox(height: 10),
+                    _TodaySalesList(onPrint: _printReceipt),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _ConnectionCard(printer: printer, onTest: _testPrint),
-          const SizedBox(height: 16),
-          _DeviceList(
-            printer:      printer,
-            onConnect:    _connect,
-            onDisconnect: () => ref.read(printerProvider.notifier).disconnect(),
+    );
+  }
+}
+
+// ── Section header ────────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.colors,
+    required this.label,
+  });
+  final IconData    icon;
+  final List<Color> colors;
+  final String      label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GradIconBox(
+          icon:         icon,
+          colors:       colors,
+          size:         26,
+          iconSize:     13,
+          borderRadius: 7,
+        ),
+        const SizedBox(width: 8),
+        ShaderMask(
+          shaderCallback: (b) =>
+              LinearGradient(colors: colors).createShader(b),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color:      Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize:   15,
+            ),
           ),
-          if (printer.isConnected) ...[
-            const SizedBox(height: 20),
-            Text("Today's Sales — Reprint Receipt",
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 10),
-            _TodaySalesList(onPrint: _printReceipt),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -144,63 +252,117 @@ class _ConnectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme     = Theme.of(context);
-    final cs        = theme.colorScheme;
+    final cs        = Theme.of(context).colorScheme;
+    final tt        = Theme.of(context).textTheme;
     final connected = printer.isConnected;
+    final grad      = connected ? kGradGreen : kGradSky;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(color: cs.surfaceContainer),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 10, height: 10,
-                  decoration: BoxDecoration(
-                    color:  connected ? Colors.green : Colors.red.shade400,
-                    shape:  BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    connected
-                        ? 'Connected: ${printer.connectedDevice!.name}'
-                        : 'No printer connected',
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
+            // Gradient top bar
+            Container(
+              height:     3,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: grad),
+              ),
             ),
-            if (printer.lastStatus != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                printer.lastStatus!,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: cs.onSurface.withValues(alpha: 0.55)),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      GradIconBox(
+                        icon:         connected
+                            ? Icons.print_rounded
+                            : Icons.print_disabled_rounded,
+                        colors:       grad,
+                        size:         44,
+                        iconSize:     22,
+                        borderRadius: 12,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              connected ? 'Connected' : 'No Printer Connected',
+                              style: tt.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            if (connected) ...[
+                              const SizedBox(height: 2),
+                              ShaderMask(
+                                shaderCallback: (b) =>
+                                    const LinearGradient(colors: kGradGreen)
+                                        .createShader(b),
+                                child: Text(
+                                  printer.connectedDevice!.name,
+                                  style: const TextStyle(
+                                    color:      Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize:   13,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      // Status dot
+                      Container(
+                        width:  10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          shape:    BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: connected
+                                ? kGradGreen
+                                : [
+                                    const Color(0xFFEF4444),
+                                    const Color(0xFFDC2626),
+                                  ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (printer.lastStatus != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      printer.lastStatus!,
+                      style: tt.bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                  if (printer.error != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      printer.error!,
+                      style: tt.bodySmall?.copyWith(color: cs.error),
+                    ),
+                  ],
+                  if (connected) ...[
+                    const SizedBox(height: 14),
+                    GradButton(
+                      label:     'Test Print',
+                      icon:      Icons.print_outlined,
+                      onPressed: onTest,
+                      loading:   printer.isPrinting,
+                      colors:    kGradSky,
+                      height:    44,
+                    ),
+                  ],
+                ],
               ),
-            ],
-            if (printer.error != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                printer.error!,
-                style: theme.textTheme.bodySmall?.copyWith(color: cs.error),
-              ),
-            ],
-            if (connected) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  icon:     const Icon(Icons.print_outlined, size: 18),
-                  label:    const Text('Test Print'),
-                  onPressed: printer.isPrinting ? null : onTest,
-                ),
-              ),
-            ],
+            ),
           ],
         ),
       ),
@@ -222,63 +384,174 @@ class _DeviceList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text('Paired Bluetooth Devices',
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
+            const _SectionHeader(
+              icon:   Icons.bluetooth_rounded,
+              colors: kGradSky,
+              label:  'Paired Bluetooth Devices',
+            ),
             const Spacer(),
             if (printer.isScanning)
-              const SizedBox(
-                  width: 16, height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2)),
+              SizedBox(
+                width: 16, height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: kGradSky[0],
+                ),
+              ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         if (printer.pairedDevices.isEmpty && !printer.isScanning)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'No paired devices found.\n'
-                'Pair your printer in Android Bluetooth settings first, '
-                'then tap the scan button above.',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.55)),
-              ),
+          Container(
+            decoration: BoxDecoration(
+              color:        cs.surfaceContainer,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: cs.outlineVariant.withValues(alpha: 0.4)),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                const GradIconBox(
+                  icon:         Icons.bluetooth_searching,
+                  colors:       kGradSky,
+                  size:         44,
+                  iconSize:     22,
+                  borderRadius: 12,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    'No paired devices found.\n'
+                    'Pair your printer in Android Bluetooth settings first, '
+                    'then tap the scan button above.',
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+              ],
             ),
           )
         else
           ...printer.pairedDevices.map((device) {
-            final isThis = printer.connectedDevice?.macAdress == device.macAdress;
-            return Card(
+            final isThis =
+                printer.connectedDevice?.macAdress == device.macAdress;
+            final devGrad = isThis ? kGradGreen : kGradSky;
+
+            return Container(
               margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Icon(
-                  Icons.print_rounded,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
                   color: isThis
-                      ? Colors.green
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                      ? kGradGreen[0].withValues(alpha: 0.4)
+                      : cs.outlineVariant.withValues(alpha: 0.35),
                 ),
-                title:    Text(device.name,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text(device.macAdress,
-                    style: theme.textTheme.bodySmall),
-                trailing: isThis
-                    ? TextButton(
-                        onPressed: onDisconnect,
-                        child: const Text('Disconnect',
-                            style: TextStyle(color: Colors.red)),
-                      )
-                    : FilledButton(
-                        onPressed: () => onConnect(device),
-                        child: const Text('Connect'),
-                      ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Material(
+                  color: cs.surfaceContainer,
+                  child: InkWell(
+                    onTap: isThis ? null : () => onConnect(device),
+                    child: Column(
+                      children: [
+                        Container(
+                          height:     2,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: devGrad),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          child: Row(
+                            children: [
+                              GradIconBox(
+                                icon:         Icons.print_rounded,
+                                colors:       devGrad,
+                                size:         40,
+                                iconSize:     20,
+                                borderRadius: 11,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(device.name,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600)),
+                                    Text(device.macAdress,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall),
+                                  ],
+                                ),
+                              ),
+                              if (isThis)
+                                GestureDetector(
+                                  onTap: onDisconnect,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEF4444)
+                                          .withValues(alpha: 0.12),
+                                      borderRadius:
+                                          BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: const Color(0xFFEF4444)
+                                            .withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Disconnect',
+                                      style: TextStyle(
+                                        color:      Color(0xFFEF4444),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize:   12,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                GestureDetector(
+                                  onTap: () => onConnect(device),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                          colors: kGradSky),
+                                      borderRadius:
+                                          BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'Connect',
+                                      style: TextStyle(
+                                        color:      Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize:   12,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             );
           }),
@@ -296,34 +569,55 @@ class _TodaySalesList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final salesAsync = ref.watch(_todaySalesProvider);
-    final theme      = Theme.of(context);
+    final cs         = Theme.of(context).colorScheme;
 
     return salesAsync.when(
-      loading: () => const Center(
-          child: Padding(
-            padding: EdgeInsets.all(32),
-            child:   CircularProgressIndicator(),
-          )),
-      error: (e, _) => Card(
+      loading: () => Center(
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text('Could not load sales: $e',
-              style: TextStyle(color: theme.colorScheme.error)),
+          padding: const EdgeInsets.all(32),
+          child: CircularProgressIndicator(color: kGradPrimary[0]),
         ),
+      ),
+      error: (e, _) => Container(
+        decoration: BoxDecoration(
+          color:        cs.errorContainer.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Text('Could not load sales: $e',
+            style: TextStyle(color: cs.error)),
       ),
       data: (sales) {
         if (sales.isEmpty) {
-          return Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('No sales today yet.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.55))),
+          return Container(
+            decoration: BoxDecoration(
+              color:        cs.surfaceContainer,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: cs.outlineVariant.withValues(alpha: 0.4)),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                const GradIconBox(
+                  icon:         Icons.receipt_long_outlined,
+                  colors:       kGradPrimary,
+                  size:         44,
+                  iconSize:     22,
+                  borderRadius: 12,
+                ),
+                const SizedBox(width: 14),
+                Text('No sales today yet.',
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: cs.onSurfaceVariant)),
+              ],
             ),
           );
         }
         return Column(
-          children: sales.map((s) => _SaleTile(sale: s, onPrint: onPrint)).toList(),
+          children: sales
+              .map((s) => _SaleTile(sale: s, onPrint: onPrint))
+              .toList(),
         );
       },
     );
@@ -344,47 +638,114 @@ class _SaleTileState extends State<_SaleTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final time  = DateFormat('HH:mm').format(
+    final cs   = Theme.of(context).colorScheme;
+    final tt   = Theme.of(context).textTheme;
+    final time = DateFormat('HH:mm').format(
       DateTime.tryParse(widget.sale.createdAt) ?? DateTime.now(),
     );
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          radius: 18,
-          backgroundColor: theme.colorScheme.primaryContainer,
-          child: Icon(Icons.receipt_outlined, size: 18,
-              color: theme.colorScheme.onPrimaryContainer),
-        ),
-        title:    Text(widget.sale.invoiceNo,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(
-          '$time  •  ${widget.sale.customerName ?? 'Walk-in'}  •  '
-          '${widget.sale.paymentMethod.toUpperCase()}',
-          style: theme.textTheme.bodySmall,
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(formatCurrency(widget.sale.totalAmount),
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(width: 4),
-            _printing
-                ? const SizedBox(width: 20, height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : IconButton(
-                    icon:     const Icon(Icons.print_rounded),
-                    tooltip:  'Print receipt',
-                    onPressed: () async {
-                      setState(() => _printing = true);
-                      await widget.onPrint(widget.sale);
-                      if (mounted) setState(() => _printing = false);
-                    },
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: cs.outlineVariant.withValues(alpha: 0.35)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Material(
+          color: cs.surfaceContainer,
+          child: InkWell(
+            onTap: _printing
+                ? null
+                : () async {
+                    setState(() => _printing = true);
+                    await widget.onPrint(widget.sale);
+                    if (mounted) setState(() => _printing = false);
+                  },
+            child: Column(
+              children: [
+                Container(
+                  height:     2,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: kGradPrimary),
                   ),
-          ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      const GradIconBox(
+                        icon:         Icons.receipt_outlined,
+                        colors:       kGradPrimary,
+                        size:         36,
+                        iconSize:     18,
+                        borderRadius: 10,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.sale.invoiceNo,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$time  •  '
+                              '${widget.sale.customerName ?? 'Walk-in'}  •  '
+                              '${widget.sale.paymentMethod.toUpperCase()}',
+                              style: tt.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          ShaderMask(
+                            shaderCallback: (b) =>
+                                const LinearGradient(colors: kGradGreen)
+                                    .createShader(b),
+                            child: Text(
+                              formatCurrency(widget.sale.totalAmount),
+                              style: const TextStyle(
+                                color:      Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize:   13,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          _printing
+                              ? SizedBox(
+                                  width:  18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: kGradPrimary[0],
+                                  ),
+                                )
+                              : Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: kGradSky[0].withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Icon(Icons.print_rounded,
+                                      size: 16, color: kGradSky[0]),
+                                ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

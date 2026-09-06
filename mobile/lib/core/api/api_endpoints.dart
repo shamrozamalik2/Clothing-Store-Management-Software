@@ -50,6 +50,7 @@ class ApiEndpoints {
   // Users
   static const String users          = '/users';
   static const String fcmToken       = '/users/me/fcm-token';
+  static const String updateMyProfile = '/users/me/profile';
 
   // Expense categories
   static const String expenseCategories  = '/expenses/categories';

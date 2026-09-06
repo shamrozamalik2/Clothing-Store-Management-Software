@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
+import '../../../../core/widgets/grad_widgets.dart';
 import '../../data/models/stock_model.dart';
 
 class StockAdjustmentSheet extends ConsumerStatefulWidget {
@@ -11,14 +12,16 @@ class StockAdjustmentSheet extends ConsumerStatefulWidget {
   final VoidCallback? onDone;
 
   @override
-  ConsumerState<StockAdjustmentSheet> createState() => _StockAdjustmentSheetState();
+  ConsumerState<StockAdjustmentSheet> createState() =>
+      _StockAdjustmentSheetState();
 }
 
-class _StockAdjustmentSheetState extends ConsumerState<StockAdjustmentSheet> {
+class _StockAdjustmentSheetState
+    extends ConsumerState<StockAdjustmentSheet> {
   final _qtyCtrl  = TextEditingController();
   final _noteCtrl = TextEditingController();
-  String _type    = 'in';
-  bool   _saving  = false;
+  String _type   = 'in';
+  bool   _saving = false;
 
   @override
   void dispose() {
@@ -36,17 +39,21 @@ class _StockAdjustmentSheetState extends ConsumerState<StockAdjustmentSheet> {
     }
     setState(() => _saving = true);
     try {
-      await ref.read(apiClientProvider).post(ApiEndpoints.stockAdjustments, data: {
-        'product_id':        widget.item.id,
-        'type':              _type,
-        'quantity':          qty,
-        if (_noteCtrl.text.isNotEmpty) 'notes': _noteCtrl.text.trim(),
-      });
+      await ref.read(apiClientProvider).post(
+        ApiEndpoints.stockAdjustments,
+        data: {
+          'product_id': widget.item.id,
+          'type':       _type,
+          'quantity':   qty,
+          if (_noteCtrl.text.isNotEmpty) 'notes': _noteCtrl.text.trim(),
+        },
+      );
       widget.onDone?.call();
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Stock adjusted: ${_type == 'in' ? '+' : '-'}$qty units.'),
+          content: Text(
+              'Stock adjusted: ${_type == 'in' ? '+' : '-'}$qty units.'),
           backgroundColor: Colors.green.shade700,
         ));
       }
@@ -68,19 +75,48 @@ class _StockAdjustmentSheetState extends ConsumerState<StockAdjustmentSheet> {
     final cs = Theme.of(context).colorScheme;
     final mq = MediaQuery.of(context);
 
+    const inGrad  = kGradGreen;
+    final outGrad = [const Color(0xFFEF4444), const Color(0xFFDC2626)];
+
     return Padding(
       padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
         child: Column(
-          mainAxisSize:     MainAxisSize.min,
+          mainAxisSize:       MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Stock Adjustment',
-                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text('${widget.item.name}  •  Current: ${widget.item.stockQuantity} units',
-                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            // Sheet header
+            Row(
+              children: [
+                const GradIconBox(
+                  icon:         Icons.tune_rounded,
+                  colors:       kGradPrimary,
+                  size:         38,
+                  iconSize:     19,
+                  borderRadius: 11,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Stock Adjustment',
+                          style: tt.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700)),
+                      Text(
+                        '${widget.item.name}  •  Current: '
+                        '${widget.item.stockQuantity} units',
+                        style: tt.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant),
+                        maxLines:  1,
+                        overflow:  TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
 
             // Type toggle
@@ -91,7 +127,7 @@ class _StockAdjustmentSheetState extends ConsumerState<StockAdjustmentSheet> {
                     label:    'Stock In',
                     icon:     Icons.add_circle_outline,
                     selected: _type == 'in',
-                    color:    const Color(0xFF10B981),
+                    grads:    inGrad,
                     onTap:    () => setState(() => _type = 'in'),
                   ),
                 ),
@@ -101,7 +137,7 @@ class _StockAdjustmentSheetState extends ConsumerState<StockAdjustmentSheet> {
                     label:    'Stock Out',
                     icon:     Icons.remove_circle_outline,
                     selected: _type == 'out',
-                    color:    const Color(0xFFEF4444),
+                    grads:    outGrad,
                     onTap:    () => setState(() => _type = 'out'),
                   ),
                 ),
@@ -117,14 +153,16 @@ class _StockAdjustmentSheetState extends ConsumerState<StockAdjustmentSheet> {
                 labelText:  'Quantity',
                 prefixIcon: Icon(
                   _type == 'in' ? Icons.add : Icons.remove,
-                  color: _type == 'in' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                  color: _type == 'in'
+                      ? kGradGreen[0]
+                      : const Color(0xFFEF4444),
                 ),
               ),
             ),
             const SizedBox(height: 14),
 
             TextField(
-              controller: _noteCtrl,
+              controller:  _noteCtrl,
               decoration: const InputDecoration(
                 labelText:  'Reason / Note (optional)',
                 prefixIcon: Icon(Icons.notes_outlined),
@@ -132,15 +170,12 @@ class _StockAdjustmentSheetState extends ConsumerState<StockAdjustmentSheet> {
             ),
             const SizedBox(height: 24),
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _submit,
-                child: _saving
-                    ? const SizedBox(height: 22, width: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                    : const Text('Apply Adjustment'),
-              ),
+            GradButton(
+              label:    'Apply Adjustment',
+              icon:     Icons.check_circle_outline_rounded,
+              onPressed: _submit,
+              loading:  _saving,
+              colors:   _type == 'in' ? kGradGreen : outGrad,
             ),
           ],
         ),
@@ -154,40 +189,51 @@ class _TypeBtn extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.selected,
-    required this.color,
+    required this.grads,
     required this.onTap,
   });
   final String       label;
   final IconData     icon;
   final bool         selected;
-  final Color        color;
+  final List<Color>  grads;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap:        onTap,
-      borderRadius: BorderRadius.circular(10),
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
       child: AnimatedContainer(
-        duration:   const Duration(milliseconds: 150),
-        padding:    const EdgeInsets.symmetric(vertical: 12),
+        duration: const Duration(milliseconds: 150),
+        padding:  const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color:        selected ? color.withValues(alpha: 0.12) : Colors.transparent,
+          gradient: selected ? LinearGradient(colors: grads) : null,
+          color:    selected ? null : cs.surfaceContainer,
           borderRadius: BorderRadius.circular(10),
-          border:       Border.all(
-              color: selected ? color : Theme.of(context).colorScheme.outlineVariant),
+          border: Border.all(
+            color: selected
+                ? Colors.transparent
+                : cs.outlineVariant.withValues(alpha: 0.5),
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: selected ? color : Theme.of(context).colorScheme.onSurfaceVariant,
-                size: 18),
+            Icon(
+              icon,
+              color:  selected ? Colors.white : cs.onSurfaceVariant,
+              size:   18,
+            ),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(
-              color:      selected ? color : Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
-              fontSize:   13,
-            )),
+            Text(
+              label,
+              style: TextStyle(
+                color:      selected ? Colors.white : cs.onSurfaceVariant,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                fontSize:   13,
+                fontFamily: 'Inter',
+              ),
+            ),
           ],
         ),
       ),

@@ -1,7 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/api/api_client.dart';
+import 'core/api/api_endpoints.dart';
 import 'core/router/app_router.dart';
 import 'core/services/biometric_lock_service.dart';
 import 'core/services/notification_service.dart';
@@ -37,6 +40,16 @@ void main() async {
       final n = SaleNotification.fromFcmData(msg.data);
       _container.read(notificationsProvider.notifier).add(n);
     }
+  });
+
+  // Keep FCM token fresh — Firebase rotates tokens periodically; re-register immediately.
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+    try {
+      await _container.read(apiClientProvider).post(
+        ApiEndpoints.fcmToken,
+        data: {'token': newToken},
+      );
+    } catch (_) {}
   });
 
   runApp(UncontrolledProviderScope(

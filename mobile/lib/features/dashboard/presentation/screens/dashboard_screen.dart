@@ -409,7 +409,27 @@ class _HeroSalesCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
+        child: Stack(
+          children: [
+            // Decorative background blob (top-right depth)
+            Positioned(
+              right: -30,
+              top:   -30,
+              child: Container(
+                width:  160,
+                height: 160,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.white.withValues(alpha: 0.07),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -519,6 +539,8 @@ class _HeroSalesCard extends StatelessWidget {
                 ),
               ],
             ),
+          ],
+        ),
           ],
         ),
       ),
@@ -655,45 +677,71 @@ class _PaymentBreakdown extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color:        cs.surfaceContainer,
-          borderRadius: BorderRadius.circular(16),
-          border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
-          boxShadow: [
-            BoxShadow(
-              color:      Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset:     const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Payment Breakdown',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color:      cs.onSurface,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            color:  cs.surfaceContainer,
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+            boxShadow: [
+              BoxShadow(
+                color:      Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset:     const Offset(0, 2),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _PmTile(label: 'Cash',   amount: stats.cashSales,   icon: Icons.payments_outlined,            color: const Color(0xFF10B981)),
-                const SizedBox(width: 8),
-                _PmTile(label: 'Card',   amount: stats.cardSales,   icon: Icons.credit_card_rounded,          color: const Color(0xFF6366F1)),
-                const SizedBox(width: 8),
-                _PmTile(label: 'Credit', amount: stats.creditSales, icon: Icons.account_balance_wallet_outlined, color: const Color(0xFFF59E0B)),
-                if (stats.bankSales > 0) ...[
-                  const SizedBox(width: 8),
-                  _PmTile(label: 'Bank', amount: stats.bankSales, icon: Icons.account_balance_outlined, color: const Color(0xFF0EA5E9)),
-                ],
-              ],
-            ),
-          ],
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 3,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(colors: kGradElectric),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const GradIconBox(
+                          icon:         Icons.pie_chart_outline_rounded,
+                          colors:       kGradElectric,
+                          size:         28,
+                          iconSize:     14,
+                          borderRadius: 8,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Payment Breakdown',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        _PmTile(label: 'Cash',   amount: stats.cashSales,   icon: Icons.payments_outlined,               color: const Color(0xFF10B981)),
+                        const SizedBox(width: 8),
+                        _PmTile(label: 'Card',   amount: stats.cardSales,   icon: Icons.credit_card_rounded,             color: const Color(0xFF6366F1)),
+                        const SizedBox(width: 8),
+                        _PmTile(label: 'Credit', amount: stats.creditSales, icon: Icons.account_balance_wallet_outlined,  color: const Color(0xFFF59E0B)),
+                        if (stats.bankSales > 0) ...[
+                          const SizedBox(width: 8),
+                          _PmTile(label: 'Bank', amount: stats.bankSales, icon: Icons.account_balance_outlined, color: const Color(0xFF0EA5E9)),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -726,24 +774,28 @@ class _PmTile extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Container(
-              width: 28, height: 28,
-              decoration: BoxDecoration(
-                color:        color.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 14),
+            GradIconBox(
+              icon:         icon,
+              colors:       [color, color.withValues(alpha: 0.65)],
+              size:         32,
+              iconSize:     16,
+              borderRadius: 9,
             ),
-            const SizedBox(height: 5),
-            Text(
-              formatCompact(amount),
-              style: tt.bodySmall?.copyWith(
-                color:      color,
-                fontWeight: FontWeight.w800,
-                fontSize:   11,
+            const SizedBox(height: 6),
+            ShaderMask(
+              shaderCallback: (bounds) => LinearGradient(
+                colors: [color, color.withValues(alpha: 0.7)],
+              ).createShader(bounds),
+              child: Text(
+                formatCompact(amount),
+                style: tt.bodySmall?.copyWith(
+                  color:      Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize:   12,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
             Text(
               label,
@@ -777,11 +829,12 @@ class _WeeklyChart extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
         decoration: BoxDecoration(
-          color:        cs.surfaceContainer,
-          borderRadius: BorderRadius.circular(20),
-          border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
+          color:  cs.surfaceContainer,
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
           boxShadow: [
             BoxShadow(
               color:       _kIndigo.withValues(alpha: 0.05),
@@ -790,19 +843,28 @@ class _WeeklyChart extends StatelessWidget {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 3,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: kGradElectric),
+              ),
+            ),
+            Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 8, height: 8,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(colors: kGradElectric),
-                    ),
+                  const GradIconBox(
+                    icon:         Icons.bar_chart_rounded,
+                    colors:       kGradElectric,
+                    size:         28,
+                    iconSize:     14,
+                    borderRadius: 8,
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -929,6 +991,9 @@ class _WeeklyChart extends StatelessWidget {
             ],
           ),
         ),
+          ],
+        ),
+        ),
       ),
     );
   }
@@ -1004,11 +1069,11 @@ class _Tile extends StatelessWidget {
           onTap:        onTap,
           borderRadius: BorderRadius.circular(14),
           splashColor:  grad[0].withValues(alpha: 0.10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
             decoration: BoxDecoration(
-              color:        cs.surfaceContainer,
-              borderRadius: BorderRadius.circular(14),
+              color:  cs.surfaceContainer,
               border: Border.all(color: grad[0].withValues(alpha: 0.15)),
               boxShadow: [
                 BoxShadow(
@@ -1021,6 +1086,17 @@ class _Tile extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Container(
+                  height: 2,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: grad),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                 GradIconBox(
                   icon:         icon,
                   colors:       grad,
@@ -1043,9 +1119,13 @@ class _Tile extends StatelessWidget {
               ],
             ),
           ),
+              ],
+            ),
+          ),
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -1069,20 +1149,22 @@ class _RecentSales extends StatelessWidget {
           Row(
             children: [
               Expanded(child: GradSectionLabel('Recent Sales')),
-              TextButton(
-                onPressed: () => context.go('/sales'),
-                style: TextButton.styleFrom(
-                  minimumSize: Size.zero,
-                  padding:     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
-                  'See all',
-                  style: TextStyle(
-                    color:      _kIndigoLight,
-                    fontSize:   12,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Inter',
+              GestureDetector(
+                onTap: () => context.go('/sales'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: kGradPrimary),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'See all',
+                    style: TextStyle(
+                      color:      Colors.white,
+                      fontSize:   11,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Inter',
+                    ),
                   ),
                 ),
               ),
@@ -1101,7 +1183,13 @@ class _RecentSales extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.receipt_long_outlined, size: 32, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                    const GradIconBox(
+                      icon:         Icons.receipt_long_outlined,
+                      colors:       kGradElectric,
+                      size:         48,
+                      iconSize:     24,
+                      borderRadius: 14,
+                    ),
                     const SizedBox(height: 8),
                     Text('No sales today', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                   ],
@@ -1109,11 +1197,12 @@ class _RecentSales extends StatelessWidget {
               ),
             )
           else
-            Container(
+            ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
               decoration: BoxDecoration(
-                color:        cs.surfaceContainer,
-                borderRadius: BorderRadius.circular(18),
-                border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+                color:  cs.surfaceContainer,
+                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
                 boxShadow: [
                   BoxShadow(
                     color:      _kIndigo.withValues(alpha: 0.04),
@@ -1122,9 +1211,15 @@ class _RecentSales extends StatelessWidget {
                   ),
                 ],
               ),
-              clipBehavior: Clip.antiAlias,
               child: Column(
-                children: list.asMap().entries.map((entry) {
+                children: [
+                  Container(
+                    height: 3,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(colors: kGradElectric),
+                    ),
+                  ),
+                  ...list.asMap().entries.map((entry) {
                   final i    = entry.key;
                   final sale = entry.value;
                   final pm   = sale.paymentMethod?.toLowerCase() ?? 'cash';
@@ -1204,9 +1299,11 @@ class _RecentSales extends StatelessWidget {
                         ),
                     ],
                   );
-                }).toList(),
+                  }).toList(),
+                ],
               ),
             ),
+          ),
         ],
       ),
     );
@@ -1248,17 +1345,27 @@ class _TopProducts extends StatelessWidget {
 
                 return SizedBox(
                   width: 138,
-                  child: Container(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
                     decoration: BoxDecoration(
-                      color:        cs.surfaceContainer,
-                      borderRadius: BorderRadius.circular(14),
-                      border:       Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+                      color:  cs.surfaceContainer,
+                      border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 2,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: rankGrad),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -1308,10 +1415,13 @@ class _TopProducts extends StatelessWidget {
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                ),
                 );
               },
             ),
@@ -1407,13 +1517,12 @@ class _ErrorCard extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 64, height: 64,
-            decoration: BoxDecoration(
-              color:        cs.error.withValues(alpha: 0.10),
-              shape:        BoxShape.circle,
-            ),
-            child: Icon(Icons.error_outline_rounded, size: 32, color: cs.error),
+          GradIconBox(
+            icon:         Icons.error_outline_rounded,
+            colors:       [cs.error, cs.error.withValues(alpha: 0.6)],
+            size:         64,
+            iconSize:     32,
+            borderRadius: 18,
           ),
           const SizedBox(height: 16),
           Text(
