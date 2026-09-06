@@ -459,3 +459,87 @@ exports.staffReport = async (req, res, next) => {
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
+
+// ─── sales analysis (period-based, for dashboard filter) ─────────────────────
+
+exports.salesAnalysis = async (req, res, next) => {
+  try {
+    const cid = req.companyId;
+    const { period = '7days', from: fromQ, to: toQ } = req.query;
+
+    const today = new Date().toISOString().slice(0, 10);
+    let from, to;
+
+    if (period === 'today') {
+      from = today; to = today;
+    } else if (period === '7days') {
+      const d = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+      from = d.toISOString().slice(0, 10); to = today;
+    } else if (period === 'month') {
+      from = today.slice(0, 7) + '-01'; to = today;
+    } else if (period === 'year') {
+      from = today.slice(0, 4) + '-01-01'; to = today;
+    } else {
+      // custom
+      from = fromQ || today; to = toQ || today;
+    }
+
+    const { rows: [totals] } = await query(`
+      SELECT
+        COALESCE(SUM(total_amount), 0)::numeric AS total_sales,
+        COUNT(*)::int                           AS order_count
+      FROM sales
+      WHERE company_id = $1 AND status = 'completed'
+        AND sale_date::date BETWEEN $2 AND $3
+    `, [cid, from, to]);
+
+    const daysDiff = Math.ceil(
+      (new Date(to) - new Date(from)) / (1000 * 60 * 60 * 24)
+    ) + 1;
+
+    let chartRows;
+    if (daysDiff <= 60) {
+      const { rows } = await query(`
+        SELECT
+          sale_date::date::text AS date,
+          COALESCE(SUM(total_amount), 0)::numeric AS amount,
+          COUNT(*)::int AS orders
+        FROM sales
+        WHERE company_id = $1 AND status = 'completed'
+          AND sale_date::date BETWEEN $2 AND $3
+        GROUP BY sale_date::date
+        ORDER BY sale_date::date
+      `, [cid, from, to]);
+      chartRows = rows;
+    } else {
+      const { rows } = await query(`
+        SELECT
+          TO_CHAR(sale_date, 'YYYY-MM') AS date,
+          COALESCE(SUM(total_amount), 0)::numeric AS amount,
+          COUNT(*)::int AS orders
+        FROM sales
+        WHERE company_id = $1 AND status = 'completed'
+          AND sale_date::date BETWEEN $2 AND $3
+        GROUP BY TO_CHAR(sale_date, 'YYYY-MM')
+        ORDER BY 1
+      `, [cid, from, to]);
+      chartRows = rows;
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        period,
+        from,
+        to,
+        total_sales:  parseFloat(totals.total_sales)  || 0,
+        order_count:  totals.order_count  || 0,
+        chart: chartRows.map(r => ({
+          date:   r.date,
+          amount: parseFloat(r.amount) || 0,
+          orders: r.orders || 0,
+        })),
+      },
+    });
+  } catch (err) { next(err); }
+};

@@ -12,7 +12,9 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../expenses/presentation/screens/quick_expense_sheet.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../data/models/dashboard_stats_model.dart';
+import '../../data/models/sales_analysis_model.dart';
 import '../providers/dashboard_provider.dart';
+import '../providers/sales_analysis_provider.dart';
 import '../widgets/stat_card.dart';
 
 // ── Brand constants ───────────────────────────────────────────────────────────
@@ -77,6 +79,8 @@ class DashboardScreen extends ConsumerWidget {
                   _PaymentBreakdown(stats: stats),
                   const SizedBox(height: 20),
                   _WeeklyChart(stats: stats),
+                  const SizedBox(height: 20),
+                  const _SalesAnalysisCard(),
                   const SizedBox(height: 20),
                   _QuickActions(onExpenseTap: showExpenseSheet),
                   const SizedBox(height: 20),
@@ -1540,6 +1544,343 @@ class _ErrorCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Sales Analysis Card ───────────────────────────────────────────────────────
+
+class _SalesAnalysisCard extends ConsumerWidget {
+  const _SalesAnalysisCard();
+
+  static const _periods = [
+    ('today',  'Today'),
+    ('7days',  '7 Days'),
+    ('month',  'Month'),
+    ('year',   'Year'),
+    ('custom', 'Custom'),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final period        = ref.watch(analysisPeriodProvider);
+    final analysisAsync = ref.watch(salesAnalysisProvider);
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color:  cs.surfaceContainer,
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
+            boxShadow: [
+              BoxShadow(
+                color:       _kIndigo.withValues(alpha: 0.05),
+                blurRadius:  16,
+                offset:      const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 3,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(colors: kGradPrimary),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(
+                  children: [
+                    const GradIconBox(
+                      icon:         Icons.analytics_outlined,
+                      colors:       kGradPrimary,
+                      size:         28,
+                      iconSize:     14,
+                      borderRadius: 8,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Sales Analysis',
+                      style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              // Period filter chips
+              SizedBox(
+                height: 32,
+                child: ListView(
+                  padding:         const EdgeInsets.symmetric(horizontal: 16),
+                  scrollDirection: Axis.horizontal,
+                  children: _periods.map((p) {
+                    final selected = period == p.$1;
+                    return GestureDetector(
+                      onTap: () async {
+                        if (p.$1 == 'custom') {
+                          final range = await showDateRangePicker(
+                            context: context,
+                            firstDate: DateTime(2020),
+                            lastDate:  DateTime.now(),
+                          );
+                          if (range != null) {
+                            String fmt(DateTime d) =>
+                                '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
+                            ref.read(analysisCustomRangeProvider.notifier).state =
+                                (from: fmt(range.start), to: fmt(range.end));
+                          }
+                        }
+                        ref.read(analysisPeriodProvider.notifier).state = p.$1;
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
+                        decoration: BoxDecoration(
+                          gradient: selected
+                              ? const LinearGradient(colors: kGradPrimary)
+                              : null,
+                          color:        selected ? null : cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: selected
+                                ? _kIndigo.withValues(alpha: 0.3)
+                                : cs.outlineVariant.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Text(
+                          p.$2,
+                          style: TextStyle(
+                            fontSize:   11,
+                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                            color:      selected ? Colors.white : cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Content
+              analysisAsync.when(
+                loading: () => const SizedBox(
+                  height: 140,
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Text('Could not load data',
+                      style: tt.bodySmall?.copyWith(color: cs.error)),
+                ),
+                data: (data) => _AnalysisContent(data: data),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnalysisContent extends StatelessWidget {
+  const _AnalysisContent({required this.data});
+  final SalesAnalysis data;
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    final maxY = data.chart.isEmpty
+        ? 100.0
+        : (data.chart.map((p) => p.amount).reduce((a, b) => a > b ? a : b) * 1.3)
+            .clamp(1.0, double.infinity);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total Sales',
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    ShaderMask(
+                      shaderCallback: (b) =>
+                          const LinearGradient(colors: kGradPrimary).createShader(b),
+                      child: Text(
+                        formatCompact(data.totalSales),
+                        style: tt.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color:        _kIndigo.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _kIndigo.withValues(alpha: 0.15)),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      data.orderCount.toString(),
+                      style: tt.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color:      _kIndigoLight,
+                      ),
+                    ),
+                    Text(
+                      'Orders',
+                      style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 140,
+          child: data.chart.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.show_chart_rounded,
+                        size:  36,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No sales in this period',
+                        style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
+                  child: LineChart(
+                    LineChartData(
+                      minY: 0,
+                      maxY: maxY,
+                      lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipItems: (spots) => spots.map((spot) =>
+                              LineTooltipItem(
+                                formatCompact(spot.y),
+                                const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              )).toList(),
+                        ),
+                      ),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: maxY / 4,
+                        getDrawingHorizontalLine: (value) => FlLine(
+                          color:       cs.outlineVariant.withValues(alpha: 0.25),
+                          strokeWidth: 1,
+                          dashArray:   [4, 4],
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 24,
+                            interval: data.chart.length <= 7
+                                ? 1
+                                : (data.chart.length / 4).ceil().toDouble(),
+                            getTitlesWidget: (value, meta) {
+                              final idx = value.toInt();
+                              if (idx < 0 || idx >= data.chart.length) {
+                                return const SizedBox.shrink();
+                              }
+                              final date = data.chart[idx].date;
+                              final label = date.length > 7
+                                  ? date.substring(5)
+                                  : date.substring(2);
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  label,
+                                  style: tt.labelSmall?.copyWith(
+                                    fontSize: 9,
+                                    color:    cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        leftTitles:  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: data.chart.asMap().entries.map((e) =>
+                              FlSpot(e.key.toDouble(), e.value.amount)).toList(),
+                          isCurved:        true,
+                          curveSmoothness: 0.35,
+                          color:           _kIndigoLight,
+                          barWidth:        2.5,
+                          dotData: FlDotData(
+                            show: data.chart.length <= 10,
+                            getDotPainter: (spot, percent, bar, index) =>
+                                FlDotCirclePainter(
+                              radius:       3,
+                              color:        _kIndigoLight,
+                              strokeWidth:  1.5,
+                              strokeColor:  Colors.white,
+                            ),
+                          ),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              begin:  Alignment.topCenter,
+                              end:    Alignment.bottomCenter,
+                              colors: [
+                                _kIndigoLight.withValues(alpha: 0.18),
+                                _kIndigoLight.withValues(alpha: 0.0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+        const SizedBox(height: 16),
+      ],
     );
   }
 }

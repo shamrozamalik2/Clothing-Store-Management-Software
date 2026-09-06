@@ -519,8 +519,7 @@ class _CameraPermissionError extends StatelessWidget {
   final Future<void> Function() onRetry;
 
   Future<void> _openSettings() async {
-    // android-app://com.android.settings opens device settings
-    final uri = Uri.parse('package:com.probusiness.sas_garments_mobile');
+    final uri = Uri.parse('package:com.sasgarments.sas_garments_mobile');
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       await launchUrl(Uri.parse('app-settings:'));
     }

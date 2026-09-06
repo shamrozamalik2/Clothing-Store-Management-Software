@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
-import 'package:local_auth/local_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
-import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/widgets/grad_widgets.dart';
 import '../providers/settings_provider.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
-import '../../../shell/main_shell.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -33,11 +27,7 @@ class SettingsScreen extends ConsumerWidget {
             backgroundColor:  cs.surface,
             surfaceTintColor: Colors.transparent,
             elevation:        0,
-            leading: IconButton(
-              icon:      const Icon(Icons.menu_rounded),
-              onPressed: () =>
-                  MainShell.scaffoldKey.currentState?.openDrawer(),
-            ),
+            automaticallyImplyLeading: false,
             title: Row(
               children: [
                 const GradIconBox(
@@ -228,79 +218,41 @@ class SettingsScreen extends ConsumerWidget {
                                     fontWeight: FontWeight.w600)),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        SegmentedButton<ThemeMode>(
-                          segments: const [
-                            ButtonSegment(
-                              value: ThemeMode.light,
-                              label: Text('Light'),
-                              icon: Icon(Icons.light_mode_rounded, size: 16),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            _ThemeChip(
+                              label:    'Light',
+                              icon:     Icons.light_mode_rounded,
+                              selected: themeMode == ThemeMode.light,
+                              colors:   kGradViolet,
+                              onTap:    () => ref
+                                  .read(themeModeProvider.notifier)
+                                  .setMode(ThemeMode.light),
                             ),
-                            ButtonSegment(
-                              value: ThemeMode.dark,
-                              label: Text('Dark'),
-                              icon: Icon(Icons.dark_mode_rounded, size: 16),
+                            const SizedBox(width: 8),
+                            _ThemeChip(
+                              label:    'Dark',
+                              icon:     Icons.dark_mode_rounded,
+                              selected: themeMode == ThemeMode.dark,
+                              colors:   kGradViolet,
+                              onTap:    () => ref
+                                  .read(themeModeProvider.notifier)
+                                  .setMode(ThemeMode.dark),
                             ),
-                            ButtonSegment(
-                              value: ThemeMode.system,
-                              label: Text('System'),
-                              icon: Icon(Icons.brightness_auto_rounded,
-                                  size: 16),
+                            const SizedBox(width: 8),
+                            _ThemeChip(
+                              label:    'System',
+                              icon:     Icons.brightness_auto_rounded,
+                              selected: themeMode == ThemeMode.system,
+                              colors:   kGradViolet,
+                              onTap:    () => ref
+                                  .read(themeModeProvider.notifier)
+                                  .setMode(ThemeMode.system),
                             ),
                           ],
-                          selected: {themeMode},
-                          onSelectionChanged: (s) => ref
-                              .read(themeModeProvider.notifier)
-                              .setMode(s.first),
-                          style: SegmentedButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                          ),
                         ),
                       ],
-                    ),
-                  ),
-                ),
-
-                // ── Security ──────────────────────────────────────────────
-                const _SectionLabel('Security'),
-                Container(
-                  margin: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 4),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Material(
-                      color: cs.surfaceContainer,
-                      child: Column(
-                        children: [
-                          Container(
-                            height:     3,
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(colors: kGradGreen),
-                            ),
-                          ),
-                          ListTile(
-                            leading: const GradIconBox(
-                              icon:         Icons.pin_rounded,
-                              colors:       kGradGreen,
-                              size:         36,
-                              iconSize:     18,
-                              borderRadius: 10,
-                            ),
-                            title:   const Text('Set PIN Code'),
-                            trailing: Icon(Icons.chevron_right_rounded,
-                                color: cs.onSurfaceVariant),
-                            onTap: () => _showPinSetupSheet(context),
-                          ),
-                          Divider(
-                            indent:    56,
-                            endIndent: 0,
-                            height:    1,
-                            color: cs.outlineVariant
-                                .withValues(alpha: 0.5),
-                          ),
-                          const _BiometricTile(),
-                        ],
-                      ),
                     ),
                   ),
                 ),
@@ -402,14 +354,6 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showPinSetupSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context:            context,
-      isScrollControlled: true,
-      builder:            (_) => const _PinSetupSheet(),
-    );
-  }
-
   void _confirmLogout(BuildContext context, WidgetRef ref) {
     showDialog<void>(
       context: context,
@@ -470,8 +414,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     try {
       await widget.ref.read(authProvider.notifier).updateProfileName(name);
       if (mounted) {
+        // Capture messenger before pop to avoid stale context
+        final messenger = ScaffoldMessenger.of(context);
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('Profile updated successfully')),
         );
       }
@@ -575,18 +521,17 @@ class _EditCompanySheetState extends State<_EditCompanySheet> {
     if (name.isEmpty) return;
     setState(() => _saving = true);
     try {
-      // Update in backend settings table
       await widget.ref.read(apiClientProvider).put(
         '${ApiEndpoints.settings}/company_name',
         data: {'value': name},
       );
-      // Update local auth state so UI reflects instantly
       await widget.ref
           .read(authProvider.notifier)
           .updateCompanyName(name);
       if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('Company name updated')),
         );
       }
@@ -697,239 +642,73 @@ class _GradCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Biometric tile — local_auth
+// Theme chip selector
 // ─────────────────────────────────────────────────────────────────────────────
 
-const _kBiometricKey = 'biometric_lock_enabled';
-
-class _BiometricTile extends StatefulWidget {
-  const _BiometricTile();
-
-  @override
-  State<_BiometricTile> createState() => _BiometricTileState();
-}
-
-class _BiometricTileState extends State<_BiometricTile> {
-  final _auth      = LocalAuthentication();
-  bool _enabled    = false;
-  bool _available  = false;
-  bool _loading    = true;
-  bool _toggling   = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _init();
-  }
-
-  Future<void> _init() async {
-    final supported = await _auth.isDeviceSupported();
-    final prefs     = await SharedPreferences.getInstance();
-    final stored    = prefs.getBool(_kBiometricKey) ?? false;
-
-    if (mounted) {
-      setState(() {
-        _available = supported; // includes PIN/pattern fallback
-        _enabled   = supported && stored;
-        _loading   = false;
-      });
-    }
-  }
-
-  Future<void> _toggle(bool value) async {
-    if (!_available) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Secure lock not available on this device.'),
-      ));
-      return;
-    }
-
-    setState(() => _toggling = true);
-    try {
-      if (value) {
-        final ok = await _auth.authenticate(
-          localizedReason: 'Confirm to enable app lock',
-          options: const AuthenticationOptions(biometricOnly: false),
-        );
-        if (!ok) return;
-      }
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_kBiometricKey, value);
-      if (mounted) setState(() => _enabled = value);
-    } finally {
-      if (mounted) setState(() => _toggling = false);
-    }
-  }
+class _ThemeChip extends StatelessWidget {
+  const _ThemeChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.colors,
+    required this.onTap,
+  });
+  final String       label;
+  final IconData     icon;
+  final bool         selected;
+  final List<Color>  colors;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return ListTile(
-        leading: SizedBox(
-          width:  24,
-          height: 24,
-          child:  CircularProgressIndicator(
-              strokeWidth: 2, color: kGradViolet[0]),
-        ),
-        title: const Text('Biometric Login'),
-      );
-    }
-    return SwitchListTile.adaptive(
-      secondary: _toggling
-          ? SizedBox(
-              width:  36,
-              height: 36,
-              child:  CircularProgressIndicator(
-                  strokeWidth: 2.5, color: kGradViolet[0]),
-            )
-          : const GradIconBox(
-              icon:         Icons.fingerprint_rounded,
-              colors:       kGradViolet,
-              size:         36,
-              iconSize:     18,
-              borderRadius: 10,
+    final cs = Theme.of(context).colorScheme;
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            gradient: selected ? LinearGradient(colors: colors) : null,
+            color:    selected ? null : cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? colors[0].withValues(alpha: 0.4)
+                  : cs.outlineVariant.withValues(alpha: 0.5),
             ),
-      title:    const Text('Biometric Login'),
-      subtitle: Text(
-        _available
-            ? 'Lock app with fingerprint, face or PIN'
-            : 'Secure lock not available on this device',
-        style: const TextStyle(fontSize: 12),
-      ),
-      value:     _enabled,
-      onChanged: _available && !_toggling ? _toggle : null,
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PIN setup bottom sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _PinSetupSheet extends StatefulWidget {
-  const _PinSetupSheet();
-
-  @override
-  State<_PinSetupSheet> createState() => _PinSetupSheetState();
-}
-
-class _PinSetupSheetState extends State<_PinSetupSheet> {
-  final _pinCtrl     = TextEditingController();
-  final _confirmCtrl = TextEditingController();
-  final _storage     = const FlutterSecureStorage();
-  String? _error;
-  bool    _saving = false;
-
-  @override
-  void dispose() {
-    _pinCtrl.dispose();
-    _confirmCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs      = Theme.of(context).colorScheme;
-    final padding = MediaQuery.viewInsetsOf(context);
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + padding.bottom),
-      child: Column(
-        mainAxisSize:       MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color:      colors[0].withValues(alpha: 0.28),
+                      blurRadius: 8,
+                      offset:     const Offset(0, 3),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const GradIconBox(
-                icon:         Icons.pin_rounded,
-                colors:       kGradGreen,
-                size:         38,
-                iconSize:     19,
-                borderRadius: 11,
+              Icon(
+                icon,
+                size:  18,
+                color: selected ? Colors.white : cs.onSurfaceVariant,
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Set PIN Code',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700)),
-                  Text('Enter a 4–6 digit PIN for quick access',
-                      style: TextStyle(
-                          color: cs.onSurfaceVariant, fontSize: 12)),
-                ],
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize:   11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color:      selected ? Colors.white : cs.onSurfaceVariant,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          TextField(
-            controller:      _pinCtrl,
-            keyboardType:    TextInputType.number,
-            obscureText:     true,
-            maxLength:       6,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(
-              labelText:   'New PIN',
-              counterText: '',
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller:      _confirmCtrl,
-            keyboardType:    TextInputType.number,
-            obscureText:     true,
-            maxLength:       6,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(
-              labelText:   'Confirm PIN',
-              counterText: '',
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!,
-                style: TextStyle(color: cs.error, fontSize: 12)),
-          ],
-          const SizedBox(height: 20),
-          GradButton(
-            label:    'Save PIN',
-            icon:     Icons.check_circle_outline_rounded,
-            onPressed: _save,
-            loading:  _saving,
-            colors:   kGradGreen,
-          ),
-        ],
+        ),
       ),
     );
-  }
-
-  Future<void> _save() async {
-    final pin     = _pinCtrl.text.trim();
-    final confirm = _confirmCtrl.text.trim();
-    if (pin.length < 4) {
-      setState(() => _error = 'PIN must be at least 4 digits');
-      return;
-    }
-    if (pin != confirm) {
-      setState(() => _error = 'PINs do not match');
-      return;
-    }
-    setState(() => _saving = true);
-    try {
-      await _storage.write(key: kKeyPinCode, value: pin);
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PIN saved successfully')),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _error = 'Failed to save PIN. Try again.');
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
   }
 }
 

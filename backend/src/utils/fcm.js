@@ -89,7 +89,7 @@ async function notifySale(pool, companyId, saleData) {
       `SELECT u.fcm_token FROM users u
        JOIN roles r ON r.id = u.role_id
        WHERE u.company_id = $1 AND u.is_active = TRUE
-         AND r.name = 'admin' AND u.fcm_token IS NOT NULL`,
+         AND LOWER(r.name) = 'admin' AND u.fcm_token IS NOT NULL`,
       [companyId]
     );
     const tokens = rows.map(r => r.fcm_token).filter(Boolean);
