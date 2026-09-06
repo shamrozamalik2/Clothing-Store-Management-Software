@@ -1,388 +1,172 @@
+import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-// ── Brand tokens ──────────────────────────────────────────────────────────────
+// ── Brand seeds ───────────────────────────────────────────────────────────────
 
-const _kSeed       = Color(0xFF4F46E5); // indigo-600
-const _kCardLight  = Color(0xFFFFFFFF);
-const _kBgLight    = Color(0xFFF1F5F9); // slate-100
-const _kCardDark   = Color(0xFF1E293B); // slate-800
-const _kBgDark     = Color(0xFF0F172A); // slate-900
+const _kPrimary           = Color(0xFF4F46E5); // indigo-600
+const _kPrimaryContainer  = Color(0xFFE8E7FF);
+const _kSecondary         = Color(0xFF7C3AED); // violet-600
+const _kSecondaryContainer= Color(0xFFF3E8FF);
+const _kTertiary          = Color(0xFF0EA5E9); // sky-500
+const _kTertiaryContainer = Color(0xFFE0F2FE);
+const _kError             = Color(0xFFEF4444);
 
-// ── TextTheme helper ──────────────────────────────────────────────────────────
+// ── Typography (Plus Jakarta Sans — rounded, modern display face) ─────────────
 
-TextStyle _ts(double size, FontWeight weight, Color color, {double spacing = 0}) =>
-    TextStyle(
-      fontFamily:  'Inter',
-      fontFamilyFallback: const ['Roboto', 'sans-serif'],
-      fontSize:    size,
-      fontWeight:  weight,
-      color:       color,
-      letterSpacing: spacing,
-      height:      1.4,
-    );
-
-TextTheme _buildTextTheme(Color onSurface, Color onSurfaceVariant) {
-  final text  = onSurface;
-  final muted = onSurfaceVariant;
-
+TextTheme _buildTextTheme() {
+  // ignore: prefer_const_declarations
+  final g = GoogleFonts.plusJakartaSans;
   return TextTheme(
-    displayLarge:   _ts(57, FontWeight.w800, text,  spacing: -0.5),
-    displayMedium:  _ts(45, FontWeight.w700, text,  spacing: -0.4),
-    displaySmall:   _ts(36, FontWeight.w700, text,  spacing: -0.3),
-    headlineLarge:  _ts(32, FontWeight.w700, text,  spacing: -0.3),
-    headlineMedium: _ts(28, FontWeight.w700, text,  spacing: -0.2),
-    headlineSmall:  _ts(24, FontWeight.w700, text,  spacing: -0.2),
-    titleLarge:     _ts(20, FontWeight.w700, text,  spacing: -0.1),
-    titleMedium:    _ts(16, FontWeight.w600, text),
-    titleSmall:     _ts(14, FontWeight.w600, text),
-    bodyLarge:      _ts(16, FontWeight.w400, text),
-    bodyMedium:     _ts(14, FontWeight.w400, text),
-    bodySmall:      _ts(12, FontWeight.w400, muted, spacing: 0.1),
-    labelLarge:     _ts(14, FontWeight.w600, text),
-    labelMedium:    _ts(12, FontWeight.w500, muted, spacing: 0.1),
-    labelSmall:     _ts(11, FontWeight.w500, muted, spacing: 0.1),
+    displayLarge:  g(fontSize: 57, fontWeight: FontWeight.w800, letterSpacing: -0.5, height: 1.12),
+    displayMedium: g(fontSize: 45, fontWeight: FontWeight.w700, letterSpacing: -0.4, height: 1.16),
+    displaySmall:  g(fontSize: 36, fontWeight: FontWeight.w700, letterSpacing: -0.3, height: 1.2),
+    headlineLarge: g(fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: -0.3, height: 1.25),
+    headlineMedium:g(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.2, height: 1.28),
+    headlineSmall: g(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.2, height: 1.3),
+    titleLarge:    g(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.1, height: 1.4),
+    titleMedium:   g(fontSize: 16, fontWeight: FontWeight.w600, height: 1.4),
+    titleSmall:    g(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4),
+    bodyLarge:     g(fontSize: 16, fontWeight: FontWeight.w400, height: 1.5),
+    bodyMedium:    g(fontSize: 14, fontWeight: FontWeight.w400, height: 1.5),
+    bodySmall:     g(fontSize: 12, fontWeight: FontWeight.w400, letterSpacing: 0.1, height: 1.4),
+    labelLarge:    g(fontSize: 14, fontWeight: FontWeight.w600, height: 1.4),
+    labelMedium:   g(fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 0.1, height: 1.4),
+    labelSmall:    g(fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.2, height: 1.4),
   );
 }
 
-// ── Shared component themes ───────────────────────────────────────────────────
+// ── Shared sub-themes ─────────────────────────────────────────────────────────
 
-InputDecorationTheme _inputTheme(Color fill, Color border, Color focused, Color label, Color hint) =>
-  InputDecorationTheme(
-    filled:        true,
-    fillColor:     fill,
-    border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: border)),
-    enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: border)),
-    focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: focused, width: 2)),
-    errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFEF4444))),
-    focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2)),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    labelStyle: TextStyle(fontFamily: 'Inter', color: label,
-        fontWeight: FontWeight.w500, fontSize: 14),
-    hintStyle:  TextStyle(fontFamily: 'Inter', color: hint, fontSize: 14),
-    prefixIconColor: hint,
-  );
-
-BottomSheetThemeData _sheetTheme(Color bg) => BottomSheetThemeData(
-  backgroundColor:     bg,
-  surfaceTintColor:    Colors.transparent,
-  elevation:           0,
-  shape: const RoundedRectangleBorder(
-    borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-  dragHandleSize: const Size(40, 4),
+const _kSubThemes = FlexSubThemesData(
+  interactionEffects:                    true,
+  tintedDisabledControls:                true,
+  blendOnColors:                         true,
+  useM2StyleDividerInM3:                 true,
+  inputDecoratorBorderType:              FlexInputBorderType.outline,
+  inputDecoratorRadius:                  12,
+  inputDecoratorUnfocusedBorderIsColored: false,
+  cardRadius:                            16,
+  dialogRadius:                          20,
+  bottomSheetRadius:                     24,
+  elevatedButtonRadius:                  12,
+  outlinedButtonRadius:                  12,
+  filledButtonRadius:                    12,
+  textButtonRadius:                      12,
+  chipRadius:                            8,
+  snackBarRadius:                        12,
+  snackBarElevation:                     4,
+  elevatedButtonSchemeColor:             SchemeColor.primary,
+  elevatedButtonSecondarySchemeColor:    SchemeColor.onPrimary,
+  outlinedButtonOutlineSchemeColor:      SchemeColor.outlineVariant,
+  switchSchemeColor:                     SchemeColor.primary,
+  checkboxSchemeColor:                   SchemeColor.primary,
+  radioSchemeColor:                      SchemeColor.primary,
 );
 
-SnackBarThemeData _snackTheme(Color bg) => SnackBarThemeData(
-  behavior:         SnackBarBehavior.floating,
-  backgroundColor:  bg,
-  contentTextStyle: const TextStyle(
-    fontFamily: 'Inter', color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-  shape:            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-  elevation:        4,
-  insetPadding:     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+// ── System overlay helpers ────────────────────────────────────────────────────
+
+const _kOverlayLight = SystemUiOverlayStyle(
+  statusBarColor:                    Colors.transparent,
+  statusBarIconBrightness:           Brightness.dark,
+  systemNavigationBarColor:          Color(0xFFF1F5F9),
+  systemNavigationBarIconBrightness: Brightness.dark,
 );
 
-// ── Theme ─────────────────────────────────────────────────────────────────────
+const _kOverlayDark = SystemUiOverlayStyle(
+  statusBarColor:                    Colors.transparent,
+  statusBarIconBrightness:           Brightness.light,
+  systemNavigationBarColor:          Color(0xFF0F172A),
+  systemNavigationBarIconBrightness: Brightness.light,
+);
+
+// ── AppTheme ──────────────────────────────────────────────────────────────────
 
 class AppTheme {
   static ThemeData light() {
-    const onSurface        = Color(0xFF0F172A);
-    const onSurfaceVariant = Color(0xFF64748B);
-
-    final cs = ColorScheme.fromSeed(
-      seedColor:  _kSeed,
-      brightness: Brightness.light,
-    ).copyWith(
-      surface:           _kBgLight,
-      surfaceContainer:  _kCardLight,
-      onSurface:         onSurface,
-      onSurfaceVariant:  onSurfaceVariant,
-      outlineVariant:    const Color(0xFFE2E8F0),
-      primary:           _kSeed,
-      onPrimary:         Colors.white,
+    final tt = _buildTextTheme(); // not const — GoogleFonts generates at runtime
+    final base = FlexThemeData.light(
+      colors: const FlexSchemeColor(
+        primary:            _kPrimary,
+        primaryContainer:   _kPrimaryContainer,
+        secondary:          _kSecondary,
+        secondaryContainer: _kSecondaryContainer,
+        tertiary:           _kTertiary,
+        tertiaryContainer:  _kTertiaryContainer,
+        error:              _kError,
+        errorContainer:     Color(0xFFFFEDED),
+      ),
+      surface:             const Color(0xFFFFFFFF),
+      scaffoldBackground:  const Color(0xFFF1F5F9),
+      surfaceMode:         FlexSurfaceMode.levelSurfacesLowScaffold,
+      blendLevel:          7,
+      subThemesData:       _kSubThemes,
+      visualDensity:       FlexColorScheme.comfortablePlatformDensity,
+      useMaterial3:        true,
+      textTheme:           tt,
+      primaryTextTheme:    tt,
     );
 
-    return ThemeData(
-      useMaterial3:            true,
-      colorScheme:             cs,
-      fontFamily:              'Inter',
-      scaffoldBackgroundColor: _kBgLight,
-      textTheme:               _buildTextTheme(onSurface, onSurfaceVariant),
-
-      appBarTheme: AppBarTheme(
-        centerTitle:           false,
-        elevation:             0,
+    return base.copyWith(
+      appBarTheme: base.appBarTheme.copyWith(
+        systemOverlayStyle: _kOverlayLight,
+        centerTitle:        false,
+        elevation:          0,
         scrolledUnderElevation: 0.5,
-        backgroundColor:       _kCardLight,
-        foregroundColor:       onSurface,
-        shadowColor:           Colors.black.withValues(alpha: 0.06),
-        systemOverlayStyle:    const SystemUiOverlayStyle(
-          statusBarColor:               Colors.transparent,
-          statusBarIconBrightness:      Brightness.dark,
-          systemNavigationBarColor:     _kBgLight,
-          systemNavigationBarIconBrightness: Brightness.dark,
-        ),
-        titleTextStyle: const TextStyle(
-          fontFamily: 'Inter', color: onSurface,
+        titleTextStyle: GoogleFonts.plusJakartaSans(
+          color: const Color(0xFF0F172A),
           fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.1),
       ),
-
-      cardTheme: CardThemeData(
-        elevation:        0,
-        color:            _kCardLight,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFFE2E8F0)),
-        ),
-        margin: EdgeInsets.zero,
+      snackBarTheme: base.snackBarTheme.copyWith(
+        behavior:         SnackBarBehavior.floating,
+        contentTextStyle: GoogleFonts.plusJakartaSans(
+          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
-
-      inputDecorationTheme: _inputTheme(
-        _kCardLight,
-        const Color(0xFFE2E8F0),
-        _kSeed,
-        onSurfaceVariant,
-        const Color(0xFF94A3B8),
-      ),
-
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _kSeed,
-          foregroundColor: Colors.white,
-          minimumSize:     const Size(double.infinity, 52),
-          shape:           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w700),
-          elevation: 0,
-        ),
-      ),
-
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(88, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-      ),
-
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(88, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-      ),
-
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          textStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-      ),
-
-      bottomSheetTheme: _sheetTheme(_kCardLight),
-      snackBarTheme:    _snackTheme(const Color(0xFF1E293B)),
-
-      listTileTheme: const ListTileThemeData(
-        contentPadding:  EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        minLeadingWidth: 24,
-        titleTextStyle: TextStyle(
-          fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w500, color: onSurface),
-        subtitleTextStyle: TextStyle(
-          fontFamily: 'Inter', fontSize: 12, color: onSurfaceVariant),
-      ),
-
-      dividerTheme: const DividerThemeData(
-        color: Color(0xFFE2E8F0), thickness: 1, space: 1),
-
-      chipTheme: ChipThemeData(
-        backgroundColor: const Color(0xFFF1F5F9),
-        selectedColor:   _kSeed.withValues(alpha: 0.12),
-        side:            const BorderSide(color: Color(0xFFE2E8F0)),
-        shape:           RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        labelStyle: const TextStyle(
-          fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w500),
-      ),
-
-      segmentedButtonTheme: SegmentedButtonThemeData(
-        style: SegmentedButton.styleFrom(
-          textStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      ),
-
-      switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((s) =>
-            s.contains(WidgetState.selected) ? _kSeed : Colors.white),
-        trackColor: WidgetStateProperty.resolveWith((s) =>
-            s.contains(WidgetState.selected)
-                ? _kSeed.withValues(alpha: 0.30)
-                : const Color(0xFFCBD5E1)),
-      ),
-
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: _kSeed, linearMinHeight: 3),
     );
   }
 
-  // ── Dark theme ───────────────────────────────────────────────────────────────
-
   static ThemeData dark() {
-    const onSurface        = Color(0xFFF1F5F9);
-    const onSurfaceVariant = Color(0xFF94A3B8);
-    const primary          = Color(0xFF818CF8);
-
-    final cs = ColorScheme.fromSeed(
-      seedColor:  _kSeed,
-      brightness: Brightness.dark,
-    ).copyWith(
-      surface:           _kBgDark,
-      surfaceContainer:  _kCardDark,
-      onSurface:         onSurface,
-      onSurfaceVariant:  onSurfaceVariant,
-      outlineVariant:    const Color(0xFF334155),
-      primary:           primary,
-      onPrimary:         Colors.white,
+    final tt = _buildTextTheme();
+    final base = FlexThemeData.dark(
+      colors: const FlexSchemeColor(
+        primary:            Color(0xFF818CF8),
+        primaryContainer:   Color(0xFF3730A3),
+        secondary:          Color(0xFFA78BFA),
+        secondaryContainer: Color(0xFF5B21B6),
+        tertiary:           Color(0xFF38BDF8),
+        tertiaryContainer:  Color(0xFF0369A1),
+        error:              Color(0xFFF87171),
+        errorContainer:     Color(0xFF7F1D1D),
+      ),
+      surface:             const Color(0xFF1E293B),
+      scaffoldBackground:  const Color(0xFF0F172A),
+      surfaceMode:         FlexSurfaceMode.levelSurfacesLowScaffold,
+      blendLevel:          13,
+      subThemesData:       _kSubThemes,
+      visualDensity:       FlexColorScheme.comfortablePlatformDensity,
+      useMaterial3:        true,
+      textTheme:           tt,
+      primaryTextTheme:    tt,
     );
 
-    return ThemeData(
-      useMaterial3:            true,
-      colorScheme:             cs,
-      fontFamily:              'Inter',
-      scaffoldBackgroundColor: _kBgDark,
-      textTheme:               _buildTextTheme(onSurface, onSurfaceVariant),
-
-      appBarTheme: AppBarTheme(
-        centerTitle:           false,
-        elevation:             0,
+    return base.copyWith(
+      appBarTheme: base.appBarTheme.copyWith(
+        systemOverlayStyle: _kOverlayDark,
+        centerTitle:        false,
+        elevation:          0,
         scrolledUnderElevation: 0.5,
-        backgroundColor:       _kBgDark,
-        foregroundColor:       onSurface,
-        shadowColor:           Colors.black.withValues(alpha: 0.3),
-        systemOverlayStyle:    const SystemUiOverlayStyle(
-          statusBarColor:               Colors.transparent,
-          statusBarIconBrightness:      Brightness.light,
-          systemNavigationBarColor:     _kBgDark,
-          systemNavigationBarIconBrightness: Brightness.light,
-        ),
-        titleTextStyle: const TextStyle(
-          fontFamily: 'Inter', color: onSurface,
+        titleTextStyle: GoogleFonts.plusJakartaSans(
+          color: const Color(0xFFF1F5F9),
           fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.1),
       ),
-
-      cardTheme: CardThemeData(
-        elevation:        0,
-        color:            _kCardDark,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFF334155)),
-        ),
-        margin: EdgeInsets.zero,
+      snackBarTheme: base.snackBarTheme.copyWith(
+        behavior:         SnackBarBehavior.floating,
+        contentTextStyle: GoogleFonts.plusJakartaSans(
+          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
-
-      inputDecorationTheme: _inputTheme(
-        _kCardDark,
-        const Color(0xFF334155),
-        primary,
-        onSurfaceVariant,
-        const Color(0xFF475569),
-      ),
-
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF4F46E5),
-          foregroundColor: Colors.white,
-          minimumSize:     const Size(double.infinity, 52),
-          shape:           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w700),
-          elevation: 0,
-        ),
-      ),
-
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(88, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-      ),
-
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(88, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          side: const BorderSide(color: Color(0xFF334155), width: 1.5),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-      ),
-
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          textStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-      ),
-
-      bottomSheetTheme: _sheetTheme(_kCardDark),
-      snackBarTheme:    _snackTheme(const Color(0xFF334155)),
-
-      listTileTheme: const ListTileThemeData(
-        contentPadding:  EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        minLeadingWidth: 24,
-        titleTextStyle: TextStyle(
-          fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w500, color: onSurface),
-        subtitleTextStyle: TextStyle(
-          fontFamily: 'Inter', fontSize: 12, color: onSurfaceVariant),
-      ),
-
-      dividerTheme: const DividerThemeData(
-        color: Color(0xFF334155), thickness: 1, space: 1),
-
-      chipTheme: ChipThemeData(
-        backgroundColor: const Color(0xFF1E293B),
-        selectedColor:   const Color(0xFF4F46E5).withValues(alpha: 0.2),
-        side:            const BorderSide(color: Color(0xFF334155)),
-        shape:           RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        labelStyle: const TextStyle(
-          fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w500),
-      ),
-
-      segmentedButtonTheme: SegmentedButtonThemeData(
-        style: SegmentedButton.styleFrom(
-          textStyle: const TextStyle(
-            fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      ),
-
-      switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((s) =>
-            s.contains(WidgetState.selected) ? primary : const Color(0xFF94A3B8)),
-        trackColor: WidgetStateProperty.resolveWith((s) =>
-            s.contains(WidgetState.selected)
-                ? primary.withValues(alpha: 0.30)
-                : const Color(0xFF334155)),
-      ),
-
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: primary, linearMinHeight: 3),
     );
   }
 }

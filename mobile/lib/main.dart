@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'core/api/api_client.dart';
 import 'core/api/api_endpoints.dart';
@@ -66,14 +67,19 @@ class SasGarmentsApp extends ConsumerWidget {
     final router    = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
 
-    return MaterialApp.router(
-      title:                      'ProBusiness',
-      debugShowCheckedModeBanner: false,
-      theme:                      AppTheme.light(),
-      darkTheme:                  AppTheme.dark(),
-      themeMode:                  themeMode,
-      routerConfig:               router,
-      builder: (ctx, child) => BiometricLockOverlay(child: child ?? const SizedBox()),
+    return ScreenUtilInit(
+      designSize:      const Size(390, 844), // iPhone 14 Pro baseline
+      minTextAdapt:    true,
+      splitScreenMode: true,
+      builder: (_, __) => MaterialApp.router(
+        title:                      'ProBusiness',
+        debugShowCheckedModeBanner: false,
+        theme:                      AppTheme.light(),
+        darkTheme:                  AppTheme.dark(),
+        themeMode:                  themeMode,
+        routerConfig:               router,
+        builder: (ctx, child) => BiometricLockOverlay(child: child ?? const SizedBox()),
+      ),
     );
   }
 }

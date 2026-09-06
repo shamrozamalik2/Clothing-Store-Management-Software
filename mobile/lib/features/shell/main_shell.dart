@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:iconsax/iconsax.dart';
 
 import '../../core/widgets/grad_widgets.dart';
 import '../../core/widgets/pbc_logo.dart';
@@ -9,19 +10,19 @@ import '../notifications/presentation/providers/notifications_provider.dart';
 // ── Bottom nav tabs ────────────────────────────────────────────────────────────
 
 const _kBottomTabs = [
-  _NavItem('/dashboard',  Icons.home_rounded,           Icons.home_outlined,           'Home'),
-  _NavItem('/pos',        Icons.point_of_sale_rounded,   Icons.point_of_sale_outlined,  'POS'),
-  _NavItem('/sales',      Icons.receipt_long_rounded,    Icons.receipt_long_outlined,   'Sales'),
-  _NavItem('/stock',      Icons.inventory_2_rounded,     Icons.inventory_2_outlined,    'Stock'),
+  _NavItem('/dashboard',  Iconsax.home5,         Iconsax.home,        'Home'),
+  _NavItem('/pos',        Iconsax.bag5,          Iconsax.bag,         'POS'),
+  _NavItem('/sales',      Iconsax.receipt_item2, Iconsax.receipt_item, 'Sales'),
+  _NavItem('/stock',      Iconsax.box5,          Iconsax.box,         'Stock'),
 ];
 
 const _kMoreItems = [
-  _NavItem('/reports',       Icons.bar_chart_rounded,       Icons.bar_chart_outlined,       'Reports'),
-  _NavItem('/staff',         Icons.badge_rounded,            Icons.badge_outlined,            'Staff'),
-  _NavItem('/customers',     Icons.person_pin_rounded,       Icons.person_pin_outlined,       'Customers'),
-  _NavItem('/notifications', Icons.notifications_rounded,    Icons.notifications_outlined,    'Alerts'),
-  _NavItem('/printer',       Icons.print_rounded,            Icons.print_outlined,            'Printer'),
-  _NavItem('/settings',      Icons.settings_rounded,         Icons.settings_outlined,         'Settings'),
+  _NavItem('/reports',       Iconsax.chart5,          Iconsax.chart,         'Reports'),
+  _NavItem('/staff',         Iconsax.people2,          Iconsax.people,        'Staff'),
+  _NavItem('/customers',     Iconsax.profile_2user2,   Iconsax.profile_2user, 'Customers'),
+  _NavItem('/notifications', Iconsax.notification2,    Iconsax.notification,  'Alerts'),
+  _NavItem('/printer',       Iconsax.printer2,         Iconsax.printer,       'Printer'),
+  _NavItem('/settings',      Iconsax.setting_22,       Iconsax.setting_2,     'Settings'),
 ];
 
 // ── Tablet rail colours ───────────────────────────────────────────────────────
@@ -212,7 +213,6 @@ class _NavBtn extends StatelessWidget {
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 220),
               style: TextStyle(
-                fontFamily: 'Inter',
                 fontSize:   10,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
                 color:      selected
