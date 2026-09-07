@@ -68,102 +68,6 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Profile ───────────────────────────────────────────────
-                const _SectionLabel('Profile'),
-                _GradCard(
-                  colors: kGradPrimary,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        (user?.avatar != null && user!.avatar!.isNotEmpty)
-                            ? Container(
-                                width:  56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  shape:    BoxShape.circle,
-                                  gradient: const LinearGradient(
-                                    begin:  Alignment.topLeft,
-                                    end:    Alignment.bottomRight,
-                                    colors: kGradPrimary,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color:      kGradPrimary[0]
-                                          .withValues(alpha: 0.28),
-                                      blurRadius: 12,
-                                      offset:     const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipOval(
-                                  child: Image.network(user.avatar!,
-                                      fit: BoxFit.cover),
-                                ),
-                              )
-                            : GradAvatar(
-                                name:   user?.name ?? '?',
-                                radius: 28,
-                                colors: kGradPrimary,
-                              ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ShaderMask(
-                                shaderCallback: (b) =>
-                                    const LinearGradient(
-                                            colors: kGradPrimary)
-                                        .createShader(b),
-                                child: Text(
-                                  user?.name ?? '—',
-                                  style: const TextStyle(
-                                    color:      Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize:   16,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                user?.email ?? '—',
-                                style: TextStyle(
-                                  color:    cs.onSurfaceVariant,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              _RoleBadge(role: user?.roleName ?? ''),
-                            ],
-                          ),
-                        ),
-                        // Edit profile button
-                        GestureDetector(
-                          onTap: () => _showEditProfileSheet(context, ref),
-                          child: Container(
-                            width:  34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color:        kGradPrimary[0]
-                                  .withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: kGradPrimary[0]
-                                      .withValues(alpha: 0.2)),
-                            ),
-                            child: Icon(
-                              Icons.edit_rounded,
-                              color: kGradPrimary[0],
-                              size:  17,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
                 // ── Company ───────────────────────────────────────────────
                 const _SectionLabel('Company'),
                 _GradCard(
@@ -327,18 +231,6 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   // ── Sheet helpers ─────────────────────────────────────────────────────────
-
-  void _showEditProfileSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet<void>(
-      context:            context,
-      isScrollControlled: true,
-      showDragHandle:     true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _EditProfileSheet(ref: ref),
-    );
-  }
 
   void _showEditCompanySheet(
       BuildContext context, WidgetRef ref, String current) {
@@ -807,32 +699,3 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
-class _RoleBadge extends StatelessWidget {
-  const _RoleBadge({required this.role});
-  final String role;
-
-  @override
-  Widget build(BuildContext context) {
-    if (role.isEmpty) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin:  Alignment.topLeft,
-          end:    Alignment.bottomRight,
-          colors: [Color(0x254F46E5), Color(0x257C3AED)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0x404F46E5)),
-      ),
-      child: Text(
-        role[0].toUpperCase() + role.substring(1),
-        style: const TextStyle(
-          color:      Color(0xFF818CF8),
-          fontSize:   11,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
