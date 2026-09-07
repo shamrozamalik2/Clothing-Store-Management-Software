@@ -68,17 +68,28 @@ class BarcodeScannerScreen extends ConsumerStatefulWidget {
   ConsumerState<BarcodeScannerScreen> createState() => _BarcodeScannerScreenState();
 }
 
-class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
+class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
+    with WidgetsBindingObserver {
   late MobileScannerController _controller;
 
   String _lastCode = '';
   bool   _torchOn  = false;
   bool   _paused   = false;
+  bool   _hasError = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = _makeController();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _hasError) {
+      _hasError = false;
+      _restartController();
+    }
   }
 
   MobileScannerController _makeController() => MobileScannerController(
@@ -87,6 +98,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
   }
@@ -114,6 +126,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
     setState(() {
       _lastCode = '';
       _paused   = false;
+      _hasError = false;
     });
     _controller.start();
   }
@@ -166,6 +179,11 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
             onDetect:     _onDetect,
             errorBuilder: (context, error, child) {
               final denied = error.errorCode == MobileScannerErrorCode.permissionDenied;
+              if (!_hasError) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() => _hasError = true);
+                });
+              }
               return _CameraPermissionError(
                 permanent: denied,
                 onRetry:   _restartController,

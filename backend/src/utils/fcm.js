@@ -2,6 +2,7 @@
 
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getMessaging }                  = require('firebase-admin/messaging');
+const { query }                         = require('../config/database');
 
 // ── Lazy initialise Firebase Admin SDK ─────────────────────────────────────
 
@@ -83,9 +84,9 @@ async function sendPush(tokens, notification, data = {}) {
 /**
  * Notify all admin users of a company about a new sale.
  */
-async function notifySale(pool, companyId, saleData) {
+async function notifySale(companyId, saleData) {
   try {
-    const { rows } = await pool.query(
+    const { rows } = await query(
       `SELECT u.fcm_token FROM users u
        JOIN roles r ON r.id = u.role_id
        WHERE u.company_id = $1 AND u.is_active = TRUE

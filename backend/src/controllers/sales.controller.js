@@ -1,6 +1,6 @@
 'use strict';
 
-const { query, withTransaction, pool } = require('../config/database');
+const { query, withTransaction } = require('../config/database');
 const { success, created, error }      = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { AUDIT_ACTIONS }  = require('../config/constants');
@@ -275,7 +275,7 @@ const create = async (req, res, next) => {
       { reference: sale.reference, total: sale.total_amount });
 
     // Push notification to admin(s)
-    notifySale(pool, cid, {
+    notifySale(cid, {
       id:             saleId,
       reference:      sale.reference,
       customer_name:  sale.customer_name,
