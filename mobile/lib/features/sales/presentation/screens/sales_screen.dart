@@ -46,7 +46,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         ref.read(salesDateFromProvider.notifier).state = today;
         ref.read(salesToDateProvider.notifier).state   = today;
       case _DateFilter.week:
-        final start = now.subtract(Duration(days: now.weekday - 1));
+        final start = now.subtract(const Duration(days: 6));
         ref.read(salesDateFromProvider.notifier).state = _apiDate.format(start);
         ref.read(salesToDateProvider.notifier).state   = _apiDate.format(now);
       case _DateFilter.month:
