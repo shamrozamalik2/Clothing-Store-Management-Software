@@ -45,7 +45,8 @@ class PaginatedResponse<T> {
     T Function(Map<String, dynamic>) fromItem,
   ) {
     final rawItems = (json['data'] as List<dynamic>?) ?? [];
-    final meta     = json['meta'] as Map<String, dynamic>? ?? {};
+    // backend sends key 'pagination'; accept 'meta' as legacy fallback
+    final meta     = (json['pagination'] ?? json['meta']) as Map<String, dynamic>? ?? {};
     return PaginatedResponse<T>(
       items: rawItems.map((e) => fromItem(e as Map<String, dynamic>)).toList(),
       total: meta['total'] as int? ?? rawItems.length,

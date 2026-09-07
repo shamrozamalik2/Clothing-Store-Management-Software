@@ -38,7 +38,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
   void _applyFilter(_DateFilter filter) {
     setState(() => _activeFilter = filter);
-    final now = DateTime.now();
+    // Use UTC so dates match the backend's sale_date::date comparison (UTC session)
+    final now = DateTime.now().toUtc();
     switch (filter) {
       case _DateFilter.today:
         final today = _apiDate.format(now);
@@ -50,7 +51,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         ref.read(salesToDateProvider.notifier).state   = _apiDate.format(now);
       case _DateFilter.month:
         ref.read(salesDateFromProvider.notifier).state =
-            _apiDate.format(DateTime(now.year, now.month, 1));
+            _apiDate.format(DateTime.utc(now.year, now.month, 1));
         ref.read(salesToDateProvider.notifier).state = _apiDate.format(now);
       case _DateFilter.custom:
         _pickCustomRange();
