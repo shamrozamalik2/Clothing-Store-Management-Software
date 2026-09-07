@@ -178,48 +178,50 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
             controller:   _controller,
             onDetect:     _onDetect,
             errorBuilder: (context, error, child) {
-              final denied = error.errorCode == MobileScannerErrorCode.permissionDenied;
               if (!_hasError) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted) setState(() => _hasError = true);
                 });
               }
               return _CameraPermissionError(
-                permanent: denied,
-                onRetry:   _restartController,
+                onRetry: _restartController,
               );
             },
           ),
 
-          // Overlay — scanning frame
-          CustomPaint(
-            painter: _ScanOverlayPainter(cs.primary),
-            child: const SizedBox.expand(),
-          ),
+          // Overlay — scanning frame (IgnorePointer so error buttons stay tappable)
+          if (!_hasError)
+            IgnorePointer(
+              child: CustomPaint(
+                painter: _ScanOverlayPainter(cs.primary),
+                child: const SizedBox.expand(),
+              ),
+            ),
 
           // Instruction label at bottom
-          Positioned(
-            bottom: 40,
-            left: 0,
-            right: 0,
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  decoration: BoxDecoration(
-                    color:        Colors.black.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(24),
+          if (!_hasError)
+            Positioned(
+              bottom: 40,
+              left: 0,
+              right: 0,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      color:        Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Text(
+                      _paused ? 'Product found — swipe down to scan again'
+                              : 'Point camera at a barcode or QR code',
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                  child: Text(
-                    _paused ? 'Product found — swipe down to scan again'
-                            : 'Point camera at a barcode or QR code',
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -532,11 +534,11 @@ class _ErrorResult extends StatelessWidget {
 // ── Camera permission error overlay ──────────────────────────────────────────
 
 class _CameraPermissionError extends StatelessWidget {
-  const _CameraPermissionError({required this.permanent, required this.onRetry});
-  final bool             permanent;
+  const _CameraPermissionError({required this.onRetry});
   final Future<void> Function() onRetry;
 
   Future<void> _openSettings() async {
+    // Try app-specific settings first, fall back to general app-settings URI
     final uri = Uri.parse('package:com.sasgarments.sas_garments_mobile');
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       await launchUrl(Uri.parse('app-settings:'));
@@ -577,34 +579,30 @@ class _CameraPermissionError extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              Text(
-                permanent
-                    ? 'Camera permission was denied.\nGo to Settings → Apps → ProBusiness → Permissions → Camera and enable it.'
-                    : 'Allow camera access to scan barcodes.',
-                style: const TextStyle(color: Colors.white60, fontSize: 13, height: 1.5),
+              const Text(
+                'Camera permission is required to scan barcodes.\nOpen Settings and enable Camera permission, then return to the app.',
+                style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 28),
-              if (permanent)
-                FilledButton.icon(
-                  onPressed: _openSettings,
-                  icon:  const Icon(Icons.settings_rounded),
-                  label: const Text('Open Settings'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF4F46E5),
-                    minimumSize:     const Size(200, 48),
-                  ),
-                )
-              else
-                FilledButton.icon(
-                  onPressed: onRetry,
-                  icon:  const Icon(Icons.refresh_rounded),
-                  label: const Text('Grant Permission'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF4F46E5),
-                    minimumSize:     const Size(200, 48),
-                  ),
+              // Always open settings — retrying alone won't re-show the permission dialog
+              FilledButton.icon(
+                onPressed: _openSettings,
+                icon:  const Icon(Icons.settings_rounded),
+                label: const Text('Open Settings'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F46E5),
+                  minimumSize:     const Size(200, 48),
                 ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: onRetry,
+                child: const Text(
+                  'Already granted? Tap to retry',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ),
             ],
           ),
         ),
