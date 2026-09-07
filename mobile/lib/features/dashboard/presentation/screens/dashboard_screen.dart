@@ -67,11 +67,8 @@ class DashboardScreen extends ConsumerWidget {
               data:    (stats) => SliverList(
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: 16),
-                  _CompanyBanner(
-                    companyName: user?.companyName ?? 'My Store',
-                    userName:    user?.name ?? 'Owner',
-                  ),
-                  const SizedBox(height: 16),
+                  _HeroSalesCard(stats: stats),
+                  const SizedBox(height: 12),
                   _MetricTrio(stats: stats),
                   const SizedBox(height: 16),
                   _PaymentBreakdown(stats: stats),
@@ -239,136 +236,166 @@ class _PremiumAppBar extends StatelessWidget {
   }
 }
 
-// ── Company Banner ────────────────────────────────────────────────────────────
+// ── Hero Sales Card ───────────────────────────────────────────────────────────
 
-class _CompanyBanner extends StatelessWidget {
-  const _CompanyBanner({required this.companyName, required this.userName});
-  final String companyName;
-  final String userName;
+class _HeroSalesCard extends StatelessWidget {
+  const _HeroSalesCard({required this.stats});
+  final DashboardStats stats;
 
   @override
   Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
+    final avg = stats.todayOrders > 0
+        ? formatCompact(stats.todaySales / stats.todayOrders)
+        : '—';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end:   Alignment.bottomRight,
-            colors: [Color(0xFF1E1B6B), Color(0xFF3730A3), Color(0xFF4F46E5)],
-            stops:  [0.0, 0.55, 1.0],
+            colors: [Color(0xFF312E81), Color(0xFF4338CA), Color(0xFF6366F1)],
+            stops:  [0.0, 0.5, 1.0],
           ),
           boxShadow: [
             BoxShadow(
-              color:      _kIndigo.withValues(alpha: 0.32),
-              blurRadius: 20,
-              offset:     const Offset(0, 6),
+              color:      _kIndigo.withValues(alpha: 0.40),
+              blurRadius: 28,
+              offset:     const Offset(0, 10),
             ),
           ],
         ),
-        child: Row(
+        child: Stack(
           children: [
-            // PBC logo mark on dark gradient
-            Container(
-              width:  42,
-              height: 42,
-              decoration: BoxDecoration(
-                color:        Colors.white.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.20),
-                  width: 1,
+            Positioned(
+              right: -30,
+              top:   -30,
+              child: Container(
+                width:  160,
+                height: 160,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.white.withValues(alpha: 0.07),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
               ),
-              child: const Center(
-                child: PBCLogoMark(size: 24, onDark: true),
-              ),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Today's Revenue",
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize:   13,
+                    fontWeight: FontWeight.w500,
+                    color:      Colors.white.withValues(alpha: 0.72),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color:        Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color:        const Color(0xFF4ADE80).withValues(alpha: 0.20),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: const Color(0xFF4ADE80).withValues(alpha: 0.35),
-                          ),
+                        width: 6, height: 6,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF4ADE80),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 5, height: 5,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Color(0xFF4ADE80),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Text(
-                              'ACTIVE',
-                              style: TextStyle(
-                                fontFamily:    'Inter',
-                                fontSize:      9,
-                                fontWeight:    FontWeight.w700,
-                                color:         Color(0xFF86EFAC),
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ],
+                      ),
+                      const SizedBox(width: 5),
+                      const Text(
+                        'Live',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize:   11,
+                          fontWeight: FontWeight.w600,
+                          color:      Colors.white,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    companyName,
-                    style: tt.titleMedium?.copyWith(
-                      color:       Colors.white,
-                      fontWeight:  FontWeight.w800,
-                      letterSpacing: -0.3,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    userName,
-                    style: tt.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.65),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            // ProBusinessCloud wordmark chip
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(
-                color:        Colors.white.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-              ),
-              child: const Text(
-                'PBC',
-                style: TextStyle(
+            const SizedBox(height: 10),
+            FittedBox(
+              fit:       BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                formatCompact(stats.todaySales),
+                style: const TextStyle(
                   fontFamily:    'Inter',
-                  fontSize:      12,
+                  fontSize:      38,
                   fontWeight:    FontWeight.w800,
                   color:         Colors.white,
-                  letterSpacing: 0.5,
+                  letterSpacing: -1.5,
+                  height:        1.1,
                 ),
               ),
             ),
+            const SizedBox(height: 4),
+            Text(
+              '${stats.todayOrders} ${stats.todayOrders == 1 ? 'order' : 'orders'} completed today',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize:   13,
+                color:      Colors.white.withValues(alpha: 0.68),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.0),
+                    Colors.white.withValues(alpha: 0.15),
+                    Colors.white.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _HeroMetric(
+                  label: 'Profit',
+                  value: formatCompact(stats.todayProfit),
+                  icon:  Icons.trending_up_rounded,
+                ),
+                _HeroMetricDivider(),
+                _HeroMetric(
+                  label: 'Pending',
+                  value: formatCompact(stats.pendingPayments),
+                  icon:  Icons.hourglass_top_rounded,
+                ),
+                _HeroMetricDivider(),
+                _HeroMetric(
+                  label: 'Avg Sale',
+                  value: avg,
+                  icon:  Icons.receipt_outlined,
+                ),
+              ],
+            ),
+          ],
+        ),
           ],
         ),
       ),
@@ -376,7 +403,69 @@ class _CompanyBanner extends StatelessWidget {
   }
 }
 
-// ── Hero Sales Card ───────────────────────────────────────────────────────────
+class _HeroMetric extends StatelessWidget {
+  const _HeroMetric({required this.label, required this.value, required this.icon});
+  final String   label;
+  final String   value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.white.withValues(alpha: 0.65), size: 14),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize:   13,
+              fontWeight: FontWeight.w700,
+              color:      Colors.white,
+              letterSpacing: -0.3,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize:   10,
+              color:      Colors.white.withValues(alpha: 0.55),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroMetricDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width:  1,
+      height: 36,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin:  Alignment.topCenter,
+          end:    Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withValues(alpha: 0.18),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 // ── Metric Trio (Orders / Profit / Low Stock) ─────────────────────────────────
 
