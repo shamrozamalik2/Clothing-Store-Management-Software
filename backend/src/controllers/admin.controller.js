@@ -1,63 +1,49 @@
 'use strict';
 
-const bcrypt = require('bcryptjs');
-const jwt    = require('jsonwebtoken');
-const { query } = require('../config/database');
-const logger    = require('../config/logger');
+const bcrypt     = require('bcryptjs');
+const jwt        = require('jsonwebtoken');
+const Company    = require('../models/Company');
+const User       = require('../models/User');
+const Role       = require('../models/Role');
+const Branch     = require('../models/Branch');
+const Sale       = require('../models/Sale');
+const Product    = require('../models/Product');
+const SuperAdmin = require('../models/SuperAdmin');
+const logger     = require('../config/logger');
 
-const SUPER_ADMIN_SECRET  = process.env.SUPER_ADMIN_JWT_SECRET || process.env.JWT_SECRET;
-const JWT_EXPIRES_IN      = '4h';
-const BCRYPT_ROUNDS       = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+const SUPER_ADMIN_SECRET = process.env.SUPER_ADMIN_JWT_SECRET || process.env.JWT_SECRET;
+const JWT_EXPIRES_IN     = '4h';
+const BCRYPT_ROUNDS      = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(422).json({ success: false, message: 'Email and password are required.' });
-    }
+    if (!email || !password) return res.status(422).json({ success: false, message: 'Email and password are required.' });
 
-    const { rows: [admin] } = await query(
-      'SELECT * FROM super_admins WHERE email = $1 AND is_active = TRUE',
-      [email.toLowerCase().trim()]
-    );
-
+    const admin = await SuperAdmin.findOne({ email: email.toLowerCase().trim(), is_active: true }).lean();
     if (!admin || !(await bcrypt.compare(password, admin.password))) {
       return res.status(401).json({ success: false, message: 'Invalid credentials.' });
     }
 
-    await query('UPDATE super_admins SET last_login=NOW() WHERE id=$1', [admin.id]);
+    await SuperAdmin.findByIdAndUpdate(admin._id, { last_login: new Date() });
 
-    const token = jwt.sign(
-      { id: admin.id, email: admin.email, name: admin.name, role: 'super_admin' },
-      SUPER_ADMIN_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
-
+    const token = jwt.sign({ id: admin._id.toString(), email: admin.email, name: admin.name, role: 'super_admin' }, SUPER_ADMIN_SECRET, { expiresIn: JWT_EXPIRES_IN });
     logger.info(`[SuperAdmin] Login: ${admin.email}`);
-    return res.json({ success: true, data: { token, admin: { id: admin.id, name: admin.name, email: admin.email } } });
+    return res.json({ success: true, data: { token, admin: { id: admin._id.toString(), name: admin.name, email: admin.email } } });
   } catch (err) { next(err); }
 };
 
 exports.createAdmin = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      return res.status(422).json({ success: false, message: 'name, email and password are required.' });
-    }
-    if (password.length < 10) {
-      return res.status(422).json({ success: false, message: 'Password must be at least 10 characters.' });
-    }
+    if (!name || !email || !password) return res.status(422).json({ success: false, message: 'name, email and password are required.' });
+    if (password.length < 10)         return res.status(422).json({ success: false, message: 'Password must be at least 10 characters.' });
 
     const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    const { rows: [admin] } = await query(`
-      INSERT INTO super_admins (name, email, password)
-      VALUES ($1, $2, $3)
-      RETURNING id, name, email, created_at
-    `, [name.trim(), email.toLowerCase().trim(), hashed]);
-
-    return res.status(201).json({ success: true, data: admin });
+    const admin  = await SuperAdmin.create({ name: name.trim(), email: email.toLowerCase().trim(), password: hashed });
+    return res.status(201).json({ success: true, data: { id: admin._id.toString(), name: admin.name, email: admin.email, created_at: admin.created_at } });
   } catch (err) { next(err); }
 };
 
@@ -69,199 +55,136 @@ exports.listCompanies = async (req, res, next) => {
     const lim = Math.min(parseInt(limit, 10) || 25, 100);
     const off = (Math.max(parseInt(page, 10) || 1, 1) - 1) * lim;
 
-    const params = [];
-    const where  = ['1=1'];
+    const filter = {};
+    if (search) filter.$or = [{ name: { $regex: search, $options: 'i' } }, { slug: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }];
+    if (status) filter.subscription_status = status;
 
-    if (search) {
-      params.push(`%${search}%`);
-      where.push(`(c.name ILIKE $${params.length} OR c.slug ILIKE $${params.length} OR c.email ILIKE $${params.length})`);
-    }
-    if (status) {
-      params.push(status);
-      where.push(`c.subscription_status = $${params.length}`);
-    }
+    const [total, companies] = await Promise.all([
+      Company.countDocuments(filter),
+      Company.find(filter, { name: 1, slug: 1, email: 1, phone: 1, plan: 1, subscription_status: 1, max_users: 1, is_active: 1, trial_ends_at: 1, suspended_at: 1, billing_email: 1, notes: 1, created_at: 1 }).sort({ created_at: -1 }).skip(off).limit(lim).lean(),
+    ]);
 
-    const wStr = where.join(' AND ');
+    const companyIds = companies.map(c => c._id);
+    const [userCounts, saleCounts] = await Promise.all([
+      User.aggregate([{ $match: { company_id: { $in: companyIds }, is_active: true } }, { $group: { _id: '$company_id', count: { $sum: 1 } } }]),
+      Sale.aggregate([{ $match: { company_id: { $in: companyIds } } }, { $group: { _id: '$company_id', count: { $sum: 1 } } }]),
+    ]);
+    const userMap = Object.fromEntries(userCounts.map(u => [u._id.toString(), u.count]));
+    const saleMap = Object.fromEntries(saleCounts.map(s => [s._id.toString(), s.count]));
 
-    const { rows: [{ cnt }] } = await query(
-      `SELECT COUNT(*) AS cnt FROM companies c WHERE ${wStr}`,
-      params
-    );
+    const data = companies.map(c => ({
+      ...c,
+      id:           c._id.toString(),
+      active_users: userMap[c._id.toString()] || 0,
+      total_sales:  saleMap[c._id.toString()] || 0,
+    }));
 
-    params.push(lim, off);
-    const { rows: companies } = await query(`
-      SELECT
-        c.id, c.name, c.slug, c.email, c.phone, c.plan,
-        c.subscription_status, c.max_users, c.is_active,
-        c.trial_ends_at, c.suspended_at, c.billing_email,
-        c.notes, c.created_at,
-        (SELECT COUNT(*) FROM users u WHERE u.company_id = c.id AND u.is_active = TRUE)::int AS active_users,
-        (SELECT COUNT(*) FROM sales s WHERE s.company_id = c.id)::int AS total_sales
-      FROM companies c
-      WHERE ${wStr}
-      ORDER BY c.created_at DESC
-      LIMIT $${params.length - 1} OFFSET $${params.length}
-    `, params);
-
-    return res.json({
-      success: true,
-      data: companies,
-      pagination: { total: parseInt(cnt, 10), page: parseInt(page, 10), limit: lim },
-    });
+    return res.json({ success: true, data, pagination: { total, page: parseInt(page, 10), limit: lim } });
   } catch (err) { next(err); }
 };
 
 exports.getCompany = async (req, res, next) => {
   try {
-    const { rows: [company] } = await query(`
-      SELECT c.*,
-        (SELECT COUNT(*) FROM users u WHERE u.company_id = c.id AND u.is_active = TRUE)::int AS active_users,
-        (SELECT COUNT(*) FROM users u WHERE u.company_id = c.id)::int AS total_users,
-        (SELECT COUNT(*) FROM sales s WHERE s.company_id = c.id)::int AS total_sales,
-        (SELECT COUNT(*) FROM products p WHERE p.company_id = c.id)::int AS total_products
-      FROM companies c
-      WHERE c.id = $1
-    `, [req.params.id]);
-
+    const company = await Company.findById(req.params.id).lean();
     if (!company) return res.status(404).json({ success: false, message: 'Company not found.' });
-    return res.json({ success: true, data: company });
+
+    const [activeUsers, totalUsers, totalSales, totalProducts] = await Promise.all([
+      User.countDocuments({ company_id: company._id, is_active: true }),
+      User.countDocuments({ company_id: company._id }),
+      Sale.countDocuments({ company_id: company._id }),
+      Product.countDocuments({ company_id: company._id }),
+    ]);
+
+    return res.json({ success: true, data: { ...company, id: company._id.toString(), active_users: activeUsers, total_users: totalUsers, total_sales: totalSales, total_products: totalProducts } });
   } catch (err) { next(err); }
 };
 
 exports.createCompany = async (req, res, next) => {
   try {
-    const {
-      name, slug, email, phone, plan = 'standard',
-      max_users = 5, billing_email, notes,
-      admin_name, admin_email, admin_password,
-    } = req.body;
-
+    const { name, slug, email, phone, plan = 'standard', max_users = 5, billing_email, notes, admin_name, admin_email, admin_password } = req.body;
     if (!name || !slug || !admin_email || !admin_password) {
       return res.status(422).json({ success: false, message: 'name, slug, admin_email and admin_password are required.' });
     }
 
-    const { rows: [company] } = await query(`
-      INSERT INTO companies (name, slug, email, phone, plan, is_active, subscription_status, max_users, billing_email, notes, trial_ends_at)
-      VALUES ($1,$2,$3,$4,$5,TRUE,'trial',$6,$7,$8, NOW() + INTERVAL '30 days')
-      RETURNING *
-    `, [name.trim(), slug.trim(), email || null, phone || null, plan, max_users, billing_email || null, notes || null]);
+    const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const company = await Company.create({ name: name.trim(), slug: slug.trim(), email: email || null, phone: phone || null, plan, is_active: true, subscription_status: 'trial', max_users, billing_email: billing_email || null, notes: notes || null, trial_ends_at: trialEndsAt });
 
-    // Create default branch
-    const { rows: [branch] } = await query(
-      'INSERT INTO branches (company_id, name, is_default) VALUES ($1,$2,TRUE) RETURNING id',
-      [company.id, 'Main Branch']
-    );
+    const branch = await Branch.create({ company_id: company._id, name: 'Main Branch', is_default: true });
 
-    // Create admin role
-    const permissions = { products: { view:true,create:true,edit:true,delete:true }, sales: { view:true,create:true,edit:true,delete:true }, reports: { view:true }, settings: { view:true,edit:true } };
-    const { rows: [role] } = await query(
-      "INSERT INTO roles (company_id, name, label, permissions, is_system) VALUES ($1,'admin','Administrator',$2::jsonb,TRUE) RETURNING id",
-      [company.id, JSON.stringify(permissions)]
-    );
+    const permissions = { products: { view: true, create: true, edit: true, delete: true }, sales: { view: true, create: true, edit: true, delete: true }, reports: { view: true }, settings: { view: true, edit: true } };
+    const role = await Role.create({ company_id: company._id, name: 'admin', label: 'Administrator', permissions, is_system: true });
 
-    // Create admin user
     const hashed = await bcrypt.hash(admin_password, BCRYPT_ROUNDS);
-    await query(
-      'INSERT INTO users (company_id, branch_id, role_id, name, email, password) VALUES ($1,$2,$3,$4,$5,$6)',
-      [company.id, branch.id, role.id, admin_name || 'Admin', admin_email.toLowerCase(), hashed]
-    );
+    await User.create({ company_id: company._id, branch_id: branch._id, role_id: role._id, name: admin_name || 'Admin', email: admin_email.toLowerCase(), password: hashed, is_active: true });
 
-    logger.info(`[SuperAdmin] Company created: ${company.slug} (id=${company.id})`);
-    return res.status(201).json({ success: true, data: company, message: 'Company created successfully.' });
+    logger.info(`[SuperAdmin] Company created: ${company.slug} (id=${company._id})`);
+    return res.status(201).json({ success: true, data: { ...company.toJSON(), id: company._id.toString() }, message: 'Company created successfully.' });
   } catch (err) { next(err); }
 };
 
 exports.updateCompany = async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    const { name, email, phone, plan, subscription_status, max_users, is_active, billing_email, notes } = req.body;
-
-    const { rows: [existing] } = await query('SELECT * FROM companies WHERE id=$1', [id]);
+    const existing = await Company.findById(req.params.id).lean();
     if (!existing) return res.status(404).json({ success: false, message: 'Company not found.' });
 
-    const { rows: [updated] } = await query(`
-      UPDATE companies SET
-        name=$2, email=$3, phone=$4, plan=$5,
-        subscription_status=$6, max_users=$7, is_active=$8,
-        billing_email=$9, notes=$10, updated_at=NOW()
-      WHERE id=$1
-      RETURNING *
-    `, [
-      id,
-      name ?? existing.name,
-      email !== undefined ? email : existing.email,
-      phone !== undefined ? phone : existing.phone,
-      plan ?? existing.plan,
-      subscription_status ?? existing.subscription_status,
-      max_users !== undefined ? parseInt(max_users, 10) : existing.max_users,
-      is_active !== undefined ? Boolean(is_active) : existing.is_active,
-      billing_email !== undefined ? billing_email : existing.billing_email,
-      notes !== undefined ? notes : existing.notes,
-    ]);
+    const { name, email, phone, plan, subscription_status, max_users, is_active, billing_email, notes } = req.body;
+    const upd = {};
+    if (name                !== undefined) upd.name                = name ?? existing.name;
+    if (email               !== undefined) upd.email               = email;
+    if (phone               !== undefined) upd.phone               = phone;
+    if (plan                !== undefined) upd.plan                = plan;
+    if (subscription_status !== undefined) upd.subscription_status = subscription_status;
+    if (max_users           !== undefined) upd.max_users           = parseInt(max_users, 10);
+    if (is_active           !== undefined) upd.is_active           = Boolean(is_active);
+    if (billing_email       !== undefined) upd.billing_email       = billing_email;
+    if (notes               !== undefined) upd.notes               = notes;
+    upd.updated_at = new Date();
 
-    return res.json({ success: true, data: updated, message: 'Company updated.' });
+    const updated = await Company.findByIdAndUpdate(req.params.id, upd, { new: true }).lean();
+    return res.json({ success: true, data: { ...updated, id: updated._id.toString() }, message: 'Company updated.' });
   } catch (err) { next(err); }
 };
 
-// PUT /admin/companies/:id/plan
 exports.updatePlan = async (req, res, next) => {
   try {
-    const id   = parseInt(req.params.id, 10);
     const { plan, max_users, trial_ends_at } = req.body;
     if (!plan) return res.status(422).json({ success: false, message: 'plan is required.' });
 
-    const { rows: [updated] } = await query(`
-      UPDATE companies SET plan=$2, max_users=COALESCE($3, max_users),
-        trial_ends_at=COALESCE($4::timestamptz, trial_ends_at), updated_at=NOW()
-      WHERE id=$1 RETURNING id, name, plan, max_users, trial_ends_at
-    `, [id, plan, max_users ? parseInt(max_users) : null, trial_ends_at || null]);
+    const upd = { plan, updated_at: new Date() };
+    if (max_users)     upd.max_users    = parseInt(max_users, 10);
+    if (trial_ends_at) upd.trial_ends_at = new Date(trial_ends_at);
 
+    const updated = await Company.findByIdAndUpdate(req.params.id, upd, { new: true }).lean();
     if (!updated) return res.status(404).json({ success: false, message: 'Company not found.' });
-    logger.info(`[SuperAdmin] Plan updated: id=${id} plan=${plan}`);
-    return res.json({ success: true, data: updated, message: 'Plan updated.' });
+    logger.info(`[SuperAdmin] Plan updated: id=${req.params.id} plan=${plan}`);
+    return res.json({ success: true, data: { id: updated._id.toString(), name: updated.name, plan: updated.plan, max_users: updated.max_users, trial_ends_at: updated.trial_ends_at }, message: 'Plan updated.' });
   } catch (err) { next(err); }
 };
 
-// PUT /admin/companies/:id/features
 exports.updateFeatures = async (req, res, next) => {
   try {
-    const id       = parseInt(req.params.id, 10);
     const features = req.body.features;
-    if (!features || typeof features !== 'object') {
-      return res.status(422).json({ success: false, message: 'features object is required.' });
-    }
+    if (!features || typeof features !== 'object') return res.status(422).json({ success: false, message: 'features object is required.' });
 
-    const { rows: [updated] } = await query(
-      'UPDATE companies SET features=$2, updated_at=NOW() WHERE id=$1 RETURNING id, name, features',
-      [id, JSON.stringify(features)]
-    );
+    const updated = await Company.findByIdAndUpdate(req.params.id, { features, updated_at: new Date() }, { new: true }).lean();
     if (!updated) return res.status(404).json({ success: false, message: 'Company not found.' });
-    return res.json({ success: true, data: updated, message: 'Features updated.' });
+    return res.json({ success: true, data: { id: updated._id.toString(), name: updated.name, features: updated.features }, message: 'Features updated.' });
   } catch (err) { next(err); }
 };
 
 exports.suspendCompany = async (req, res, next) => {
   try {
-    const id     = parseInt(req.params.id, 10);
     const reason = req.body.reason || 'Suspended by admin';
-
-    await query(
-      "UPDATE companies SET is_active=FALSE, suspended_at=NOW(), suspended_reason=$2, subscription_status='suspended', updated_at=NOW() WHERE id=$1",
-      [id, reason]
-    );
-    logger.warn(`[SuperAdmin] Company suspended: id=${id} reason="${reason}"`);
+    await Company.findByIdAndUpdate(req.params.id, { is_active: false, suspended_at: new Date(), suspended_reason: reason, subscription_status: 'suspended', updated_at: new Date() });
+    logger.warn(`[SuperAdmin] Company suspended: id=${req.params.id} reason="${reason}"`);
     return res.json({ success: true, message: 'Company suspended.' });
   } catch (err) { next(err); }
 };
 
 exports.reinstateCompany = async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    await query(
-      "UPDATE companies SET is_active=TRUE, suspended_at=NULL, suspended_reason=NULL, subscription_status='active', updated_at=NOW() WHERE id=$1",
-      [id]
-    );
-    logger.info(`[SuperAdmin] Company reinstated: id=${id}`);
+    await Company.findByIdAndUpdate(req.params.id, { is_active: true, suspended_at: null, suspended_reason: null, subscription_status: 'active', updated_at: new Date() });
+    logger.info(`[SuperAdmin] Company reinstated: id=${req.params.id}`);
     return res.json({ success: true, message: 'Company reinstated.' });
   } catch (err) { next(err); }
 };
@@ -273,120 +196,103 @@ exports.listUsers = async (req, res, next) => {
     const { search = '', company_id = '', status = '', page = 1, limit = 25 } = req.query;
     const lim = Math.min(parseInt(limit, 10) || 25, 100);
     const off = (Math.max(parseInt(page, 10) || 1, 1) - 1) * lim;
-    const params = [];
-    const where  = ['1=1'];
 
-    if (search) {
-      params.push(`%${search}%`);
-      where.push(`(u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`);
-    }
-    if (company_id) {
-      params.push(parseInt(company_id, 10));
-      where.push(`u.company_id = $${params.length}`);
-    }
-    if (status === 'active')   where.push('u.is_active = TRUE');
-    if (status === 'inactive') where.push('u.is_active = FALSE');
+    const filter = {};
+    if (search)     filter.$or = [{ name: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }];
+    if (company_id) filter.company_id = company_id;
+    if (status === 'active')   filter.is_active = true;
+    if (status === 'inactive') filter.is_active = false;
 
-    const wStr = where.join(' AND ');
-    const { rows: [{ cnt }] } = await query(`SELECT COUNT(*) AS cnt FROM users u WHERE ${wStr}`, params);
+    const [total, users] = await Promise.all([
+      User.countDocuments(filter),
+      User.find(filter, { name: 1, email: 1, is_active: 1, last_login: 1, created_at: 1, company_id: 1, role_id: 1 }).sort({ created_at: -1 }).skip(off).limit(lim).lean(),
+    ]);
 
-    params.push(lim, off);
-    const { rows } = await query(`
-      SELECT u.id, u.name, u.email, u.is_active, u.last_login, u.created_at,
-             c.id AS company_id, c.name AS company_name, c.slug AS company_slug,
-             r.name AS role_name, r.label AS role_label
-      FROM users u
-      JOIN companies c ON c.id = u.company_id
-      JOIN roles r     ON r.id = u.role_id
-      WHERE ${wStr}
-      ORDER BY u.created_at DESC
-      LIMIT $${params.length - 1} OFFSET $${params.length}
-    `, params);
+    const compIds = [...new Set(users.map(u => u.company_id?.toString()).filter(Boolean))];
+    const roleIds = [...new Set(users.map(u => u.role_id?.toString()).filter(Boolean))];
+    const [companies, roles] = await Promise.all([
+      Company.find({ _id: { $in: compIds } }, { name: 1, slug: 1 }).lean(),
+      Role.find({ _id: { $in: roleIds } }, { name: 1, label: 1 }).lean(),
+    ]);
+    const compMap = Object.fromEntries(companies.map(c => [c._id.toString(), c]));
+    const roleMap = Object.fromEntries(roles.map(r => [r._id.toString(), r]));
 
-    return res.json({ success: true, data: rows, pagination: { total: parseInt(cnt, 10), page: parseInt(page, 10), limit: lim } });
+    const data = users.map(u => {
+      const c = u.company_id ? compMap[u.company_id.toString()] : null;
+      const r = u.role_id    ? roleMap[u.role_id.toString()]    : null;
+      return { id: u._id.toString(), name: u.name, email: u.email, is_active: u.is_active, last_login: u.last_login, created_at: u.created_at, company_id: c?._id?.toString(), company_name: c?.name, company_slug: c?.slug, role_name: r?.name, role_label: r?.label };
+    });
+
+    return res.json({ success: true, data, pagination: { total, page: parseInt(page, 10), limit: lim } });
   } catch (err) { next(err); }
 };
 
 exports.updateUser = async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
     const { name, email } = req.body;
-    const { rows: [u] } = await query('SELECT * FROM users WHERE id=$1', [id]);
+    const u = await User.findById(req.params.id).lean();
     if (!u) return res.status(404).json({ success: false, message: 'User not found.' });
-    const { rows: [updated] } = await query(
-      'UPDATE users SET name=$2, email=$3, updated_at=NOW() WHERE id=$1 RETURNING id,name,email,is_active',
-      [id, name ?? u.name, email ? email.toLowerCase().trim() : u.email]
-    );
-    return res.json({ success: true, data: updated, message: 'User updated.' });
+    const updated = await User.findByIdAndUpdate(req.params.id, { name: name ?? u.name, email: email ? email.toLowerCase().trim() : u.email, updated_at: new Date() }, { new: true, select: 'name email is_active' }).lean();
+    return res.json({ success: true, data: { id: updated._id.toString(), name: updated.name, email: updated.email, is_active: updated.is_active }, message: 'User updated.' });
   } catch (err) { next(err); }
 };
 
 exports.toggleUser = async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    const { rows: [u] } = await query('SELECT is_active FROM users WHERE id=$1', [id]);
+    const u = await User.findById(req.params.id, { is_active: 1 }).lean();
     if (!u) return res.status(404).json({ success: false, message: 'User not found.' });
-    const { rows: [updated] } = await query(
-      'UPDATE users SET is_active=$2, updated_at=NOW() WHERE id=$1 RETURNING id, is_active',
-      [id, !u.is_active]
-    );
-    return res.json({ success: true, data: updated, message: updated.is_active ? 'User activated.' : 'User deactivated.' });
+    const updated = await User.findByIdAndUpdate(req.params.id, { is_active: !u.is_active, updated_at: new Date() }, { new: true, select: 'is_active' }).lean();
+    return res.json({ success: true, data: { id: updated._id.toString(), is_active: updated.is_active }, message: updated.is_active ? 'User activated.' : 'User deactivated.' });
   } catch (err) { next(err); }
 };
 
 exports.resetUserPassword = async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
     const { password } = req.body;
-    if (!password || password.length < 6)
-      return res.status(422).json({ success: false, message: 'Password must be at least 6 characters.' });
+    if (!password || password.length < 6) return res.status(422).json({ success: false, message: 'Password must be at least 6 characters.' });
     const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
-    await query('UPDATE users SET password=$2, updated_at=NOW() WHERE id=$1', [id, hashed]);
+    await User.findByIdAndUpdate(req.params.id, { password: hashed, updated_at: new Date() });
     return res.json({ success: true, message: 'Password reset.' });
   } catch (err) { next(err); }
 };
 
 exports.deleteUser = async (req, res, next) => {
   try {
-    await query('DELETE FROM users WHERE id=$1', [parseInt(req.params.id, 10)]);
+    await User.findByIdAndDelete(req.params.id);
     return res.json({ success: true, message: 'User deleted.' });
   } catch (err) { next(err); }
 };
 
 exports.deleteCompany = async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    await query('DELETE FROM companies WHERE id=$1', [id]);
-    logger.warn(`[SuperAdmin] Company deleted: id=${id}`);
+    await Company.findByIdAndDelete(req.params.id);
+    logger.warn(`[SuperAdmin] Company deleted: id=${req.params.id}`);
     return res.json({ success: true, message: 'Company deleted.' });
   } catch (err) { next(err); }
 };
 
 exports.impersonateCompany = async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    const { rows: [company] } = await query('SELECT * FROM companies WHERE id=$1', [id]);
+    const company = await Company.findById(req.params.id).lean();
     if (!company) return res.status(404).json({ success: false, message: 'Company not found.' });
 
-    const { rows: [user] } = await query(`
-      SELECT u.*, r.name AS role_name, r.permissions
-      FROM users u JOIN roles r ON r.id = u.role_id
-      WHERE u.company_id=$1 AND r.name='admin' AND u.is_active=TRUE
-      LIMIT 1
-    `, [id]);
+    const adminRole = await Role.findOne({ company_id: company._id, name: 'admin' }).lean();
+    if (!adminRole) return res.status(404).json({ success: false, message: 'No admin role found for this company.' });
+
+    const user = await User.findOne({ company_id: company._id, role_id: adminRole._id, is_active: true }).lean();
     if (!user) return res.status(404).json({ success: false, message: 'No active admin found for this company.' });
 
     const token = jwt.sign({
-      id:          user.id,
-      companyId:   user.company_id,
-      branchId:    user.branch_id || null,
-      role:        user.role_name,
-      permissions: user.permissions,
+      id:           user._id.toString(),
+      companyId:    user.company_id.toString(),
+      branchId:     user.branch_id?.toString() || null,
+      role:         adminRole.name,
+      permissions:  adminRole.permissions,
       impersonated: true,
     }, process.env.JWT_SECRET, { expiresIn: '2h' });
 
     logger.info(`[SuperAdmin] Impersonating company ${company.slug} as ${user.email}`);
-    return res.json({ success: true, data: { token, user: { id: user.id, name: user.name, email: user.email, role: user.role_name, roleId: user.role_id, companyId: user.company_id, branchId: user.branch_id || null, avatar: user.avatar, permissions: user.permissions } } });
+    return res.json({ success: true, data: { token, user: { id: user._id.toString(), name: user.name, email: user.email, role: adminRole.name, roleId: adminRole._id.toString(), companyId: user.company_id.toString(), branchId: user.branch_id?.toString() || null, avatar: user.avatar, permissions: adminRole.permissions } } });
   } catch (err) { next(err); }
 };
 
@@ -394,30 +300,34 @@ exports.impersonateCompany = async (req, res, next) => {
 
 exports.stats = async (req, res, next) => {
   try {
-    const [companies, users, sales, stock] = await Promise.all([
-      query(`
-        SELECT
-          COUNT(*)::int AS total,
-          SUM(CASE WHEN is_active THEN 1 ELSE 0 END)::int AS active,
-          SUM(CASE WHEN subscription_status='trial' THEN 1 ELSE 0 END)::int AS trial,
-          SUM(CASE WHEN subscription_status='suspended' THEN 1 ELSE 0 END)::int AS suspended
-        FROM companies
-      `),
-      query('SELECT COUNT(*)::int AS total FROM users WHERE is_active=TRUE'),
-      query("SELECT COUNT(*)::int AS today FROM sales WHERE sale_date::date = CURRENT_DATE AND status != 'cancelled'"),
-      query("SELECT COUNT(*)::int AS low FROM products WHERE is_active=TRUE AND track_inventory=TRUE AND stock_quantity <= low_stock_alert"),
+    const todayStart = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
+    const todayEnd   = new Date(new Date().toISOString().slice(0, 10) + 'T23:59:59.999Z');
+
+    const [companiesAgg, activeUsers, salesToday, lowStock] = await Promise.all([
+      Company.aggregate([
+        { $group: {
+          _id:       null,
+          total:     { $sum: 1 },
+          active:    { $sum: { $cond: ['$is_active', 1, 0] } },
+          trial:     { $sum: { $cond: [{ $eq: ['$subscription_status', 'trial'] }, 1, 0] } },
+          suspended: { $sum: { $cond: [{ $eq: ['$subscription_status', 'suspended'] }, 1, 0] } },
+        }},
+      ]),
+      User.countDocuments({ is_active: true }),
+      Sale.countDocuments({ sale_date: { $gte: todayStart, $lte: todayEnd }, status: { $ne: 'cancelled' } }),
+      Product.countDocuments({ is_active: true, track_inventory: true, $expr: { $lte: ['$stock_quantity', '$low_stock_alert'] } }),
     ]);
 
     return res.json({
       success: true,
       data: {
-        companies: companies.rows[0],
-        active_users: users.rows[0].total,
-        sales_today:  sales.rows[0].today,
-        low_stock_products: stock.rows[0].low,
-        server_time: new Date().toISOString(),
-        uptime_seconds: Math.floor(process.uptime()),
-        memory_mb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        companies:          companiesAgg[0] || { total: 0, active: 0, trial: 0, suspended: 0 },
+        active_users:       activeUsers,
+        sales_today:        salesToday,
+        low_stock_products: lowStock,
+        server_time:        new Date().toISOString(),
+        uptime_seconds:     Math.floor(process.uptime()),
+        memory_mb:          Math.round(process.memoryUsage().rss / 1024 / 1024),
       },
     });
   } catch (err) { next(err); }

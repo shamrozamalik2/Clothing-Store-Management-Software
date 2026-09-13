@@ -1,42 +1,18 @@
 'use strict';
 
+const mongoose  = require('mongoose');
 const { validationResult }          = require('express-validator');
-const { query, withTransaction }    = require('../config/database');
+const Product   = require('../models/Product');
+const Category  = require('../models/Category');
+const Brand     = require('../models/Brand');
+const Sale      = require('../models/Sale');
+const Purchase  = require('../models/Purchase');
+const StockAdj  = require('../models/StockAdjustment');
 const { generateSku, uniqueSku }    = require('../utils/sku');
 const { AUDIT_ACTIONS }             = require('../config/constants');
 const { success, created, error }   = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { logAudit }                  = require('../utils/audit');
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-const PRODUCT_SELECT = `
-  SELECT p.*,
-         c.name AS category_name,
-         b.name AS brand_name,
-         CASE
-           WHEN p.stock_quantity <= 0                THEN 'out_of_stock'
-           WHEN p.stock_quantity <= p.low_stock_alert THEN 'low_stock'
-           ELSE 'in_stock'
-         END AS stock_status,
-         (
-           EXISTS (SELECT 1 FROM sale_items            si  WHERE si.product_id  = p.id) OR
-           EXISTS (SELECT 1 FROM purchase_items         pi  WHERE pi.product_id  = p.id) OR
-           EXISTS (SELECT 1 FROM stock_adjustment_items sai WHERE sai.product_id = p.id)
-         ) AS has_transactions,
-         COALESCE((SELECT SUM(si.quantity) FROM sale_items si WHERE si.product_id = p.id), 0) AS total_sold
-  FROM products p
-  LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
-  LEFT JOIN brands     b ON b.id = p.brand_id     AND b.company_id = p.company_id
-`;
-
-const ALLOWED_SORT = {
-  name:    'p.name',
-  sku:     'p.sku',
-  stock:   'p.stock_quantity',
-  price:   'p.sale_price',
-  created: 'p.created_at',
-};
 
 // ─── list ─────────────────────────────────────────────────────────────────────
 
@@ -44,50 +20,61 @@ const list = async (req, res, next) => {
   try {
     const cid = req.companyId;
     const { page, limit, offset } = parsePagination(req.query);
-    const {
-      search = '', category = '', brand = '',
-      stock_status = '', status = '',
-      sort = 'name', order = 'asc',
-    } = req.query;
+    const { search = '', category = '', brand = '', stock_status = '', status = '', sort = 'name', order = 'asc' } = req.query;
 
-    const params = [cid];
-    const where  = ['p.company_id = $1'];
+    const filter = { company_id: cid };
+    if (search)   filter.$or = [{ name: { $regex: search, $options: 'i' } }, { sku: { $regex: search, $options: 'i' } }, { barcode: { $regex: search, $options: 'i' } }];
+    if (category) filter.category_id = category;
+    if (brand)    filter.brand_id    = brand;
+    if (status !== '') filter.is_active = status === 'active';
+    if (stock_status === 'out_of_stock') { filter.stock_quantity = { $lte: 0 }; }
+    else if (stock_status === 'low_stock')    { filter.stock_quantity = { $gt: 0, $lte: mongoose.Types.Decimal128.fromString ? undefined : undefined }; /* handled below */ }
+    else if (stock_status === 'in_stock')     { /* handled below */ }
 
-    if (search) {
-      params.push(`%${search}%`);
-      where.push(`(p.name ILIKE $${params.length} OR p.sku ILIKE $${params.length} OR p.barcode ILIKE $${params.length})`);
-    }
-    if (category) {
-      params.push(parseInt(category, 10));
-      where.push(`p.category_id = $${params.length}`);
-    }
-    if (brand) {
-      params.push(parseInt(brand, 10));
-      where.push(`p.brand_id = $${params.length}`);
-    }
-    if (status !== '') {
-      params.push(status === 'active');
-      where.push(`p.is_active = $${params.length}`);
-    }
-    if (stock_status === 'out_of_stock') where.push('p.stock_quantity <= 0');
-    if (stock_status === 'low_stock')    where.push('p.stock_quantity > 0 AND p.stock_quantity <= p.low_stock_alert');
-    if (stock_status === 'in_stock')     where.push('p.stock_quantity > p.low_stock_alert');
+    const SORT_MAP = { name: 'name', sku: 'sku', stock: 'stock_quantity', price: 'sale_price', created: 'created_at' };
+    const sortField = SORT_MAP[sort] || 'name';
+    const sortDir   = order === 'desc' ? -1 : 1;
 
-    const sortCol = ALLOWED_SORT[sort] ?? 'p.name';
-    const sortDir = order === 'desc' ? 'DESC' : 'ASC';
-    const wStr    = where.join(' AND ');
+    let pipeline = [
+      { $match: filter },
+      { $lookup: { from: 'categories', localField: 'category_id', foreignField: '_id', as: '_cat' } },
+      { $lookup: { from: 'brands',     localField: 'brand_id',    foreignField: '_id', as: '_br'  } },
+      { $addFields: {
+        category_name: { $arrayElemAt: ['$_cat.name', 0] },
+        brand_name:    { $arrayElemAt: ['$_br.name',  0] },
+        stock_status: {
+          $switch: {
+            branches: [
+              { case: { $lte: ['$stock_quantity', 0] }, then: 'out_of_stock' },
+              { case: { $and: [{ $gt: ['$stock_quantity', 0] }, { $lte: ['$stock_quantity', '$low_stock_alert'] }] }, then: 'low_stock' },
+            ],
+            default: 'in_stock',
+          },
+        },
+        total_sold: 0,
+        has_transactions: false,
+      }},
+    ];
 
-    const { rows: [{ cnt }] } = await query(
-      `SELECT COUNT(*) AS cnt FROM products p WHERE ${wStr}`,
-      params
-    );
-    const total = parseInt(cnt, 10);
+    // Apply computed stock_status filter
+    if (stock_status === 'low_stock')    pipeline.push({ $match: { stock_status: 'low_stock' } });
+    else if (stock_status === 'in_stock') pipeline.push({ $match: { stock_status: 'in_stock' } });
 
-    params.push(limit, offset);
-    const { rows } = await query(
-      `${PRODUCT_SELECT} WHERE ${wStr} ORDER BY ${sortCol} ${sortDir} LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
+    const countPipeline = [...pipeline, { $count: 'total' }];
+    const dataPipeline  = [...pipeline,
+      { $sort: { [sortField]: sortDir } },
+      { $skip: offset },
+      { $limit: limit },
+      { $project: { _cat: 0, _br: 0, __v: 0 } },
+    ];
+
+    const [countResult, products] = await Promise.all([
+      Product.aggregate(countPipeline),
+      Product.aggregate(dataPipeline),
+    ]);
+
+    const total = countResult[0]?.total || 0;
+    const rows  = products.map(p => ({ ...p, id: p._id.toString() }));
 
     return res.json({ success: true, data: rows, pagination: buildPaginationMeta(total, page, limit) });
   } catch (err) { next(err); }
@@ -97,239 +84,149 @@ const list = async (req, res, next) => {
 
 const getOne = async (req, res, next) => {
   try {
-    const { rows: [product] } = await query(
-      `${PRODUCT_SELECT} WHERE p.id = $1 AND p.company_id = $2`,
-      [req.params.id, req.companyId]
-    );
+    const product = await Product.findOne({ _id: req.params.id, company_id: req.companyId })
+      .populate('category_id', 'name')
+      .populate('brand_id', 'name')
+      .lean();
     if (!product) return error(res, 'Product not found.', 404);
 
-    const { rows: variants } = await query(
-      'SELECT * FROM product_variants WHERE product_id = $1 ORDER BY size, color',
-      [product.id]
-    );
-    return success(res, { ...product, variants });
-  } catch (err) { next(err); }
-};
+    const totalSold = await Sale.aggregate([
+      { $match: { company_id: req.companyId } },
+      { $unwind: '$items' },
+      { $match: { 'items.product_id': product._id } },
+      { $group: { _id: null, total: { $sum: '$items.quantity' } } },
+    ]).then(r => r[0]?.total || 0);
 
-// ─── get by barcode / SKU ─────────────────────────────────────────────────────
+    const [hasSale, hasPurchase, hasAdj] = await Promise.all([
+      Sale.findOne({ company_id: req.companyId, 'items.product_id': product._id }, { _id: 1 }).lean(),
+      Purchase.findOne({ company_id: req.companyId, 'items.product_id': product._id }, { _id: 1 }).lean(),
+      StockAdj.findOne({ company_id: req.companyId, 'items.product_id': product._id }, { _id: 1 }).lean(),
+    ]);
 
-const getByBarcode = async (req, res, next) => {
-  try {
-    const { code } = req.params;
-    const { rows: [product] } = await query(
-      `${PRODUCT_SELECT} WHERE (p.barcode = $1 OR p.sku = $1) AND p.is_active = TRUE AND p.company_id = $2`,
-      [code, req.companyId]
-    );
-    if (!product) return error(res, 'Product not found.', 404);
-
-    const { rows: variants } = await query(
-      'SELECT * FROM product_variants WHERE product_id = $1',
-      [product.id]
-    );
-    return success(res, { ...product, variants });
+    return success(res, {
+      ...product,
+      id:               product._id.toString(),
+      category_name:    product.category_id?.name,
+      brand_name:       product.brand_id?.name,
+      category_id:      product.category_id?._id?.toString() || null,
+      brand_id:         product.brand_id?._id?.toString()    || null,
+      has_transactions: !!(hasSale || hasPurchase || hasAdj),
+      total_sold:       totalSold,
+      stock_status:     product.stock_quantity <= 0 ? 'out_of_stock'
+                      : product.stock_quantity <= product.low_stock_alert ? 'low_stock'
+                      : 'in_stock',
+    });
   } catch (err) { next(err); }
 };
 
 // ─── create ───────────────────────────────────────────────────────────────────
 
-const create = async (req, res, next) => {
+const createProduct = async (req, res, next) => {
   try {
-    const errs = validationResult(req);
-    if (!errs.isEmpty()) return error(res, 'Validation failed', 422, errs.array());
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return error(res, errors.array()[0].msg, 422);
 
-    const cid = req.companyId;
-    if (!cid) return error(res, 'Authentication error: company not identified.', 403);
-    const {
-      name, sku: skuInput, barcode,
-      category_id, brand_id, description,
-      cost_price = 0, sale_price = 0, wholesale_price = 0, tax_rate = 0,
-      unit = 'pcs', stock_quantity = 0, low_stock_alert = 5,
-      track_inventory = true, allow_negative = false,
-      variants = [],
-    } = req.body;
+    const cid  = req.companyId;
+    const body = req.body;
+    const image = req.file?.filename ? `${req.file.filename}` : null;
 
-    const baseSku = skuInput?.trim() || generateSku(name);
-    const sku     = await uniqueSku(cid, baseSku);
+    let sku = body.sku?.trim();
+    if (!sku) sku = await generateSku(body.name, cid);
+    sku = await uniqueSku(sku, cid);
 
-    if (barcode) {
-      const { rows: [dup] } = await query(
-        'SELECT id FROM products WHERE barcode = $1 AND company_id = $2',
-        [barcode.trim(), cid]
-      );
-      if (dup) return error(res, 'Barcode already in use by another product.', 409);
-    }
+    const existing = await Product.findOne({ company_id: cid, sku }).lean();
+    if (existing) return error(res, `SKU "${sku}" already exists.`, 409);
 
-    const image = req.file ? `/uploads/products/${req.file.filename}` : null;
-    const parsedVariants = typeof variants === 'string' ? JSON.parse(variants) : (variants || []);
-
-    const productId = await withTransaction(async (client) => {
-      const { rows: [row] } = await client.query(`
-        INSERT INTO products
-          (company_id, name, sku, barcode, category_id, brand_id, description, image,
-           cost_price, sale_price, wholesale_price, tax_rate,
-           unit, stock_quantity, low_stock_alert, track_inventory, allow_negative, is_active)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,TRUE)
-        RETURNING id
-      `, [
-        cid, name.trim(), sku, barcode?.trim() || null,
-        category_id || null, brand_id || null,
-        description || null, image,
-        parseFloat(cost_price) || 0,
-        parseFloat(sale_price) || 0,
-        parseFloat(wholesale_price) || 0,
-        parseFloat(tax_rate) || 0,
-        unit,
-        parseFloat(stock_quantity) || 0,
-        parseFloat(low_stock_alert) || 5,
-        Boolean(track_inventory),
-        Boolean(allow_negative),
-      ]);
-
-      const pid = row.id;
-
-      for (const v of parsedVariants) {
-        const varSku = await uniqueSku(cid, `${sku}-${v.size || v.color || 'VAR'}`);
-        await client.query(`
-          INSERT INTO product_variants
-            (company_id, product_id, sku, barcode, size, color, cost_price, sale_price, stock_quantity, is_active)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE)
-        `, [
-          cid, pid, varSku, v.barcode?.trim() || null,
-          v.size || null, v.color || null,
-          parseFloat(v.cost_price) || parseFloat(cost_price) || 0,
-          parseFloat(v.sale_price) || parseFloat(sale_price) || 0,
-          parseFloat(v.stock_quantity) || 0,
-        ]);
-      }
-
-      return pid;
+    const product = await Product.create({
+      company_id:      cid,
+      category_id:     body.category_id || null,
+      brand_id:        body.brand_id    || null,
+      name:            body.name,
+      sku,
+      barcode:         body.barcode || null,
+      description:     body.description || null,
+      image,
+      unit:            body.unit || 'pcs',
+      cost_price:      parseFloat(body.cost_price) || 0,
+      sale_price:      parseFloat(body.sale_price) || 0,
+      wholesale_price: parseFloat(body.wholesale_price) || 0,
+      tax_rate:        parseFloat(body.tax_rate) || 0,
+      stock_quantity:  parseFloat(body.stock_quantity) || 0,
+      low_stock_alert: parseInt(body.low_stock_alert, 10) || 5,
+      track_inventory: body.track_inventory !== 'false' && body.track_inventory !== false,
+      allow_negative:  body.allow_negative  === 'true'  || body.allow_negative === true,
+      is_active:       body.is_active !== 'false' && body.is_active !== false,
+      is_raw_material:  body.is_raw_material  === 'true' || body.is_raw_material === true,
+      is_finished_good: body.is_finished_good === 'true' || body.is_finished_good === true,
     });
 
-    const { rows: [product] } = await query(
-      `${PRODUCT_SELECT} WHERE p.id = $1 AND p.company_id = $2`,
-      [productId, cid]
-    );
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'products', productId, null, { name: product.name, sku: product.sku });
-    return created(res, product, 'Product created successfully.');
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'products', product._id.toString(), null, { sku, name: body.name });
+    return created(res, { ...product.toJSON() }, 'Product created.');
   } catch (err) { next(err); }
 };
 
 // ─── update ───────────────────────────────────────────────────────────────────
 
-const update = async (req, res, next) => {
+const updateProduct = async (req, res, next) => {
   try {
-    const errs = validationResult(req);
-    if (!errs.isEmpty()) return error(res, 'Validation failed', 422, errs.array());
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return error(res, errors.array()[0].msg, 422);
 
-    const cid = req.companyId;
-    const id  = parseInt(req.params.id, 10);
-
-    const { rows: [existing] } = await query(
-      'SELECT * FROM products WHERE id = $1 AND company_id = $2',
-      [id, cid]
-    );
-    if (!existing) return error(res, 'Product not found.', 404);
-
-    const {
-      name, sku: skuInput, barcode, category_id, brand_id, description,
-      cost_price, sale_price, wholesale_price, tax_rate,
-      unit, stock_quantity, low_stock_alert,
-      track_inventory, allow_negative, is_active,
-    } = req.body;
-
-    let newSku = existing.sku;
-    if (skuInput && skuInput.trim() !== existing.sku) {
-      newSku = await uniqueSku(cid, skuInput.trim(), id);
-    }
-
-    if (barcode && barcode.trim() !== existing.barcode) {
-      const { rows: [dup] } = await query(
-        'SELECT id FROM products WHERE barcode = $1 AND company_id = $2 AND id != $3',
-        [barcode.trim(), cid, id]
-      );
-      if (dup) return error(res, 'Barcode already in use by another product.', 409);
-    }
-
-    const newImage = req.file ? `/uploads/products/${req.file.filename}` : existing.image;
-    const num = (val, fallback) => {
-      if (val === null || val === undefined || val === '') return fallback;
-      const n = parseFloat(val);
-      return isNaN(n) ? fallback : n;
-    };
-
-    const { rows: [product] } = await query(`
-      UPDATE products SET
-        name=$3, sku=$4, barcode=$5, category_id=$6, brand_id=$7, description=$8, image=$9,
-        cost_price=$10, sale_price=$11, wholesale_price=$12, tax_rate=$13,
-        unit=$14, low_stock_alert=$15,
-        track_inventory=$16, allow_negative=$17, is_active=$18, updated_at=NOW()
-      WHERE id=$1 AND company_id=$2
-      RETURNING *
-    `, [
-      id, cid,
-      (name ?? existing.name).trim(),
-      newSku,
-      barcode !== undefined ? (barcode?.trim() || null) : existing.barcode,
-      category_id !== undefined ? (category_id || null) : existing.category_id,
-      brand_id    !== undefined ? (brand_id    || null) : existing.brand_id,
-      description !== undefined ? (description || null) : existing.description,
-      newImage,
-      num(cost_price,      existing.cost_price),
-      num(sale_price,      existing.sale_price),
-      num(wholesale_price, existing.wholesale_price),
-      num(tax_rate,        existing.tax_rate),
-      unit ?? existing.unit,
-      num(low_stock_alert, existing.low_stock_alert),
-      track_inventory !== undefined ? Boolean(track_inventory) : existing.track_inventory,
-      allow_negative  !== undefined ? Boolean(allow_negative)  : existing.allow_negative,
-      is_active       !== undefined ? Boolean(is_active)       : existing.is_active,
-    ]);
-
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'products', id,
-      { name: existing.name }, { name: product.name });
-
-    const { rows: [full] } = await query(
-      `${PRODUCT_SELECT} WHERE p.id = $1 AND p.company_id = $2`,
-      [id, cid]
-    );
-    return success(res, full, 'Product updated successfully.');
-  } catch (err) { next(err); }
-};
-
-// ─── remove (soft) ────────────────────────────────────────────────────────────
-
-const remove = async (req, res, next) => {
-  try {
-    const cid = req.companyId;
-    const id  = parseInt(req.params.id, 10);
-
-    const { rows: [product] } = await query(
-      'SELECT id, name FROM products WHERE id = $1 AND company_id = $2',
-      [id, cid]
-    );
+    const cid  = req.companyId;
+    const product = await Product.findOne({ _id: req.params.id, company_id: cid }).lean();
     if (!product) return error(res, 'Product not found.', 404);
 
-    await query(
-      'UPDATE products SET is_active=FALSE, updated_at=NOW() WHERE id=$1 AND company_id=$2',
-      [id, cid]
-    );
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.DELETE, 'products', id, { name: product.name });
-    return success(res, null, 'Product deactivated successfully.');
+    const body   = req.body;
+    const image  = req.file?.filename || product.image;
+    const update = {};
+
+    if (body.name !== undefined)            update.name            = body.name;
+    if (body.category_id !== undefined)     update.category_id     = body.category_id || null;
+    if (body.brand_id    !== undefined)     update.brand_id        = body.brand_id    || null;
+    if (body.barcode     !== undefined)     update.barcode         = body.barcode     || null;
+    if (body.description !== undefined)     update.description     = body.description || null;
+    if (body.unit        !== undefined)     update.unit            = body.unit;
+    if (body.cost_price  !== undefined)     update.cost_price      = parseFloat(body.cost_price);
+    if (body.sale_price  !== undefined)     update.sale_price      = parseFloat(body.sale_price);
+    if (body.wholesale_price !== undefined) update.wholesale_price = parseFloat(body.wholesale_price);
+    if (body.tax_rate    !== undefined)     update.tax_rate        = parseFloat(body.tax_rate);
+    if (body.stock_quantity  !== undefined) update.stock_quantity  = parseFloat(body.stock_quantity);
+    if (body.low_stock_alert !== undefined) update.low_stock_alert = parseInt(body.low_stock_alert, 10);
+    if (body.track_inventory !== undefined) update.track_inventory = body.track_inventory !== 'false' && body.track_inventory !== false;
+    if (body.allow_negative  !== undefined) update.allow_negative  = body.allow_negative === 'true' || body.allow_negative === true;
+    if (body.is_active       !== undefined) update.is_active       = body.is_active !== 'false' && body.is_active !== false;
+    if (body.is_raw_material  !== undefined) update.is_raw_material  = body.is_raw_material === 'true'  || body.is_raw_material === true;
+    if (body.is_finished_good !== undefined) update.is_finished_good = body.is_finished_good === 'true' || body.is_finished_good === true;
+    if (req.file?.filename) update.image = image;
+
+    await Product.findByIdAndUpdate(req.params.id, { ...update, updated_at: new Date() });
+    const updated = await Product.findById(req.params.id).lean();
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'products', req.params.id);
+    return success(res, { ...updated, id: updated._id.toString() }, 'Product updated.');
   } catch (err) { next(err); }
 };
 
-// ─── low stock list ───────────────────────────────────────────────────────────
+// ─── delete ───────────────────────────────────────────────────────────────────
 
-const lowStock = async (req, res, next) => {
+const deleteProduct = async (req, res, next) => {
   try {
-    const { rows } = await query(
-      `${PRODUCT_SELECT}
-       WHERE p.company_id = $1 AND p.is_active = TRUE AND p.track_inventory = TRUE
-             AND p.stock_quantity <= p.low_stock_alert
-       ORDER BY p.stock_quantity ASC LIMIT 50`,
-      [req.companyId]
-    );
-    return success(res, rows);
+    const cid     = req.companyId;
+    const product = await Product.findOne({ _id: req.params.id, company_id: cid }).lean();
+    if (!product) return error(res, 'Product not found.', 404);
+
+    const [hasSale, hasPurchase, hasAdj] = await Promise.all([
+      Sale.findOne({ company_id: cid, 'items.product_id': product._id }, { _id: 1 }).lean(),
+      Purchase.findOne({ company_id: cid, 'items.product_id': product._id }, { _id: 1 }).lean(),
+      StockAdj.findOne({ company_id: cid, 'items.product_id': product._id }, { _id: 1 }).lean(),
+    ]);
+
+    if (hasSale || hasPurchase || hasAdj) {
+      return error(res, 'Cannot delete product with transaction history. Deactivate it instead.', 409);
+    }
+
+    await Product.findByIdAndDelete(req.params.id);
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.DELETE, 'products', req.params.id);
+    return success(res, null, 'Product deleted.');
   } catch (err) { next(err); }
 };
 
@@ -337,214 +234,68 @@ const lowStock = async (req, res, next) => {
 
 const listVariants = async (req, res, next) => {
   try {
-    const cid = req.companyId;
-    const id  = parseInt(req.params.id, 10);
+    const product = await Product.findOne({ _id: req.params.id, company_id: req.companyId }, { variants: 1 }).lean();
+    if (!product) return error(res, 'Product not found.', 404);
+    const variants = (product.variants || []).map(v => ({ ...v, id: v._id.toString() }));
+    return success(res, variants);
+  } catch (err) { next(err); }
+};
 
-    const { rows: [product] } = await query(
-      'SELECT id FROM products WHERE id = $1 AND company_id = $2',
-      [id, cid]
-    );
+const addVariant = async (req, res, next) => {
+  try {
+    const cid     = req.companyId;
+    const product = await Product.findOne({ _id: req.params.id, company_id: cid }).lean();
     if (!product) return error(res, 'Product not found.', 404);
 
-    const { rows } = await query(
-      'SELECT * FROM product_variants WHERE product_id = $1 ORDER BY size, color',
-      [id]
-    );
-    return success(res, rows);
+    const { sku, size, color, cost_price, sale_price, stock_quantity, barcode } = req.body;
+    if (!sku) return error(res, 'SKU is required.', 422);
+
+    const dupSku = await Product.findOne({ company_id: cid, 'variants.sku': sku }).lean();
+    if (dupSku) return error(res, `Variant SKU "${sku}" already exists.`, 409);
+
+    const variant = {
+      company_id:     cid,
+      sku,
+      barcode:        barcode || null,
+      size:           size    || null,
+      color:          color   || null,
+      cost_price:     parseFloat(cost_price) || 0,
+      sale_price:     parseFloat(sale_price) || 0,
+      stock_quantity: parseFloat(stock_quantity) || 0,
+      is_active:      true,
+    };
+
+    await Product.findByIdAndUpdate(req.params.id, { $push: { variants: variant } });
+    const updated = await Product.findById(req.params.id, { variants: 1 }).lean();
+    const added   = updated.variants[updated.variants.length - 1];
+    return created(res, { ...added, id: added._id.toString() }, 'Variant added.');
   } catch (err) { next(err); }
 };
 
-const upsertVariant = async (req, res, next) => {
-  try {
-    const errs = validationResult(req);
-    if (!errs.isEmpty()) return error(res, 'Validation failed', 422, errs.array());
-
-    const cid       = req.companyId;
-    const productId = parseInt(req.params.id, 10);
-    const variantId = req.params.variantId ? parseInt(req.params.variantId, 10) : null;
-    const { size, color, cost_price, sale_price, stock_quantity, barcode } = req.body;
-
-    if (!size && !color) return error(res, 'At least one of size or color is required.', 400);
-
-    const { rows: [product] } = await query(
-      'SELECT sku, cost_price, sale_price FROM products WHERE id = $1 AND company_id = $2',
-      [productId, cid]
-    );
-    if (!product) return error(res, 'Product not found.', 404);
-
-    if (variantId) {
-      const { rows: [v] } = await query(
-        'SELECT * FROM product_variants WHERE id = $1 AND product_id = $2',
-        [variantId, productId]
-      );
-      if (!v) return error(res, 'Variant not found.', 404);
-
-      const { rows: [updated] } = await query(`
-        UPDATE product_variants
-        SET size=$3, color=$4, cost_price=$5, sale_price=$6, stock_quantity=$7, barcode=$8, updated_at=NOW()
-        WHERE id=$1 AND product_id=$2
-        RETURNING *
-      `, [
-        variantId, productId,
-        size  || v.size,
-        color || v.color,
-        parseFloat(cost_price)      ?? v.cost_price,
-        parseFloat(sale_price)      ?? v.sale_price,
-        parseFloat(stock_quantity)  ?? v.stock_quantity,
-        barcode?.trim() || v.barcode,
-      ]);
-      return success(res, updated, 'Variant updated.');
-    } else {
-      const varSku = await uniqueSku(cid, `${product.sku}-${size || color || 'VAR'}`);
-      const { rows: [newVar] } = await query(`
-        INSERT INTO product_variants
-          (company_id, product_id, sku, barcode, size, color, cost_price, sale_price, stock_quantity, is_active)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE)
-        RETURNING *
-      `, [
-        cid, productId, varSku, barcode?.trim() || null,
-        size || null, color || null,
-        parseFloat(cost_price) || product.cost_price,
-        parseFloat(sale_price) || product.sale_price,
-        parseFloat(stock_quantity) || 0,
-      ]);
-      return created(res, newVar, 'Variant added.');
-    }
-  } catch (err) { next(err); }
-};
-
-const deleteVariant = async (req, res, next) => {
-  try {
-    const productId = parseInt(req.params.id, 10);
-    const variantId = parseInt(req.params.variantId, 10);
-
-    const { rows: [v] } = await query(
-      'SELECT id FROM product_variants WHERE id = $1 AND product_id = $2',
-      [variantId, productId]
-    );
-    if (!v) return error(res, 'Variant not found.', 404);
-
-    await query('DELETE FROM product_variants WHERE id = $1', [variantId]);
-    return success(res, null, 'Variant deleted.');
-  } catch (err) { next(err); }
-};
-
-// ─── update barcode only ──────────────────────────────────────────────────────
-
-const updateBarcode = async (req, res, next) => {
+const updateVariant = async (req, res, next) => {
   try {
     const cid = req.companyId;
-    const id  = parseInt(req.params.id, 10);
-    const barcodeVal = req.body.barcode?.trim() || null;
+    const { id: productId, variantId } = req.params;
+    const { size, color, cost_price, sale_price, stock_quantity, barcode, is_active } = req.body;
 
-    const { rows: [existing] } = await query(
-      'SELECT id, name, barcode FROM products WHERE id = $1 AND company_id = $2',
-      [id, cid]
+    const update = {};
+    if (size           !== undefined) update['variants.$.size']           = size;
+    if (color          !== undefined) update['variants.$.color']          = color;
+    if (barcode        !== undefined) update['variants.$.barcode']        = barcode;
+    if (cost_price     !== undefined) update['variants.$.cost_price']     = parseFloat(cost_price);
+    if (sale_price     !== undefined) update['variants.$.sale_price']     = parseFloat(sale_price);
+    if (stock_quantity !== undefined) update['variants.$.stock_quantity'] = parseFloat(stock_quantity);
+    if (is_active      !== undefined) update['variants.$.is_active']      = is_active !== 'false' && is_active !== false;
+
+    await Product.updateOne(
+      { _id: productId, company_id: cid, 'variants._id': variantId },
+      { $set: { ...update, updated_at: new Date() } }
     );
-    if (!existing) return error(res, 'Product not found.', 404);
-
-    if (barcodeVal) {
-      const { rows: [dup] } = await query(
-        'SELECT id FROM products WHERE barcode = $1 AND company_id = $2 AND id != $3',
-        [barcodeVal, cid, id]
-      );
-      if (dup) return error(res, 'Barcode already in use by another product.', 409);
-    }
-
-    const { rows: [product] } = await query(
-      `UPDATE products SET barcode = $1, updated_at = NOW()
-       WHERE id = $2 AND company_id = $3 RETURNING *`,
-      [barcodeVal, id, cid]
-    );
-
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'products', id,
-      { barcode: existing.barcode }, { barcode: barcodeVal });
-
-    return success(res, product, 'Barcode saved successfully.');
+    const product = await Product.findOne({ _id: productId, company_id: cid }, { variants: 1 }).lean();
+    const variant = product?.variants?.find(v => v._id.toString() === variantId);
+    if (!variant) return error(res, 'Variant not found.', 404);
+    return success(res, { ...variant, id: variant._id.toString() }, 'Variant updated.');
   } catch (err) { next(err); }
 };
 
-// ─── stats ────────────────────────────────────────────────────────────────────
-
-const stats = async (req, res, next) => {
-  try {
-    const { rows: [row] } = await query(`
-      SELECT
-        COUNT(*)                                                             AS total,
-        COUNT(*) FILTER (WHERE is_active = TRUE)                            AS active,
-        COUNT(*) FILTER (WHERE is_active = FALSE)                           AS inactive,
-        COUNT(*) FILTER (WHERE track_inventory AND stock_quantity <= 0)     AS out_of_stock,
-        COUNT(*) FILTER (WHERE track_inventory AND stock_quantity > 0
-                           AND stock_quantity <= low_stock_alert)           AS low_stock,
-        COALESCE(SUM(GREATEST(stock_quantity,0) * cost_price),  0)::numeric AS inventory_cost,
-        COALESCE(SUM(GREATEST(stock_quantity,0) * sale_price),  0)::numeric AS inventory_value
-      FROM products
-      WHERE company_id = $1
-    `, [req.companyId]);
-    return res.json({ success: true, data: row });
-  } catch (err) { next(err); }
-};
-
-module.exports = {
-  list, getOne, getByBarcode, stats,
-  create, update, remove,
-  updateBarcode,
-  lowStock,
-  listVariants, upsertVariant, deleteVariant,
-  importCsv,
-};
-
-// ── importCsv ─────────────────────────────────────────────────────────────────
-
-async function importCsv(req, res, next) {
-  try {
-    if (!req.file) return error(res, 'CSV file is required.', 400);
-    const cid = req.companyId;
-    const { parseCsvBuffer, toBoolean, toDecimal, toInt } = require('../utils/csv-parser');
-    const { rows } = parseCsvBuffer(req.file.buffer);
-    let imported = 0;
-    const errors = [];
-
-    for (const row of rows) {
-      const line = row._line;
-      try {
-        if (!row.name) { errors.push({ row: line, message: 'Name is required' }); continue; }
-        if (!row.sku)  { errors.push({ row: line, message: 'SKU is required' }); continue; }
-
-        // Resolve optional category/brand by name
-        let catId = null, brandId = null;
-        if (row.category_name) {
-          const { rows: cr } = await query('SELECT id FROM categories WHERE company_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1', [cid, row.category_name]);
-          catId = cr[0]?.id || null;
-        }
-        if (row.brand_name) {
-          const { rows: br } = await query('SELECT id FROM brands WHERE company_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1', [cid, row.brand_name]);
-          brandId = br[0]?.id || null;
-        }
-
-        await query(
-          `INSERT INTO products
-             (company_id, category_id, brand_id, name, sku, barcode, description, unit,
-              cost_price, sale_price, wholesale_price, tax_rate,
-              stock_quantity, low_stock_alert, track_inventory, allow_negative, is_active)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-           ON CONFLICT (company_id, sku) DO NOTHING`,
-          [
-            cid, catId, brandId,
-            row.name.trim(), row.sku.trim(), row.barcode||null, row.description||null,
-            row.unit||'pcs',
-            toDecimal(row.cost_price,0), toDecimal(row.sale_price,0),
-            toDecimal(row.wholesale_price,0), toDecimal(row.tax_rate,0),
-            toDecimal(row.stock_quantity,0), toInt(row.low_stock_alert,5),
-            toBoolean(row.track_inventory,true), toBoolean(row.allow_negative,false),
-            toBoolean(row.is_active,true),
-          ]
-        );
-        imported++;
-      } catch (e) { errors.push({ row: line, message: e.message }); }
-    }
-
-    await logAudit(cid, req.user.id, 'IMPORT', 'products', null, { imported, failed: errors.length });
-    return success(res, { imported, failed: errors.length, errors }, `${imported} products imported.`);
-  } catch (err) { next(err); }
-}
+module.exports = { list, getOne, createProduct, updateProduct, deleteProduct, listVariants, addVariant, updateVariant };

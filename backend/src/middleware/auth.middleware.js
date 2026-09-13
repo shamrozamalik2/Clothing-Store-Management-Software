@@ -1,8 +1,8 @@
 'use strict';
 
-const jwt = require('jsonwebtoken');
-const { query } = require('../config/database');
+const jwt     = require('jsonwebtoken');
 const { env } = require('../config/env');
+const Company = require('../models/Company');
 
 async function authenticate(req, res, next) {
   const header = req.headers.authorization;
@@ -12,7 +12,6 @@ async function authenticate(req, res, next) {
 
   const token = header.slice(7);
 
-  // Step 1: verify JWT — only JWT errors should produce a 401
   let payload;
   try {
     payload = jwt.verify(token, env.JWT_SECRET);
@@ -23,16 +22,15 @@ async function authenticate(req, res, next) {
   }
 
   req.user      = payload;
-  req.companyId = payload.companyId;
+  req.companyId = payload.companyId; // now a string ObjectId
   req.branchId  = payload.branchId || null;
 
-  // Step 2: check company status — DB errors here must NOT log the user out
+  // Check company subscription status (non-fatal if DB is down)
   if (payload.companyId && !payload.impersonated) {
     try {
-      const { rows: [company] } = await query(
-        'SELECT subscription_status, trial_ends_at FROM companies WHERE id = $1',
-        [payload.companyId]
-      );
+      const company = await Company.findById(payload.companyId)
+        .select('subscription_status trial_ends_at')
+        .lean();
 
       if (company) {
         const status = company.subscription_status;
@@ -54,10 +52,7 @@ async function authenticate(req, res, next) {
         }
 
         if (status === 'trial' && company.trial_ends_at && new Date(company.trial_ends_at) < new Date()) {
-          await query(
-            `UPDATE companies SET subscription_status = 'expired', updated_at = NOW() WHERE id = $1`,
-            [payload.companyId]
-          );
+          await Company.findByIdAndUpdate(payload.companyId, { subscription_status: 'expired' });
           return res.status(401).json({
             success: false,
             message: 'Your free trial has ended. Please upgrade your plan to continue.',
@@ -66,8 +61,6 @@ async function authenticate(req, res, next) {
         }
       }
     } catch (dbErr) {
-      // DB unreachable — token is still valid; let the request continue
-      // (the endpoint's own query will also fail and return a proper 500)
       console.error('[Auth] Company status check failed (DB issue):', dbErr.message);
     }
   }
@@ -95,9 +88,8 @@ function requirePermission(module, action = 'view') {
       }
       if (req.user.role === 'admin') return next();
 
-      // Permissions are embedded in the JWT payload — avoid a DB round-trip
-      const perms = req.user.permissions || {};
-      const mod   = perms[module];
+      const perms   = req.user.permissions || {};
+      const mod     = perms[module];
       const allowed = mod === true || (typeof mod === 'object' && mod?.[action] === true);
 
       if (!allowed) {

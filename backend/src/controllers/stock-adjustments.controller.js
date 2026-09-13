@@ -1,42 +1,22 @@
 'use strict';
 
-const { query, withTransaction } = require('../config/database');
+const mongoose     = require('mongoose');
+const StockAdj     = require('../models/StockAdjustment');
+const Product      = require('../models/Product');
+const User         = require('../models/User');
 const { success, created, error } = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { AUDIT_ACTIONS } = require('../config/constants');
 const { logAudit }      = require('../utils/audit');
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-async function generateReference(client, companyId) {
+async function generateReference(companyId, session) {
   const date = new Date();
   const ymd  = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
   const prefix = `ADJ-${ymd}-`;
-  const { rows: [last] } = await client.query(
-    `SELECT reference FROM stock_adjustments WHERE company_id=$1 AND reference LIKE $2 ORDER BY id DESC LIMIT 1`,
-    [companyId, `${prefix}%`]
-  );
+  const last = await StockAdj.findOne({ company_id: companyId, reference: { $regex: `^${prefix}` } }, { reference: 1 })
+    .sort({ _id: -1 }).session(session).lean();
   const seq = last ? parseInt(last.reference.split('-').pop(), 10) + 1 : 1;
   return `${prefix}${String(seq).padStart(4, '0')}`;
-}
-
-const ADJ_SELECT = `
-  SELECT sa.*, u.name AS created_by_name
-  FROM stock_adjustments sa
-  LEFT JOIN users u ON u.id = sa.created_by
-`;
-
-async function getItems(adjustmentId) {
-  const { rows } = await query(`
-    SELECT sai.*,
-           pr.name AS product_name_live, pr.sku AS product_sku_live,
-           pv.size, pv.color
-    FROM stock_adjustment_items sai
-    LEFT JOIN products         pr ON pr.id = sai.product_id
-    LEFT JOIN product_variants pv ON pv.id = sai.variant_id
-    WHERE sai.adjustment_id = $1
-  `, [adjustmentId]);
-  return rows;
 }
 
 // ─── list ─────────────────────────────────────────────────────────────────────
@@ -47,39 +27,32 @@ const list = async (req, res, next) => {
     const { search = '', type = '', date_from = '', date_to = '' } = req.query;
     const { page, limit, offset } = parsePagination(req.query);
 
-    const params = [cid];
-    const where  = ['sa.company_id = $1'];
+    const filter = { company_id: cid };
+    if (type) filter.type = type;
+    if (date_from || date_to) {
+      filter.created_at = {};
+      if (date_from) filter.created_at.$gte = new Date(date_from + 'T00:00:00.000Z');
+      if (date_to)   filter.created_at.$lte = new Date(date_to   + 'T23:59:59.999Z');
+    }
 
+    // If searching by user name, find matching user IDs first
+    let userFilter = null;
     if (search) {
-      params.push(`%${search}%`);
-      where.push(`(sa.reference ILIKE $${params.length} OR u.name ILIKE $${params.length})`);
-    }
-    if (type) {
-      params.push(type);
-      where.push(`sa.type = $${params.length}`);
-    }
-    if (date_from) {
-      params.push(date_from);
-      where.push(`sa.created_at::date >= $${params.length}`);
-    }
-    if (date_to) {
-      params.push(date_to);
-      where.push(`sa.created_at::date <= $${params.length}`);
+      const matchUsers = await User.find({ company_id: cid, name: { $regex: search, $options: 'i' } }, { _id: 1 }).lean();
+      const userIds    = matchUsers.map(u => u._id);
+      filter.$or = [{ reference: { $regex: search, $options: 'i' } }, { created_by: { $in: userIds } }];
     }
 
-    const wStr = where.join(' AND ');
-    const { rows: [{ cnt }] } = await query(
-      `SELECT COUNT(*) AS cnt FROM stock_adjustments sa LEFT JOIN users u ON u.id = sa.created_by WHERE ${wStr}`,
-      params
-    );
-    const total = parseInt(cnt, 10);
+    const [total, adjustments] = await Promise.all([
+      StockAdj.countDocuments(filter),
+      StockAdj.find(filter).select('-items').sort({ created_at: -1 }).skip(offset).limit(limit).lean(),
+    ]);
 
-    params.push(limit, offset);
-    const { rows } = await query(
-      `${ADJ_SELECT} WHERE ${wStr} ORDER BY sa.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
+    const userIds = [...new Set(adjustments.map(a => a.created_by?.toString()).filter(Boolean))];
+    const users   = await User.find({ _id: { $in: userIds } }, { name: 1 }).lean();
+    const userMap = Object.fromEntries(users.map(u => [u._id.toString(), u.name]));
 
+    const rows = adjustments.map(a => ({ ...a, id: a._id.toString(), created_by_name: a.created_by ? userMap[a.created_by.toString()] || null : null }));
     return res.json({ success: true, data: rows, pagination: buildPaginationMeta(total, page, limit) });
   } catch (err) { next(err); }
 };
@@ -88,13 +61,11 @@ const list = async (req, res, next) => {
 
 const getOne = async (req, res, next) => {
   try {
-    const { rows: [adj] } = await query(
-      `${ADJ_SELECT} WHERE sa.id = $1 AND sa.company_id = $2`,
-      [req.params.id, req.companyId]
-    );
+    const adj = await StockAdj.findOne({ _id: req.params.id, company_id: req.companyId }).lean();
     if (!adj) return error(res, 'Adjustment not found.', 404);
-    const items = await getItems(adj.id);
-    return success(res, { ...adj, items });
+
+    const user = await User.findById(adj.created_by, { name: 1 }).lean();
+    return success(res, { ...adj, id: adj._id.toString(), created_by_name: user?.name || null });
   } catch (err) { next(err); }
 };
 
@@ -106,86 +77,89 @@ const create = async (req, res, next) => {
     const { type = 'adjustment', reason, notes, items = [] } = req.body;
 
     const VALID_TYPES = ['adjustment', 'damage', 'loss', 'return'];
-    if (!VALID_TYPES.includes(type)) {
-      return error(res, `Invalid type. Must be one of: ${VALID_TYPES.join(', ')}.`, 422);
-    }
+    if (!VALID_TYPES.includes(type)) return error(res, `Invalid type. Must be one of: ${VALID_TYPES.join(', ')}.`, 422);
 
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
     if (!parsedItems?.length) return error(res, 'At least one item is required.', 422);
 
-    const adjId = await withTransaction(async (client) => {
-      const reference = await generateReference(client, cid);
+    let adjDoc;
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const reference = await generateReference(cid, session);
+        const lineItems = [];
 
-      const { rows: [adjRow] } = await client.query(`
-        INSERT INTO stock_adjustments (company_id, reference, type, reason, notes, created_by)
-        VALUES ($1,$2,$3,$4,$5,$6)
-        RETURNING id
-      `, [cid, reference, type, reason?.trim() || null, notes?.trim() || null, req.user.id]);
+        for (const item of parsedItems) {
+          const productId = item.product_id;
+          const variantId = item.variant_id || null;
+          const qty       = parseFloat(item.quantity) || 0;
 
-      const aid = adjRow.id;
+          let currentStock, productName, productSku;
 
-      for (const item of parsedItems) {
-        const productId = parseInt(item.product_id, 10);
-        const variantId = item.variant_id ? parseInt(item.variant_id, 10) : null;
-        const qty       = parseFloat(item.quantity) || 0;
+          const product = await Product.findOne({ _id: productId, company_id: cid }).session(session).lean();
+          if (!product) throw new Error(`Product ID ${productId} not found.`);
 
-        let currentStock;
-        let productName;
-        let productSku;
+          if (variantId) {
+            const variant = product.variants?.find(v => v._id.toString() === variantId);
+            if (!variant) throw new Error(`Variant ID ${variantId} not found.`);
+            currentStock = parseFloat(variant.stock_quantity);
+            productName  = product.name;
+            productSku   = variant.sku;
+          } else {
+            currentStock = parseFloat(product.stock_quantity);
+            productName  = product.name;
+            productSku   = product.sku;
+          }
 
-        if (variantId) {
-          const { rows: [v] } = await client.query(
-            'SELECT pv.stock_quantity, p.name, p.sku FROM product_variants pv JOIN products p ON p.id = pv.product_id WHERE pv.id = $1 AND pv.company_id = $2',
-            [variantId, cid]
-          );
-          if (!v) throw new Error(`Variant ID ${variantId} not found.`);
-          currentStock = parseFloat(v.stock_quantity);
-          productName  = v.name;
-          productSku   = v.sku;
-        } else {
-          const { rows: [p] } = await client.query(
-            'SELECT stock_quantity, name, sku FROM products WHERE id = $1 AND company_id = $2',
-            [productId, cid]
-          );
-          if (!p) throw new Error(`Product ID ${productId} not found.`);
-          currentStock = parseFloat(p.stock_quantity);
-          productName  = p.name;
-          productSku   = p.sku;
+          const newQty = Math.max(0, currentStock + qty);
+
+          lineItems.push({
+            product_id:        product._id,
+            variant_id:        variantId || null,
+            product_name:      productName,
+            sku:               productSku,
+            quantity_before:   currentStock,
+            quantity_adjusted: qty,
+            quantity_after:    newQty,
+            unit_cost:         item.unit_cost ? parseFloat(item.unit_cost) : 0,
+          });
+
+          if (variantId) {
+            await Product.updateOne(
+              { _id: product._id, company_id: cid, 'variants._id': variantId },
+              { $set: { 'variants.$.stock_quantity': newQty, updated_at: new Date() } },
+              { session }
+            );
+          } else {
+            await Product.updateOne(
+              { _id: product._id, company_id: cid },
+              { $set: { stock_quantity: newQty, updated_at: new Date() } },
+              { session }
+            );
+          }
         }
 
-        const newQty = Math.max(0, currentStock + qty);
+        const [newAdj] = await StockAdj.create([{
+          company_id: cid,
+          reference,
+          type,
+          reason:     reason?.trim() || null,
+          notes:      notes?.trim()  || null,
+          created_by: req.user.id,
+          items:      lineItems,
+        }], { session });
 
-        await client.query(`
-          INSERT INTO stock_adjustment_items
-            (company_id, adjustment_id, product_id, variant_id, product_name, sku,
-             quantity_before, quantity_adjusted, quantity_after)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-        `, [cid, aid, productId, variantId, productName, productSku,
-            currentStock, qty, newQty]);
+        adjDoc = newAdj;
+      });
+    } catch (txErr) {
+      session.endSession();
+      return error(res, txErr.message, 422);
+    }
+    session.endSession();
 
-        if (variantId) {
-          await client.query(
-            'UPDATE product_variants SET stock_quantity=$1, updated_at=NOW() WHERE id=$2',
-            [newQty, variantId]
-          );
-        } else {
-          await client.query(
-            'UPDATE products SET stock_quantity=$1, updated_at=NOW() WHERE id=$2 AND company_id=$3',
-            [newQty, productId, cid]
-          );
-        }
-      }
-
-      return aid;
-    });
-
-    const { rows: [adj] } = await query(
-      `${ADJ_SELECT} WHERE sa.id = $1 AND sa.company_id = $2`,
-      [adjId, cid]
-    );
-    const items_out = await getItems(adjId);
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'stock_adjustments', adjId, null, { reference: adj.reference });
-    return created(res, { ...adj, items: items_out }, 'Stock adjustment created successfully.');
+    const user = await User.findById(req.user.id, { name: 1 }).lean();
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'stock_adjustments', adjDoc._id.toString(), null, { reference: adjDoc.reference });
+    return created(res, { ...adjDoc.toJSON(), id: adjDoc._id.toString(), created_by_name: user?.name || null }, 'Stock adjustment created successfully.');
   } catch (err) { next(err); }
 };
 

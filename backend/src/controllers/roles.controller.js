@@ -1,64 +1,34 @@
 'use strict';
 
 const { validationResult } = require('express-validator');
-const { query }            = require('../config/database');
+const Role    = require('../models/Role');
+const User    = require('../models/User');
 const { AUDIT_ACTIONS }    = require('../config/constants');
 const { success, error }   = require('../utils/response');
 const { logAudit }         = require('../utils/audit');
 
 const list = async (req, res, next) => {
   try {
-    const { rows } = await query(`
-      SELECT r.id, r.name, r.label, r.permissions, r.is_system,
-             COUNT(u.id) AS user_count
-      FROM roles r
-      LEFT JOIN users u ON u.role_id = r.id AND u.is_active = TRUE
-      WHERE r.company_id = $1
-      GROUP BY r.id
-      ORDER BY r.id
-    `, [req.companyId]);
-    // permissions is JSONB — pg returns it already parsed
-    return success(res, rows);
+    const cid   = req.companyId;
+    const roles = await Role.find({ company_id: cid }).sort({ _id: 1 }).lean();
+
+    const roleIds = roles.map(r => r._id);
+    const userCounts = await User.aggregate([
+      { $match: { company_id: cid, role_id: { $in: roleIds }, is_active: true } },
+      { $group: { _id: '$role_id', count: { $sum: 1 } } },
+    ]);
+    const cntMap = Object.fromEntries(userCounts.map(r => [r._id.toString(), r.count]));
+
+    const data = roles.map(r => ({ ...r, id: r._id.toString(), user_count: cntMap[r._id.toString()] || 0 }));
+    return success(res, data);
   } catch (err) { next(err); }
 };
 
 const getOne = async (req, res, next) => {
   try {
-    const { rows: [role] } = await query(
-      'SELECT * FROM roles WHERE id = $1 AND company_id = $2',
-      [req.params.id, req.companyId]
-    );
+    const role = await Role.findOne({ _id: req.params.id, company_id: req.companyId }).lean();
     if (!role) return error(res, 'Role not found.', 404);
-    return success(res, role);
-  } catch (err) { next(err); }
-};
-
-const updatePermissions = async (req, res, next) => {
-  try {
-    const errs = validationResult(req);
-    if (!errs.isEmpty()) return error(res, errs.array()[0].msg, 422);
-
-    const cid = req.companyId;
-    const id  = parseInt(req.params.id, 10);
-
-    const { rows: [role] } = await query(
-      'SELECT * FROM roles WHERE id = $1 AND company_id = $2',
-      [id, cid]
-    );
-    if (!role) return error(res, 'Role not found.', 404);
-    if (role.name === 'admin') return error(res, 'Admin permissions cannot be modified.', 403);
-
-    const { permissions } = req.body;
-    const oldPerms = role.permissions;
-
-    const { rows: [updated] } = await query(`
-      UPDATE roles SET permissions=$3::jsonb, updated_at=NOW()
-      WHERE id=$1 AND company_id=$2
-      RETURNING *
-    `, [id, cid, JSON.stringify(permissions)]);
-
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'roles', id, oldPerms, permissions);
-    return success(res, updated, 'Permissions updated.');
+    return success(res, { ...role, id: role._id.toString() });
   } catch (err) { next(err); }
 };
 
@@ -68,25 +38,33 @@ const create = async (req, res, next) => {
     const label = (req.body.label || '').trim();
     if (!label) return error(res, 'Role label is required.', 422);
 
-    // auto-generate slug from label
     const name = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
     if (!name) return error(res, 'Invalid role label.', 422);
 
-    // check for duplicate
-    const { rows: [existing] } = await query(
-      'SELECT id FROM roles WHERE company_id = $1 AND name = $2',
-      [cid, name]
-    );
+    const existing = await Role.findOne({ company_id: cid, name }).lean();
     if (existing) return error(res, `A role with name "${name}" already exists.`, 409);
 
-    const { rows: [role] } = await query(`
-      INSERT INTO roles (company_id, name, label, permissions, is_system)
-      VALUES ($1, $2, $3, '{}'::jsonb, FALSE)
-      RETURNING *
-    `, [cid, name, label]);
+    const role = await Role.create({ company_id: cid, name, label, permissions: {}, is_system: false });
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'roles', role._id.toString());
+    return success(res, { ...role.toJSON(), id: role._id.toString() }, 'Role created.', 201);
+  } catch (err) { next(err); }
+};
 
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'roles', role.id);
-    return success(res, role, 'Role created.', 201);
+const updatePermissions = async (req, res, next) => {
+  try {
+    const errs = validationResult(req);
+    if (!errs.isEmpty()) return error(res, errs.array()[0].msg, 422);
+
+    const cid  = req.companyId;
+    const role = await Role.findOne({ _id: req.params.id, company_id: cid }).lean();
+    if (!role) return error(res, 'Role not found.', 404);
+    if (role.name === 'admin') return error(res, 'Admin permissions cannot be modified.', 403);
+
+    const { permissions } = req.body;
+    await Role.findByIdAndUpdate(req.params.id, { permissions, updated_at: new Date() });
+    const updated = await Role.findById(req.params.id).lean();
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'roles', req.params.id, role.permissions, permissions);
+    return success(res, { ...updated, id: updated._id.toString() }, 'Permissions updated.');
   } catch (err) { next(err); }
 };
 

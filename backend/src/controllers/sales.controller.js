@@ -1,47 +1,41 @@
 'use strict';
 
-const { query, withTransaction } = require('../config/database');
-const { success, created, error }      = require('../utils/response');
+const mongoose = require('mongoose');
+const Sale     = require('../models/Sale');
+const Product  = require('../models/Product');
+const Customer = require('../models/Customer');
+const User     = require('../models/User');
+const Return   = require('../models/Return');
+const { success, created, error } = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
-const { AUDIT_ACTIONS }  = require('../config/constants');
-const { logAudit }       = require('../utils/audit');
-const { notifySale }     = require('../utils/fcm');
+const { AUDIT_ACTIONS } = require('../config/constants');
+const { logAudit }      = require('../utils/audit');
+const { notifySale }    = require('../utils/fcm');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-async function generateReference(client, companyId) {
+async function generateReference(companyId, session) {
   const d   = new Date();
   const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
   const prefix = `SAL-${ymd}-`;
-  const { rows: [last] } = await client.query(
-    `SELECT reference FROM sales WHERE company_id=$1 AND reference LIKE $2 ORDER BY id DESC LIMIT 1`,
-    [companyId, `${prefix}%`]
-  );
+  const last = await Sale.findOne({ company_id: companyId, reference: { $regex: `^${prefix}` } }, { reference: 1 })
+    .sort({ _id: -1 })
+    .session(session)
+    .lean();
   const seq = last ? parseInt(last.reference.split('-').pop(), 10) + 1 : 1;
   return `${prefix}${String(seq).padStart(4, '0')}`;
 }
 
-const SALE_SELECT = `
-  SELECT s.*,
-         c.name  AS customer_name,  c.phone AS customer_phone,
-         u.name  AS cashier_name
-  FROM sales s
-  LEFT JOIN customers c ON c.id = s.customer_id AND c.company_id = s.company_id
-  LEFT JOIN users     u ON u.id = s.created_by
-`;
-
-async function getItems(saleId) {
-  const { rows } = await query(`
-    SELECT si.*,
-           pr.name AS product_name_live, pr.sku AS product_sku_live,
-           pv.size, pv.color
-    FROM sale_items si
-    LEFT JOIN products         pr ON pr.id = si.product_id
-    LEFT JOIN product_variants pv ON pv.id = si.variant_id
-    WHERE si.sale_id = $1
-    ORDER BY si.id
-  `, [saleId]);
-  return rows;
+function populateSale(sale, customerMap, userMap) {
+  const cust = sale.customer_id ? customerMap[sale.customer_id.toString()] : null;
+  const usr  = sale.created_by  ? userMap[sale.created_by.toString()]     : null;
+  return {
+    ...sale,
+    id:             sale._id.toString(),
+    customer_name:  cust?.name  || null,
+    customer_phone: cust?.phone || null,
+    cashier_name:   usr?.name   || null,
+  };
 }
 
 // ─── list ─────────────────────────────────────────────────────────────────────
@@ -52,48 +46,44 @@ const list = async (req, res, next) => {
     const { search = '', customer = '', status = '', payment_method = '', date_from = '', date_to = '' } = req.query;
     const { page, limit, offset } = parsePagination(req.query);
 
-    const params = [cid];
-    const where  = ['s.company_id = $1'];
+    const filter = { company_id: cid };
+    if (status)         filter.status         = status;
+    if (payment_method) filter.payment_method = payment_method;
+    if (customer)       filter.customer_id    = customer;
+    if (date_from || date_to) {
+      filter.sale_date = {};
+      if (date_from) filter.sale_date.$gte = new Date(date_from);
+      if (date_to)   filter.sale_date.$lte = new Date(date_to + 'T23:59:59.999Z');
+    }
+
+    let query = Sale.find(filter).select('-items').sort({ created_at: -1 });
 
     if (search) {
-      params.push(`%${search}%`);
-      where.push(`(s.reference ILIKE $${params.length} OR c.name ILIKE $${params.length} OR c.phone ILIKE $${params.length})`);
-    }
-    if (customer) {
-      params.push(parseInt(customer, 10));
-      where.push(`s.customer_id = $${params.length}`);
-    }
-    if (status) {
-      params.push(status);
-      where.push(`s.status = $${params.length}`);
-    }
-    if (payment_method) {
-      params.push(payment_method);
-      where.push(`s.payment_method = $${params.length}`);
-    }
-    if (date_from) {
-      params.push(date_from);
-      where.push(`s.sale_date::date >= $${params.length}`);
-    }
-    if (date_to) {
-      params.push(date_to);
-      where.push(`s.sale_date::date <= $${params.length}`);
+      // Reference search done via regex; customer name requires separate lookup
+      const custIds = await Customer.find(
+        { company_id: cid, $or: [{ name: { $regex: search, $options: 'i' } }, { phone: { $regex: search, $options: 'i' } }] },
+        { _id: 1 }
+      ).lean().then(r => r.map(c => c._id));
+      filter.$or = [
+        { reference: { $regex: search, $options: 'i' } },
+        { customer_id: { $in: custIds } },
+      ];
     }
 
-    const wStr = where.join(' AND ');
-    const { rows: [{ cnt }] } = await query(
-      `SELECT COUNT(*) AS cnt
-       FROM sales s LEFT JOIN customers c ON c.id = s.customer_id AND c.company_id = s.company_id
-       WHERE ${wStr}`,
-      params
-    );
-    const total = parseInt(cnt, 10);
+    const total = await Sale.countDocuments(filter);
+    const sales = await Sale.find(filter).select('-items').sort({ created_at: -1 }).skip(offset).limit(limit).lean();
 
-    params.push(limit, offset);
-    const { rows } = await query(
-      `${SALE_SELECT} WHERE ${wStr} ORDER BY s.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
+    // Populate customer + user names in batch
+    const custIds = [...new Set(sales.map(s => s.customer_id?.toString()).filter(Boolean))];
+    const userIds = [...new Set(sales.map(s => s.created_by?.toString()).filter(Boolean))];
+    const [customers, users] = await Promise.all([
+      Customer.find({ _id: { $in: custIds } }, { name: 1, phone: 1 }).lean(),
+      User.find({ _id: { $in: userIds } }, { name: 1 }).lean(),
+    ]);
+    const customerMap = Object.fromEntries(customers.map(c => [c._id.toString(), c]));
+    const userMap     = Object.fromEntries(users.map(u => [u._id.toString(), u]));
+
+    const rows = sales.map(s => populateSale(s, customerMap, userMap));
 
     return res.json({ success: true, data: rows, pagination: buildPaginationMeta(total, page, limit) });
   } catch (err) { next(err); }
@@ -103,13 +93,20 @@ const list = async (req, res, next) => {
 
 const getOne = async (req, res, next) => {
   try {
-    const { rows: [sale] } = await query(
-      `${SALE_SELECT} WHERE s.id = $1 AND s.company_id = $2`,
-      [req.params.id, req.companyId]
-    );
+    const sale = await Sale.findOne({ _id: req.params.id, company_id: req.companyId }).lean();
     if (!sale) return error(res, 'Sale not found.', 404);
-    const items = await getItems(sale.id);
-    return success(res, { ...sale, items });
+
+    const [cust, usr] = await Promise.all([
+      sale.customer_id ? Customer.findById(sale.customer_id, { name: 1, phone: 1 }).lean() : null,
+      sale.created_by  ? User.findById(sale.created_by, { name: 1 }).lean() : null,
+    ]);
+    return success(res, {
+      ...sale,
+      id:             sale._id.toString(),
+      customer_name:  cust?.name  || null,
+      customer_phone: cust?.phone || null,
+      cashier_name:   usr?.name   || null,
+    });
   } catch (err) { next(err); }
 };
 
@@ -134,10 +131,7 @@ const create = async (req, res, next) => {
 
     // Credit limit check
     if (customer_id && payment_method === 'credit') {
-      const { rows: [cust] } = await query(
-        'SELECT credit_limit, current_balance FROM customers WHERE id=$1 AND company_id=$2',
-        [customer_id, cid]
-      );
+      const cust = await Customer.findOne({ _id: customer_id, company_id: cid }).lean();
       if (cust && parseFloat(cust.credit_limit) > 0) {
         const projected = parseFloat(cust.current_balance) + parseFloat(paid_amount || 0);
         if (projected > parseFloat(cust.credit_limit)) {
@@ -146,52 +140,70 @@ const create = async (req, res, next) => {
       }
     }
 
-    let saleId;
+    let saleDoc;
+    const session = await mongoose.startSession();
     try {
-      saleId = await withTransaction(async (client) => {
-        const reference = await generateReference(client, cid);
-        let subtotal = 0;
+      await session.withTransaction(async () => {
+        const reference = await generateReference(cid, session);
+        let subtotal    = 0;
         const lineItems = [];
 
         for (const item of parsedItems) {
-          const productId = parseInt(item.product_id, 10);
-          const variantId = item.variant_id ? parseInt(item.variant_id, 10) : null;
+          const productId = item.product_id;
+          const variantId = item.variant_id || null;
           const qty       = parseFloat(item.quantity) || 0;
 
+          const product = await Product.findOne({ _id: productId, company_id: cid, is_active: true })
+            .session(session).lean();
+          if (!product) throw new Error(`Product ${productId} not found or inactive.`);
+
+          let price, cost, taxAmt, itemDisc, lineTot, productName, sku, resolvedVariantId;
+
           if (variantId) {
-            const { rows: [v] } = await client.query(
-              'SELECT pv.*, p.cost_price AS base_cost, p.track_inventory, p.allow_negative, p.name AS product_name, p.sku AS product_sku FROM product_variants pv JOIN products p ON p.id = pv.product_id WHERE pv.id = $1 AND pv.company_id = $2',
-              [variantId, cid]
-            );
-            if (!v) throw new Error(`Variant ${variantId} not found.`);
-            const price     = parseFloat(item.unit_price ?? v.sale_price ?? 0);
-            const cost      = parseFloat(v.cost_price ?? v.base_cost ?? 0);
-            const itemDisc  = Math.max(0, parseFloat(item.discount) || 0);
-            const lineTot   = Math.max(0, qty * price - itemDisc);
+            const variant = product.variants?.find(v => v._id.toString() === variantId.toString());
+            if (!variant) throw new Error(`Variant ${variantId} not found.`);
+            if (product.track_inventory && !product.allow_negative && parseFloat(variant.stock_quantity) < qty) {
+              throw new Error(`Insufficient stock for variant (${variant.size ?? ''} ${variant.color ?? ''}).`.trim());
+            }
+            price            = parseFloat(item.unit_price ?? variant.sale_price ?? 0);
+            cost             = parseFloat(variant.cost_price ?? product.cost_price ?? 0);
+            itemDisc         = Math.max(0, parseFloat(item.discount) || 0);
+            taxAmt           = 0;
+            lineTot          = Math.max(0, qty * price - itemDisc);
+            productName      = product.name;
+            sku              = variant.sku;
+            resolvedVariantId = variant._id;
             subtotal += lineTot;
 
-            if (v.track_inventory && !v.allow_negative && parseFloat(v.stock_quantity) < qty) {
-              throw new Error(`Insufficient stock for variant (${v.size ?? ''} ${v.color ?? ''}).`.trim());
-            }
-            lineItems.push({ productId, variantId, qty, price, cost, taxAmt: 0, itemDisc, lineTot, productName: v.product_name, sku: v.sku });
-          } else {
-            const { rows: [product] } = await client.query(
-              'SELECT * FROM products WHERE id = $1 AND company_id = $2 AND is_active = TRUE',
-              [productId, cid]
+            await Product.updateOne(
+              { _id: productId, company_id: cid, 'variants._id': variant._id },
+              { $inc: { 'variants.$.stock_quantity': -qty }, $set: { updated_at: new Date() } },
+              { session }
             );
-            if (!product) throw new Error(`Product ${productId} not found or inactive.`);
+          } else {
             if (product.track_inventory && !product.allow_negative && parseFloat(product.stock_quantity) < qty) {
               throw new Error(`Insufficient stock for "${product.name}".`);
             }
-            const price    = parseFloat(item.unit_price ?? product.sale_price);
-            const cost     = parseFloat(product.cost_price) || 0;
-            const taxRate  = parseFloat(product.tax_rate)   || 0;
-            const itemDisc = Math.max(0, parseFloat(item.discount) || 0);
-            const taxAmt   = qty * price * taxRate / 100;
-            const lineTot  = Math.max(0, qty * price - itemDisc);
+            price       = parseFloat(item.unit_price ?? product.sale_price);
+            cost        = parseFloat(product.cost_price) || 0;
+            const taxRate = parseFloat(product.tax_rate) || 0;
+            itemDisc    = Math.max(0, parseFloat(item.discount) || 0);
+            taxAmt      = qty * price * taxRate / 100;
+            lineTot     = Math.max(0, qty * price - itemDisc);
+            productName = product.name;
+            sku         = product.sku;
+            resolvedVariantId = null;
             subtotal += lineTot;
-            lineItems.push({ productId, variantId: null, qty, price, cost, taxAmt, itemDisc, lineTot, productName: product.name, sku: product.sku });
+
+            if (product.track_inventory) {
+              await Product.updateOne(
+                { _id: productId, company_id: cid },
+                { $inc: { stock_quantity: -qty }, $set: { updated_at: new Date() } },
+                { session }
+              );
+            }
           }
+          lineItems.push({ productId, variantId: resolvedVariantId, qty, price, cost, taxAmt, itemDisc, lineTot, productName, sku });
         }
 
         const discAmt  = discount_type === 'percent'
@@ -208,84 +220,73 @@ const create = async (req, res, next) => {
         const change = Math.max(0, paid - total);
         const due    = Math.max(0, total - paid);
 
-        const { rows: [saleRow] } = await client.query(`
-          INSERT INTO sales
-            (company_id, customer_id, created_by, reference, status,
-             subtotal, discount_amount, tax_amount, total_amount,
-             paid_amount, change_amount, due_amount, payment_method, notes)
-          VALUES ($1,$2,$3,$4,'completed',$5,$6,$7,$8,$9,$10,$11,$12,$13)
-          RETURNING id
-        `, [
-          cid, customer_id || null, req.user.id,
+        const [newSale] = await Sale.create([{
+          company_id:      cid,
+          customer_id:     customer_id || null,
+          created_by:      req.user.id,
           reference,
-          subtotal, discAmt, taxTotal, total, paid, change, due,
+          status:          'completed',
+          subtotal,
+          discount_amount: discAmt,
+          tax_amount:      taxTotal,
+          total_amount:    total,
+          paid_amount:     paid,
+          change_amount:   change,
+          due_amount:      due,
           payment_method,
-          notes?.trim() || null,
-        ]);
-
-        const sid = saleRow.id;
-
-        for (const li of lineItems) {
-          await client.query(`
-            INSERT INTO sale_items
-              (company_id, sale_id, product_id, variant_id, product_name, sku,
-               quantity, unit_price, cost_price, discount, tax_amount, total)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-          `, [cid, sid, li.productId, li.variantId, li.productName, li.sku,
-              li.qty, li.price, li.cost, li.itemDisc, li.taxAmt, li.lineTot]);
-
-          if (li.variantId) {
-            await client.query(
-              'UPDATE product_variants SET stock_quantity = stock_quantity - $1, updated_at=NOW() WHERE id = $2',
-              [li.qty, li.variantId]
-            );
-          } else {
-            const { rows: [prd] } = await client.query(
-              'SELECT track_inventory FROM products WHERE id = $1',
-              [li.productId]
-            );
-            if (prd?.track_inventory) {
-              await client.query(
-                'UPDATE products SET stock_quantity = stock_quantity - $1, updated_at=NOW() WHERE id = $2 AND company_id = $3',
-                [li.qty, li.productId, cid]
-              );
-            }
-          }
-        }
+          notes:           notes?.trim() || null,
+          items: lineItems.map(li => ({
+            product_id:   li.productId,
+            variant_id:   li.variantId,
+            product_name: li.productName,
+            sku:          li.sku,
+            quantity:     li.qty,
+            unit_price:   li.price,
+            cost_price:   li.cost,
+            discount:     li.itemDisc,
+            tax_amount:   li.taxAmt,
+            total:        li.lineTot,
+          })),
+        }], { session });
 
         if (customer_id && due > 0) {
-          await client.query(
-            'UPDATE customers SET current_balance = current_balance + $1, updated_at=NOW() WHERE id = $2 AND company_id = $3',
-            [due, customer_id, cid]
+          await Customer.updateOne(
+            { _id: customer_id, company_id: cid },
+            { $inc: { current_balance: due }, $set: { updated_at: new Date() } },
+            { session }
           );
         }
 
-        return sid;
+        saleDoc = newSale;
       });
     } catch (txErr) {
+      session.endSession();
       return error(res, txErr.message, 422);
     }
+    session.endSession();
 
-    const { rows: [sale] } = await query(
-      `${SALE_SELECT} WHERE s.id = $1 AND s.company_id = $2`,
-      [saleId, cid]
-    );
-    const items_out = await getItems(saleId);
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'sales', saleId, null,
+    const sale = await Sale.findById(saleDoc._id).lean();
+    const [cust, usr] = await Promise.all([
+      sale.customer_id ? Customer.findById(sale.customer_id, { name: 1, phone: 1 }).lean() : null,
+      User.findById(req.user.id, { name: 1 }).lean(),
+    ]);
+
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'sales', saleDoc._id.toString(), null,
       { reference: sale.reference, total: sale.total_amount });
 
-    // Push notification to admin(s)
+    const out = { ...sale, id: sale._id.toString(), customer_name: cust?.name || null, customer_phone: cust?.phone || null, cashier_name: usr?.name || null };
+
     notifySale(cid, {
-      id:             saleId,
+      id:             sale._id.toString(),
       reference:      sale.reference,
-      customer_name:  sale.customer_name,
-      cashier_name:   sale.cashier_name,
+      customer_name:  cust?.name || null,
+      cashier_name:   usr?.name  || null,
       payment_method: sale.payment_method,
       total_amount:   sale.total_amount,
-      items:          items_out.length,
+      items:          sale.items.length,
     });
 
-    return created(res, { ...sale, items: items_out }, 'Sale completed successfully.');
+    return created(res, out, 'Sale completed successfully.');
   } catch (err) { next(err); }
 };
 
@@ -294,59 +295,50 @@ const create = async (req, res, next) => {
 const voidSale = async (req, res, next) => {
   try {
     const cid = req.companyId;
-    const id  = parseInt(req.params.id, 10);
-
-    const { rows: [sale] } = await query(
-      `${SALE_SELECT} WHERE s.id = $1 AND s.company_id = $2`,
-      [id, cid]
-    );
+    const sale = await Sale.findOne({ _id: req.params.id, company_id: cid }).lean();
     if (!sale) return error(res, 'Sale not found.', 404);
     if (sale.status === 'cancelled') return error(res, 'Sale is already cancelled.', 409);
 
-    await withTransaction(async (client) => {
-      const { rows: items } = await client.query(`
-        SELECT si.product_id, si.variant_id, si.quantity,
-               pr.track_inventory
-        FROM sale_items si
-        JOIN products pr ON pr.id = si.product_id
-        WHERE si.sale_id = $1
-      `, [id]);
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        for (const item of sale.items) {
+          const product = await Product.findById(item.product_id, { track_inventory: 1 }).lean();
+          if (!product?.track_inventory) continue;
 
-      for (const item of items) {
-        if (!item.track_inventory) continue;
-        if (item.variant_id) {
-          await client.query(
-            'UPDATE product_variants SET stock_quantity = stock_quantity + $1, updated_at=NOW() WHERE id = $2',
-            [item.quantity, item.variant_id]
-          );
-        } else {
-          await client.query(
-            'UPDATE products SET stock_quantity = stock_quantity + $1, updated_at=NOW() WHERE id = $2 AND company_id = $3',
-            [item.quantity, item.product_id, cid]
+          if (item.variant_id) {
+            await Product.updateOne(
+              { _id: item.product_id, company_id: cid, 'variants._id': item.variant_id },
+              { $inc: { 'variants.$.stock_quantity': item.quantity } },
+              { session }
+            );
+          } else {
+            await Product.updateOne(
+              { _id: item.product_id, company_id: cid },
+              { $inc: { stock_quantity: item.quantity } },
+              { session }
+            );
+          }
+        }
+
+        if (sale.customer_id && parseFloat(sale.due_amount) > 0) {
+          await Customer.updateOne(
+            { _id: sale.customer_id, company_id: cid },
+            { $inc: { current_balance: -parseFloat(sale.due_amount) } },
+            { session }
           );
         }
-      }
 
-      if (sale.customer_id && parseFloat(sale.due_amount) > 0) {
-        await client.query(
-          'UPDATE customers SET current_balance = GREATEST(0, current_balance - $1), updated_at=NOW() WHERE id = $2 AND company_id = $3',
-          [sale.due_amount, sale.customer_id, cid]
-        );
-      }
+        await Sale.updateOne({ _id: sale._id }, { status: 'cancelled', updated_at: new Date() }, { session });
+      });
+    } finally {
+      session.endSession();
+    }
 
-      await client.query(
-        "UPDATE sales SET status='cancelled', updated_at=NOW() WHERE id=$1 AND company_id=$2",
-        [id, cid]
-      );
-    });
-
-    const { rows: [updated] } = await query(
-      `${SALE_SELECT} WHERE s.id = $1 AND s.company_id = $2`,
-      [id, cid]
-    );
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'sales', id,
+    const updated = await Sale.findById(sale._id).lean();
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'sales', sale._id.toString(),
       { status: sale.status }, { status: 'cancelled' });
-    return success(res, updated, 'Sale cancelled and stock restored.');
+    return success(res, { ...updated, id: updated._id.toString() }, 'Sale cancelled and stock restored.');
   } catch (err) { next(err); }
 };
 
@@ -354,33 +346,45 @@ const voidSale = async (req, res, next) => {
 
 const todaySummary = async (req, res, next) => {
   try {
-    const { rows: [row] } = await query(`
-      WITH sales_today AS (
-        SELECT
-          COUNT(*)::int                   AS sale_count,
-          COALESCE(SUM(total_amount), 0)  AS total_revenue,
-          COALESCE(SUM(paid_amount),  0)  AS total_paid,
-          COALESCE(SUM(due_amount),   0)  AS total_due
-        FROM sales
-        WHERE company_id = $1
-          AND sale_date::date = CURRENT_DATE
-          AND status != 'cancelled'
-      ),
-      returns_today AS (
-        SELECT COALESCE(SUM(CASE WHEN type = 'return' THEN refund_amount ELSE 0 END), 0) AS total_refunded
-        FROM returns
-        WHERE company_id = $1
-          AND return_date::date = CURRENT_DATE
-      )
-      SELECT
-        st.sale_count,
-        GREATEST(0, st.total_revenue - rt.total_refunded) AS total_revenue,
-        GREATEST(0, st.total_paid    - rt.total_refunded) AS total_paid,
-        st.total_due,
-        rt.total_refunded
-      FROM sales_today st, returns_today rt
-    `, [req.companyId]);
-    return success(res, row);
+    const cid   = req.companyId;
+    const today = new Date();
+    const start = new Date(today.toISOString().slice(0, 10) + 'T00:00:00.000Z');
+    const end   = new Date(today.toISOString().slice(0, 10) + 'T23:59:59.999Z');
+
+    const [salesAgg, cogsAgg, returnsAgg] = await Promise.all([
+      Sale.aggregate([
+        { $match: { company_id: req.companyId, status: 'completed', sale_date: { $gte: start, $lte: end } } },
+        { $group: {
+          _id:           null,
+          sale_count:    { $sum: 1 },
+          total_revenue: { $sum: '$total_amount' },
+          total_paid:    { $sum: '$paid_amount' },
+          total_due:     { $sum: '$due_amount' },
+        }},
+      ]),
+      Sale.aggregate([
+        { $match: { company_id: req.companyId, status: 'completed', sale_date: { $gte: start, $lte: end } } },
+        { $unwind: '$items' },
+        { $group: { _id: null, cogs: { $sum: { $multiply: ['$items.cost_price', '$items.quantity'] } } } },
+      ]),
+      Return.aggregate([
+        { $match: { company_id: req.companyId, return_date: { $gte: start, $lte: end } } },
+        { $group: { _id: null, total_refunded: { $sum: { $cond: [{ $eq: ['$type', 'return'] }, '$refund_amount', 0] } } } },
+      ]),
+    ]);
+
+    const s  = salesAgg[0]  || { sale_count: 0, total_revenue: 0, total_paid: 0, total_due: 0 };
+    const refunded = returnsAgg[0]?.total_refunded || 0;
+    const revenue  = Math.max(0, s.total_revenue - refunded);
+    const paid     = Math.max(0, s.total_paid    - refunded);
+
+    return success(res, {
+      sale_count:     s.sale_count,
+      total_revenue:  revenue,
+      total_paid:     paid,
+      total_due:      s.total_due,
+      total_refunded: refunded,
+    });
   } catch (err) { next(err); }
 };
 
@@ -388,46 +392,45 @@ const todaySummary = async (req, res, next) => {
 
 const collectPayment = async (req, res, next) => {
   try {
-    const cid = req.companyId;
-    const id  = parseInt(req.params.id, 10);
+    const cid    = req.companyId;
     const amount = parseFloat(req.body.amount);
     const method = req.body.payment_method || 'cash';
 
-    if (!amount || amount <= 0) {
-      return error(res, 'Amount must be greater than 0.', 400);
-    }
+    if (!amount || amount <= 0) return error(res, 'Amount must be greater than 0.', 400);
 
-    const { rows: [sale] } = await query(
-      'SELECT id, customer_id, due_amount FROM sales WHERE id=$1 AND company_id=$2',
-      [id, cid]
-    );
+    const sale = await Sale.findOne({ _id: req.params.id, company_id: cid }, { customer_id: 1, due_amount: 1 }).lean();
     if (!sale) return error(res, 'Sale not found.', 404);
 
     const due = parseFloat(sale.due_amount);
     if (due <= 0) return error(res, 'This sale has no outstanding balance.', 409);
 
-    const pay = Math.min(amount, due);
-    const remaining = parseFloat((due - pay).toFixed(2));
+    const pay       = Math.min(amount, due);
+    const remaining = parseFloat((due - pay).toFixed(4));
 
-    await withTransaction(async (client) => {
-      await client.query(`
-        UPDATE sales
-        SET paid_amount = paid_amount + $1,
-            due_amount  = $2,
-            status      = CASE WHEN $2 = 0 THEN 'completed' ELSE status END,
-            updated_at  = NOW()
-        WHERE id=$3 AND company_id=$4
-      `, [pay, remaining, id, cid]);
-
-      if (sale.customer_id) {
-        await client.query(
-          'UPDATE customers SET current_balance = GREATEST(0, current_balance - $1), updated_at=NOW() WHERE id=$2 AND company_id=$3',
-          [pay, sale.customer_id, cid]
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await Sale.updateOne(
+          { _id: sale._id },
+          {
+            $inc: { paid_amount: pay },
+            $set: { due_amount: remaining, status: remaining === 0 ? 'completed' : undefined, updated_at: new Date() },
+          },
+          { session }
         );
-      }
-    });
+        if (sale.customer_id) {
+          await Customer.updateOne(
+            { _id: sale.customer_id, company_id: cid },
+            { $inc: { current_balance: -pay } },
+            { session }
+          );
+        }
+      });
+    } finally {
+      session.endSession();
+    }
 
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'sales', id,
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'sales', sale._id.toString(),
       { due_amount: due }, { due_amount: remaining, payment_collected: pay });
 
     return success(res, { collected: pay, remaining }, 'Payment recorded.');

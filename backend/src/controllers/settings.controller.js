@@ -1,8 +1,6 @@
 'use strict';
 
-const { query } = require('../config/database');
-
-// ─── Defaults ─────────────────────────────────────────────────────────────────
+const Setting = require('../models/Setting');
 
 const DEFAULTS = [
   { key: 'company_name',         value: 'Online Store',                     type: 'string',  group_name: 'company', label: 'Company Name' },
@@ -22,13 +20,14 @@ const DEFAULTS = [
 ];
 
 async function ensureDefaults(companyId) {
-  for (const row of DEFAULTS) {
-    await query(`
-      INSERT INTO settings (company_id, key, value, type, group_name, label)
-      VALUES ($1,$2,$3,$4,$5,$6)
-      ON CONFLICT (company_id, key) DO NOTHING
-    `, [companyId, row.key, row.value, row.type, row.group_name, row.label]);
-  }
+  const ops = DEFAULTS.map(d => ({
+    updateOne: {
+      filter: { company_id: companyId, key: d.key },
+      update: { $setOnInsert: { company_id: companyId, key: d.key, value: d.value, type: d.type, group_name: d.group_name, label: d.label } },
+      upsert: true,
+    },
+  }));
+  if (ops.length) await Setting.bulkWrite(ops, { ordered: false });
 }
 
 function parseValue(row) {
@@ -39,19 +38,13 @@ function parseValue(row) {
   return row;
 }
 
-// ─── GET /settings ────────────────────────────────────────────────────────────
-
 exports.getAll = async (req, res, next) => {
   try {
     const cid = req.companyId;
     await ensureDefaults(cid);
-
-    const { rows } = await query(
-      'SELECT * FROM settings WHERE company_id=$1 ORDER BY group_name, key',
-      [cid]
-    );
-    const grouped = {};
-    for (const row of rows) {
+    const settings = await Setting.find({ company_id: cid }).sort({ group_name: 1, key: 1 }).lean();
+    const grouped  = {};
+    for (const row of settings) {
       const parsed = parseValue(row);
       if (!grouped[row.group_name]) grouped[row.group_name] = {};
       grouped[row.group_name][row.key] = parsed;
@@ -60,65 +53,46 @@ exports.getAll = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── GET /settings/:key ───────────────────────────────────────────────────────
-
 exports.getOne = async (req, res, next) => {
   try {
     const cid = req.companyId;
     await ensureDefaults(cid);
-
-    const { rows: [row] } = await query(
-      'SELECT * FROM settings WHERE company_id=$1 AND key=$2',
-      [cid, req.params.key]
-    );
+    const row = await Setting.findOne({ company_id: cid, key: req.params.key }).lean();
     if (!row) return res.status(404).json({ success: false, message: 'Setting not found.' });
     res.json({ success: true, data: parseValue(row) });
   } catch (err) { next(err); }
 };
 
-// ─── PUT /settings (bulk) ─────────────────────────────────────────────────────
-
 exports.updateBulk = async (req, res, next) => {
   try {
     const cid     = req.companyId;
     const updates = req.body;
-
     if (typeof updates !== 'object' || Array.isArray(updates)) {
       return res.status(400).json({ success: false, message: 'Body must be a flat key→value object.' });
     }
 
-    for (const [key, val] of Object.entries(updates)) {
-      await query(
-        `INSERT INTO settings (company_id, key, value, type, group_name)
-         VALUES ($1, $2, $3, 'string', 'company')
-         ON CONFLICT (company_id, key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
-        [cid, key, String(val ?? '')]
-      );
-    }
+    const ops = Object.entries(updates).map(([key, val]) => ({
+      updateOne: {
+        filter: { company_id: cid, key },
+        update: { $set: { value: String(val ?? ''), updated_at: new Date() }, $setOnInsert: { company_id: cid, key, type: 'string', group_name: 'company' } },
+        upsert: true,
+      },
+    }));
+    if (ops.length) await Setting.bulkWrite(ops, { ordered: false });
     res.json({ success: true, message: 'Settings saved.' });
   } catch (err) { next(err); }
 };
 
-// ─── PUT /settings/:key ───────────────────────────────────────────────────────
-
 exports.updateOne = async (req, res, next) => {
   try {
-    const cid = req.companyId;
+    const cid   = req.companyId;
     const { value } = req.body;
-    if (value === undefined) {
-      return res.status(400).json({ success: false, message: 'value is required.' });
-    }
+    if (value === undefined) return res.status(400).json({ success: false, message: 'value is required.' });
 
-    const { rows: [row] } = await query(
-      'SELECT id FROM settings WHERE company_id=$1 AND key=$2',
-      [cid, req.params.key]
-    );
+    const row = await Setting.findOne({ company_id: cid, key: req.params.key }).lean();
     if (!row) return res.status(404).json({ success: false, message: 'Setting not found.' });
 
-    await query(
-      'UPDATE settings SET value=$1, updated_at=NOW() WHERE company_id=$2 AND key=$3',
-      [String(value), cid, req.params.key]
-    );
+    await Setting.updateOne({ company_id: cid, key: req.params.key }, { value: String(value), updated_at: new Date() });
     res.json({ success: true, message: 'Setting updated.' });
   } catch (err) { next(err); }
 };

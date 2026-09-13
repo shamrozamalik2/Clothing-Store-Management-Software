@@ -4,23 +4,19 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env'
 
 const fs   = require('fs');
 const path = require('path');
-const { env }          = require('./config/env');
-const { initDb }       = require('./config/database');
-const { runMigrations } = require('./database/migrate');
-const { startAutoBackupScheduler } = require('./utils/backup.scheduler');
+const { env }           = require('./config/env');
+const { connectMongo }  = require('./config/db.mongo');
+const { startAutoBackupScheduler }   = require('./utils/backup.scheduler');
 const { startAuditCleanupScheduler } = require('./utils/audit.cleanup');
-const app              = require('./app');
+const app = require('./app');
 
 async function main() {
   // Ensure upload directory exists
   const uploadsDir = path.resolve(env.UPLOADS_DIR);
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-  // Connect PostgreSQL pool
-  initDb();
-
-  // Run pending migrations
-  await runMigrations();
+  // Connect MongoDB
+  await connectMongo();
 
   // Start automatic daily backup scheduler
   startAutoBackupScheduler();
@@ -29,11 +25,11 @@ async function main() {
   startAuditCleanupScheduler();
 
   // Bind server
-  const host = env.IS_DEV ? '127.0.0.1' : '0.0.0.0';
+  const host   = env.IS_DEV ? '127.0.0.1' : '0.0.0.0';
   const server = app.listen(env.PORT, host, () => {
     console.log(`[Server] SAS Garments API on http://${host}:${env.PORT}`);
     console.log(`[Server] Environment: ${env.NODE_ENV}`);
-    if (process.send) process.send('ready'); // PM2 cluster ready signal
+    if (process.send) process.send('ready');
   });
 
   server.on('error', (err) => {

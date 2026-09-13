@@ -1,72 +1,63 @@
 'use strict';
 
-const { query, withTransaction } = require('../config/database');
+const Expense         = require('../models/Expense');
+const ExpenseCategory = require('../models/ExpenseCategory');
+const User            = require('../models/User');
 const { success, error } = require('../utils/response');
 const { logAudit }       = require('../utils/audit');
 
-async function generateReference(client, companyId) {
-  const { rows: [row] } = await client.query(
-    `SELECT COUNT(*)::int AS cnt FROM expenses WHERE company_id = $1`,
-    [companyId]
-  );
-  const seq = String(row.cnt + 1).padStart(4, '0');
-  const d   = new Date();
-  const ym  = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
+async function generateReference(companyId) {
+  const cnt = await Expense.countDocuments({ company_id: companyId });
+  const seq  = String(cnt + 1).padStart(4, '0');
+  const d    = new Date();
+  const ym   = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
   return `EXP-${ym}-${seq}`;
 }
 
 // GET /expenses
 async function list(req, res, next) {
   try {
-    const cid  = req.companyId;
-    const page = Math.max(1, parseInt(req.query.page  || '1',  10));
-    const limit= Math.min(100, parseInt(req.query.limit || '25', 10));
-    const off  = (page - 1) * limit;
-
+    const cid   = req.companyId;
+    const page  = Math.max(1, parseInt(req.query.page  || '1',  10));
+    const limit = Math.min(100, parseInt(req.query.limit || '25', 10));
+    const off   = (page - 1) * limit;
     const { from, to, category_id } = req.query;
 
-    const params = [cid];
-    const where  = ['e.company_id = $1'];
+    const filter = { company_id: cid };
+    if (from) filter.expense_date = { ...filter.expense_date, $gte: new Date(from + 'T00:00:00.000Z') };
+    if (to)   filter.expense_date = { ...filter.expense_date, $lte: new Date(to   + 'T23:59:59.999Z') };
+    if (category_id) filter.category_id = category_id;
 
-    if (from) { params.push(from); where.push(`e.expense_date >= $${params.length}::date`); }
-    if (to)   { params.push(to);   where.push(`e.expense_date <= $${params.length}::date`); }
-    if (category_id) { params.push(category_id); where.push(`e.category_id = $${params.length}`); }
+    const [total, expenses] = await Promise.all([
+      Expense.countDocuments(filter),
+      Expense.find(filter).sort({ expense_date: -1, _id: -1 }).skip(off).limit(limit).lean(),
+    ]);
 
-    const whereStr = where.join(' AND ');
+    const catIds  = [...new Set(expenses.map(e => e.category_id?.toString()).filter(Boolean))];
+    const userIds = [...new Set(expenses.map(e => e.created_by?.toString()).filter(Boolean))];
+    const [cats, users] = await Promise.all([
+      ExpenseCategory.find({ _id: { $in: catIds } }, { name: 1 }).lean(),
+      User.find({ _id: { $in: userIds } }, { name: 1 }).lean(),
+    ]);
+    const catMap  = Object.fromEntries(cats.map(c => [c._id.toString(), c.name]));
+    const userMap = Object.fromEntries(users.map(u => [u._id.toString(), u.name]));
 
-    const { rows: [{ total }] } = await query(
-      `SELECT COUNT(*)::int AS total FROM expenses e WHERE ${whereStr}`,
-      params
-    );
+    const rows = expenses.map(e => ({
+      ...e,
+      id:               e._id.toString(),
+      category_name:    e.category_id ? catMap[e.category_id.toString()]  || null : null,
+      created_by_name:  e.created_by  ? userMap[e.created_by.toString()]  || null : null,
+    }));
 
-    params.push(limit, off);
-    const { rows } = await query(`
-      SELECT e.*,
-             ec.name AS category_name,
-             u.name  AS created_by_name
-      FROM expenses e
-      LEFT JOIN expense_categories ec ON ec.id = e.category_id
-      LEFT JOIN users              u  ON u.id  = e.created_by
-      WHERE ${whereStr}
-      ORDER BY e.expense_date DESC, e.id DESC
-      LIMIT $${params.length - 1} OFFSET $${params.length}
-    `, params);
-
-    return success(res, {
-      expenses: rows,
-      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    });
+    return success(res, { expenses: rows, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } });
   } catch (err) { next(err); }
 }
 
 // GET /expenses/categories
 async function listCategories(req, res, next) {
   try {
-    const { rows } = await query(
-      `SELECT id, name FROM expense_categories WHERE company_id = $1 ORDER BY name`,
-      [req.companyId]
-    );
-    return success(res, rows);
+    const cats = await ExpenseCategory.find({ company_id: req.companyId }, { name: 1 }).sort({ name: 1 }).lean();
+    return success(res, cats.map(c => ({ id: c._id.toString(), name: c.name })));
   } catch (err) { next(err); }
 }
 
@@ -74,36 +65,25 @@ async function listCategories(req, res, next) {
 async function create(req, res, next) {
   try {
     const cid = req.companyId;
-    const { category_id, amount, payment_method = 'cash', expense_date, description, notes } = req.body;
+    const { category_id, amount, payment_method = 'cash', expense_date, description, notes, is_recurring, recurring_day } = req.body;
 
-    const { is_recurring, recurring_day } = req.body;
-
-    const id = await withTransaction(async (client) => {
-      const ref = await generateReference(client, cid);
-      const { rows: [row] } = await client.query(`
-        INSERT INTO expenses
-          (company_id, category_id, reference, title, amount, payment_method, expense_date,
-           notes, is_recurring, recurring_day, created_by)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-        RETURNING id
-      `, [
-        cid,
-        category_id || null,
-        ref,
-        description?.trim() || 'Expense',
-        parseFloat(amount),
-        payment_method,
-        expense_date || new Date().toISOString().slice(0, 10),
-        notes?.trim() || null,
-        !!is_recurring,
-        is_recurring ? (parseInt(recurring_day) || 1) : null,
-        req.user.id,
-      ]);
-      return row.id;
+    const ref = await generateReference(cid);
+    const exp = await Expense.create({
+      company_id:     cid,
+      category_id:    category_id || null,
+      reference:      ref,
+      title:          description?.trim() || 'Expense',
+      amount:         parseFloat(amount),
+      payment_method,
+      expense_date:   expense_date ? new Date(expense_date) : new Date(),
+      notes:          notes?.trim() || null,
+      is_recurring:   !!is_recurring,
+      recurring_day:  is_recurring ? (parseInt(recurring_day) || 1) : null,
+      created_by:     req.user.id,
     });
 
-    await logAudit(cid, req.user.id, 'create', 'expenses', id);
-    return success(res, { id }, 'Expense recorded.', 201);
+    await logAudit(cid, req.user.id, 'create', 'expenses', exp._id.toString());
+    return success(res, { id: exp._id.toString() }, 'Expense recorded.', 201);
   } catch (err) { next(err); }
 }
 
@@ -111,36 +91,21 @@ async function create(req, res, next) {
 async function update(req, res, next) {
   try {
     const cid = req.companyId;
-    const { id } = req.params;
-    const { category_id, amount, payment_method, expense_date, description, notes } = req.body;
-
-    const { rows: [existing] } = await query(
-      'SELECT id FROM expenses WHERE id = $1 AND company_id = $2',
-      [id, cid]
-    );
+    const existing = await Expense.findOne({ _id: req.params.id, company_id: cid }).lean();
     if (!existing) return error(res, 'Expense not found.', 404);
 
-    await query(`
-      UPDATE expenses SET
-        category_id    = COALESCE($1, category_id),
-        amount         = COALESCE($2, amount),
-        payment_method = COALESCE($3, payment_method),
-        expense_date   = COALESCE($4::date, expense_date),
-        title          = COALESCE($5, title),
-        notes          = COALESCE($6, notes),
-        updated_at     = NOW()
-      WHERE id = $7 AND company_id = $8
-    `, [
-      category_id || null,
-      amount ? parseFloat(amount) : null,
-      payment_method || null,
-      expense_date   || null,
-      description?.trim() || null,
-      notes?.trim()       || null,
-      id, cid,
-    ]);
+    const { category_id, amount, payment_method, expense_date, description, notes } = req.body;
+    const upd = {};
+    if (category_id    !== undefined) upd.category_id    = category_id || null;
+    if (amount         !== undefined) upd.amount         = parseFloat(amount);
+    if (payment_method !== undefined) upd.payment_method = payment_method;
+    if (expense_date   !== undefined) upd.expense_date   = new Date(expense_date);
+    if (description    !== undefined) upd.title          = description?.trim() || existing.title;
+    if (notes          !== undefined) upd.notes          = notes?.trim() || null;
+    upd.updated_at = new Date();
 
-    await logAudit(cid, req.user.id, 'update', 'expenses', id);
+    await Expense.findByIdAndUpdate(req.params.id, upd);
+    await logAudit(cid, req.user.id, 'update', 'expenses', req.params.id);
     return success(res, null, 'Expense updated.');
   } catch (err) { next(err); }
 }
@@ -149,21 +114,14 @@ async function update(req, res, next) {
 async function remove(req, res, next) {
   try {
     const cid = req.companyId;
-    const { id } = req.params;
-
-    const { rowCount } = await query(
-      'DELETE FROM expenses WHERE id = $1 AND company_id = $2',
-      [id, cid]
-    );
-    if (!rowCount) return error(res, 'Expense not found.', 404);
-
-    await logAudit(cid, req.user.id, 'delete', 'expenses', id);
+    const deleted = await Expense.findOneAndDelete({ _id: req.params.id, company_id: cid });
+    if (!deleted) return error(res, 'Expense not found.', 404);
+    await logAudit(cid, req.user.id, 'delete', 'expenses', req.params.id);
     return success(res, null, 'Expense deleted.');
   } catch (err) { next(err); }
 }
 
-// ── importCsv (expenses) ──────────────────────────────────────────────────────
-
+// importExpensesCsv
 async function importExpensesCsv(req, res, next) {
   try {
     if (!req.file) return error(res, 'CSV file is required.', 400);
@@ -172,31 +130,26 @@ async function importExpensesCsv(req, res, next) {
     const { rows } = parseCsvBuffer(req.file.buffer);
     let imported = 0;
     const errors = [];
+    const METHODS = ['cash', 'card', 'bank_transfer', 'cheque', 'other'];
 
     for (const row of rows) {
       const line = row._line;
       try {
-        if (!row.title)  { errors.push({ row: line, message: 'Title is required' }); continue; }
+        if (!row.title)  { errors.push({ row: line, message: 'Title is required' });  continue; }
         if (!row.amount) { errors.push({ row: line, message: 'Amount is required' }); continue; }
 
         let catId = null;
         if (row.category_name) {
-          const { rows: cr } = await query(
-            'SELECT id FROM expense_categories WHERE company_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1',
-            [cid, row.category_name]
-          );
-          catId = cr[0]?.id || null;
+          const cat = await ExpenseCategory.findOne({ company_id: cid, name: { $regex: `^${row.category_name}$`, $options: 'i' } }).lean();
+          catId = cat?._id || null;
         }
-
-        const method = ['cash','card','bank_transfer','cheque','other'].includes(row.payment_method)
-          ? row.payment_method : 'cash';
-        const expDate = row.expense_date || new Date().toISOString().slice(0,10);
-
-        await query(
-          `INSERT INTO expenses (company_id, category_id, title, amount, payment_method, expense_date, notes, created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-          [cid, catId, row.title.trim(), toDecimal(row.amount,0), method, expDate, row.notes||null, req.user.id]
-        );
+        const method = METHODS.includes(row.payment_method) ? row.payment_method : 'cash';
+        await Expense.create({
+          company_id: cid, category_id: catId, title: row.title.trim(),
+          amount: toDecimal(row.amount, 0), payment_method: method,
+          expense_date: row.expense_date ? new Date(row.expense_date) : new Date(),
+          notes: row.notes || null, created_by: req.user.id,
+        });
         imported++;
       } catch (e) { errors.push({ row: line, message: e.message }); }
     }
@@ -206,8 +159,7 @@ async function importExpensesCsv(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ── importCsv (expense categories) ───────────────────────────────────────────
-
+// importExpenseCategoriesCsv
 async function importExpenseCategoriesCsv(req, res, next) {
   try {
     if (!req.file) return error(res, 'CSV file is required.', 400);
@@ -221,11 +173,8 @@ async function importExpenseCategoriesCsv(req, res, next) {
       const line = row._line;
       try {
         if (!row.name) { errors.push({ row: line, message: 'Name is required' }); continue; }
-        await query(
-          `INSERT INTO expense_categories (company_id, name, is_active)
-           VALUES ($1,$2,$3) ON CONFLICT (company_id, name) DO NOTHING`,
-          [cid, row.name.trim(), toBoolean(row.is_active, true)]
-        );
+        const exists = await ExpenseCategory.findOne({ company_id: cid, name: row.name.trim() });
+        if (!exists) await ExpenseCategory.create({ company_id: cid, name: row.name.trim(), is_active: toBoolean(row.is_active, true) });
         imported++;
       } catch (e) { errors.push({ row: line, message: e.message }); }
     }

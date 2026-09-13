@@ -7,9 +7,9 @@ module.exports = {
       script: 'backend/src/server.js',
       cwd: '/var/www/sas-garments',
 
-      // Cluster mode: one process per CPU core
-      instances: 'max',
-      exec_mode: 'cluster',
+      // Single process for 1GB RAM droplet
+      instances: 1,
+      exec_mode: 'fork',
 
       // Env vars are loaded from the .env file in cwd
       env_production: {
@@ -26,7 +26,7 @@ module.exports = {
       // Restart policy
       autorestart:  true,
       watch:        false,
-      max_memory_restart: '500M',
+      max_memory_restart: '350M',
       restart_delay: 4000,
       exp_backoff_restart_delay: 100,
 

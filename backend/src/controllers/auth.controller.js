@@ -4,25 +4,29 @@ const bcrypt  = require('bcryptjs');
 const jwt     = require('jsonwebtoken');
 const crypto  = require('crypto');
 const { validationResult } = require('express-validator');
-const { query } = require('../config/database');
 const { env }   = require('../config/env');
 const { AUDIT_ACTIONS, BCRYPT_ROUNDS } = require('../config/constants');
 const { success, error } = require('../utils/response');
 const { logAudit } = require('../utils/audit');
 
+const Company      = require('../models/Company');
+const User         = require('../models/User');
+const Role         = require('../models/Role');
+const RefreshToken = require('../models/RefreshToken');
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function signAccessToken(user) {
+function signAccessToken(user, role) {
   return jwt.sign(
     {
-      id:          user.id,
-      companyId:   user.company_id,
-      branchId:    user.branch_id || null,
+      id:          user._id.toString(),
+      companyId:   user.company_id.toString(),
+      branchId:    user.branch_id ? user.branch_id.toString() : null,
       email:       user.email,
       name:        user.name,
-      role:        user.role_name,
-      roleId:      user.role_id,
-      permissions: user.permissions, // already JSONB object from pg
+      role:        role.name,
+      roleId:      role._id.toString(),
+      permissions: role.permissions,
     },
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN }
@@ -30,7 +34,7 @@ function signAccessToken(user) {
 }
 
 function makeRefreshToken() {
-  return crypto.randomBytes(32).toString('hex'); // 64-char hex
+  return crypto.randomBytes(32).toString('hex');
 }
 
 function hashToken(raw) {
@@ -50,10 +54,7 @@ function refreshCookieOptions() {
 async function saveRefreshToken(userId, raw) {
   const hash      = hashToken(raw);
   const expiresAt = new Date(Date.now() + env.REFRESH_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
-  await query(
-    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-    [userId, hash, expiresAt]
-  );
+  await RefreshToken.create({ user_id: userId, token_hash: hash, expires_at: expiresAt });
   return hash;
 }
 
@@ -66,11 +67,7 @@ const login = async (req, res, next) => {
 
     const { company_slug, email, password } = req.body;
 
-    // Look up company
-    const { rows: [company] } = await query(
-      'SELECT id, is_active, subscription_status, trial_ends_at FROM companies WHERE slug = $1',
-      [company_slug.trim().toLowerCase()]
-    );
+    const company = await Company.findOne({ slug: company_slug.trim().toLowerCase() }).lean();
     if (!company || !company.is_active) {
       return error(res, 'Company not found.', 404);
     }
@@ -78,58 +75,49 @@ const login = async (req, res, next) => {
     if (company.subscription_status === 'suspended') {
       return error(res, 'This account has been suspended by the administrator. Please contact support.', 403);
     }
-
     if (company.subscription_status === 'expired') {
       return error(res, 'Your subscription has expired. Please renew your plan to continue.', 403);
     }
-
     if (company.subscription_status === 'trial' && company.trial_ends_at && new Date(company.trial_ends_at) < new Date()) {
-      await query(
-        `UPDATE companies SET subscription_status = 'expired', updated_at = NOW() WHERE id = $1`,
-        [company.id]
-      );
+      await Company.findByIdAndUpdate(company._id, { subscription_status: 'expired' });
       return error(res, 'Your free trial has ended. Please upgrade your plan to continue.', 403);
     }
 
-    // Look up user with role info (permissions is JSONB — pg returns it as object automatically)
-    const { rows: [user] } = await query(
-      `SELECT u.*, r.name AS role_name, r.permissions
-       FROM users u
-       JOIN roles r ON r.id = u.role_id
-       WHERE u.company_id = $1 AND u.email = $2 AND u.is_active = TRUE`,
-      [company.id, email.toLowerCase().trim()]
-    );
+    const user = await User.findOne({
+      company_id: company._id,
+      email:      email.toLowerCase().trim(),
+      is_active:  true,
+    }).lean();
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return error(res, 'Invalid email or password.', 401);
     }
 
-    // Update last login
-    await query(
-      `UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE id = $1`,
-      [user.id]
-    );
+    const role = await Role.findById(user.role_id).lean();
+    if (!role) return error(res, 'Role not found.', 500);
 
-    const accessToken  = signAccessToken(user);
+    await User.findByIdAndUpdate(user._id, { last_login: new Date() });
+
+    const accessToken  = signAccessToken(user, role);
     const refreshToken = makeRefreshToken();
-    await saveRefreshToken(user.id, refreshToken);
+    await saveRefreshToken(user._id, refreshToken);
 
-    await logAudit(user.company_id, user.id, AUDIT_ACTIONS.LOGIN, 'users', user.id);
+    await logAudit(company._id.toString(), user._id.toString(), AUDIT_ACTIONS.LOGIN, 'users', user._id.toString());
 
     res.cookie('refresh_token', refreshToken, refreshCookieOptions());
 
     return success(res, {
       token: accessToken,
       user: {
-        id:          user.id,
+        id:          user._id.toString(),
         name:        user.name,
         email:       user.email,
-        role:        user.role_name,
-        roleId:      user.role_id,
-        companyId:   user.company_id,
-        branchId:    user.branch_id || null,
+        role:        role.name,
+        roleId:      role._id.toString(),
+        companyId:   company._id.toString(),
+        branchId:    user.branch_id ? user.branch_id.toString() : null,
         avatar:      user.avatar,
-        permissions: user.permissions,
+        permissions: role.permissions,
       },
     }, 'Login successful.');
   } catch (err) {
@@ -144,41 +132,30 @@ const refresh = async (req, res, next) => {
     const raw = req.cookies?.refresh_token;
     if (!raw) return error(res, 'No refresh token.', 401);
 
-    const hash = hashToken(raw);
-    const { rows: [stored] } = await query(
-      `SELECT rt.*, u.company_id, u.is_active
-       FROM refresh_tokens rt
-       JOIN users u ON u.id = rt.user_id
-       WHERE rt.token_hash = $1
-         AND rt.revoked_at IS NULL
-         AND rt.expires_at > NOW()`,
-      [hash]
-    );
+    const hash   = hashToken(raw);
+    const stored = await RefreshToken.findOne({
+      token_hash: hash,
+      revoked_at: null,
+      expires_at: { $gt: new Date() },
+    }).lean();
 
-    if (!stored || !stored.is_active) {
+    if (!stored) {
       res.clearCookie('refresh_token', { path: '/api/auth' });
       return error(res, 'Invalid or expired refresh token.', 401);
     }
 
-    // Load full user for a fresh token
-    const { rows: [user] } = await query(
-      `SELECT u.*, r.name AS role_name, r.permissions
-       FROM users u
-       JOIN roles r ON r.id = u.role_id
-       WHERE u.id = $1 AND u.is_active = TRUE`,
-      [stored.user_id]
-    );
+    const user = await User.findOne({ _id: stored.user_id, is_active: true }).lean();
     if (!user) return error(res, 'User not found.', 401);
 
-    // Rotate — revoke old, issue new
-    await query(
-      `UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1`,
-      [hash]
-    );
+    const role = await Role.findById(user.role_id).lean();
+    if (!role) return error(res, 'Role not found.', 401);
 
-    const newAccessToken  = signAccessToken(user);
+    // Rotate — revoke old, issue new
+    await RefreshToken.updateOne({ token_hash: hash }, { revoked_at: new Date() });
+
+    const newAccessToken  = signAccessToken(user, role);
     const newRefreshToken = makeRefreshToken();
-    await saveRefreshToken(user.id, newRefreshToken);
+    await saveRefreshToken(user._id, newRefreshToken);
 
     res.cookie('refresh_token', newRefreshToken, refreshCookieOptions());
     return success(res, { token: newAccessToken }, 'Token refreshed.');
@@ -193,10 +170,7 @@ const logout = async (req, res, next) => {
   try {
     const raw = req.cookies?.refresh_token;
     if (raw) {
-      await query(
-        `UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1`,
-        [hashToken(raw)]
-      );
+      await RefreshToken.updateOne({ token_hash: hashToken(raw) }, { revoked_at: new Date() });
     }
     if (req.user) {
       await logAudit(req.user.companyId, req.user.id, AUDIT_ACTIONS.LOGOUT, 'users', req.user.id);
@@ -212,27 +186,26 @@ const logout = async (req, res, next) => {
 
 const me = async (req, res, next) => {
   try {
-    const { rows: [user] } = await query(
-      `SELECT u.id, u.name, u.email, u.avatar, u.phone, u.last_login, u.company_id, u.branch_id,
-              r.name AS role_name, r.permissions
-       FROM users u
-       JOIN roles r ON r.id = u.role_id
-       WHERE u.id = $1 AND u.company_id = $2 AND u.is_active = TRUE`,
-      [req.user.id, req.companyId]
-    );
+    const user = await User.findOne({
+      _id:       req.user.id,
+      company_id: req.companyId,
+      is_active: true,
+    }).lean();
     if (!user) return error(res, 'User not found.', 404);
 
+    const role = await Role.findById(user.role_id).lean();
+
     return success(res, {
-      id:          user.id,
+      id:          user._id.toString(),
       name:        user.name,
       email:       user.email,
-      role:        user.role_name,
-      companyId:   user.company_id,
-      branchId:    user.branch_id,
+      role:        role?.name,
+      companyId:   user.company_id.toString(),
+      branchId:    user.branch_id ? user.branch_id.toString() : null,
       avatar:      user.avatar,
       phone:       user.phone,
       lastLogin:   user.last_login,
-      permissions: user.permissions,
+      permissions: role?.permissions,
     });
   } catch (err) {
     next(err);
@@ -247,29 +220,20 @@ const changePassword = async (req, res, next) => {
     if (!errors.isEmpty()) return error(res, errors.array()[0].msg, 422);
 
     const { currentPassword, newPassword } = req.body;
-    const { rows: [user] } = await query(
-      'SELECT id, password FROM users WHERE id = $1 AND company_id = $2',
-      [req.user.id, req.companyId]
-    );
+    const user = await User.findOne({ _id: req.user.id, company_id: req.companyId }).select('+password').lean();
     if (!user) return error(res, 'User not found.', 404);
 
     const valid = await bcrypt.compare(currentPassword, user.password);
     if (!valid) return error(res, 'Current password is incorrect.', 400);
 
     const hashed = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-    await query(
-      `UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2`,
-      [hashed, user.id]
-    );
+    await User.findByIdAndUpdate(user._id, { password: hashed });
 
     // Revoke all refresh tokens — force re-login everywhere
-    await query(
-      `UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
-      [user.id]
-    );
+    await RefreshToken.updateMany({ user_id: user._id, revoked_at: null }, { revoked_at: new Date() });
     res.clearCookie('refresh_token', { path: '/api/auth' });
 
-    await logAudit(req.companyId, user.id, AUDIT_ACTIONS.UPDATE, 'users', user.id, { action: 'password_changed' });
+    await logAudit(req.companyId, user._id.toString(), AUDIT_ACTIONS.UPDATE, 'users', user._id.toString(), { action: 'password_changed' });
     return success(res, null, 'Password changed successfully. Please log in again.');
   } catch (err) {
     next(err);

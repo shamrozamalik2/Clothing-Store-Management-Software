@@ -1,20 +1,12 @@
 'use strict';
 
 const { validationResult }            = require('express-validator');
-const { query }                       = require('../config/database');
-const { toSlug, uniqueSlug }          = require('../utils/slug');
+const Category  = require('../models/Category');
+const Product   = require('../models/Product');
 const { AUDIT_ACTIONS }               = require('../config/constants');
 const { success, created, error }     = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { logAudit }                    = require('../utils/audit');
-
-const PRODUCT_COUNT_SUB = `
-  (SELECT COUNT(*) FROM products
-   WHERE category_id = c.id AND is_active = TRUE AND company_id = c.company_id)
-`;
-const SELECT_COLS = `
-  c.*, p.name AS parent_name, ${PRODUCT_COUNT_SUB} AS product_count
-`;
 
 // ── list ──────────────────────────────────────────────────────────────────────
 
@@ -23,56 +15,44 @@ const list = async (req, res, next) => {
     const cid = req.companyId;
 
     if (req.query.flat === '1') {
-      const { rows } = await query(`
-        SELECT c.id, c.name, c.parent_id, c.is_active, p.name AS parent_name
-        FROM categories c
-        LEFT JOIN categories p ON p.id = c.parent_id
-        WHERE c.company_id = $1 AND c.is_active = TRUE
-        ORDER BY COALESCE(p.name,'') ASC, c.name ASC
-      `, [cid]);
-      return success(res, rows);
+      const cats = await Category.find({ company_id: cid, is_active: true }, { name: 1, parent_id: 1 })
+        .populate('parent_id', 'name').sort({ name: 1 }).lean();
+      return success(res, cats.map(c => ({ id: c._id.toString(), name: c.name, parent_id: c.parent_id?._id?.toString() || null, parent_name: c.parent_id?.name || null, is_active: c.is_active })));
     }
 
     const { page, limit, offset } = parsePagination(req.query);
     const { search = '', status = '', parent = '' } = req.query;
 
-    const params = [cid];
-    const where  = ['c.company_id = $1'];
+    const filter = { company_id: cid };
+    if (search) filter.$or = [{ name: { $regex: search, $options: 'i' } }];
+    if (status !== '') filter.is_active = status === 'active';
+    if (parent === 'root')    filter.parent_id = null;
+    else if (parent)          filter.parent_id = parent;
 
-    if (search) {
-      params.push(`%${search}%`);
-      where.push(`(c.name ILIKE $${params.length} OR c.slug ILIKE $${params.length})`);
-    }
-    if (status !== '') {
-      params.push(status === 'active');
-      where.push(`c.is_active = $${params.length}`);
-    }
-    if (parent !== '') {
-      if (parent === 'root') {
-        where.push('c.parent_id IS NULL');
-      } else {
-        params.push(parseInt(parent, 10));
-        where.push(`c.parent_id = $${params.length}`);
-      }
-    }
+    const [total, categories] = await Promise.all([
+      Category.countDocuments(filter),
+      Category.find(filter).populate('parent_id', 'name').sort({ name: 1 }).skip(offset).limit(limit).lean(),
+    ]);
 
-    const wStr = where.join(' AND ');
+    // Get product counts
+    const catIds = categories.map(c => c._id);
+    const prodCounts = await Product.aggregate([
+      { $match: { company_id: cid, category_id: { $in: catIds }, is_active: true } },
+      { $group: { _id: '$category_id', count: { $sum: 1 } } },
+    ]);
+    const cntMap = Object.fromEntries(prodCounts.map(r => [r._id.toString(), r.count]));
 
-    const { rows: [{ cnt }] } = await query(
-      `SELECT COUNT(*) AS cnt FROM categories c WHERE ${wStr}`,
-      params
-    );
-    const total = parseInt(cnt, 10);
-
-    params.push(limit, offset);
-    const { rows } = await query(`
-      SELECT ${SELECT_COLS}
-      FROM categories c
-      LEFT JOIN categories p ON p.id = c.parent_id
-      WHERE ${wStr}
-      ORDER BY c.name ASC
-      LIMIT $${params.length - 1} OFFSET $${params.length}
-    `, params);
+    const rows = categories.map(c => ({
+      id:            c._id.toString(),
+      name:          c.name,
+      description:   c.description,
+      parent_id:     c.parent_id?._id?.toString() || null,
+      parent_name:   c.parent_id?.name || null,
+      is_active:     c.is_active,
+      product_count: cntMap[c._id.toString()] || 0,
+      created_at:    c.created_at,
+      updated_at:    c.updated_at,
+    }));
 
     return res.json({ success: true, data: rows, pagination: buildPaginationMeta(total, page, limit) });
   } catch (err) { next(err); }
@@ -83,21 +63,24 @@ const list = async (req, res, next) => {
 const getOne = async (req, res, next) => {
   try {
     const cid = req.companyId;
-    const id  = parseInt(req.params.id, 10);
+    const cat = await Category.findOne({ _id: req.params.id, company_id: cid }).populate('parent_id', 'name').lean();
+    if (!cat) return error(res, 'Category not found.', 404);
 
-    const { rows: [row] } = await query(`
-      SELECT ${SELECT_COLS}
-      FROM categories c
-      LEFT JOIN categories p ON p.id = c.parent_id
-      WHERE c.id = $1 AND c.company_id = $2
-    `, [id, cid]);
-    if (!row) return error(res, 'Category not found.', 404);
+    const [productCount, children] = await Promise.all([
+      Product.countDocuments({ company_id: cid, category_id: cat._id, is_active: true }),
+      Category.find({ company_id: cid, parent_id: cat._id }, { name: 1 }).lean(),
+    ]);
 
-    const { rows: children } = await query(
-      'SELECT id, name FROM categories WHERE parent_id = $1 AND company_id = $2',
-      [id, cid]
-    );
-    return success(res, { ...row, children });
+    return success(res, {
+      id:            cat._id.toString(),
+      name:          cat.name,
+      description:   cat.description,
+      is_active:     cat.is_active,
+      parent_id:     cat.parent_id?._id?.toString() || null,
+      parent_name:   cat.parent_id?.name || null,
+      product_count: productCount,
+      children:      children.map(ch => ({ id: ch._id.toString(), name: ch.name })),
+    });
   } catch (err) { next(err); }
 };
 
@@ -110,26 +93,11 @@ const create = async (req, res, next) => {
 
     const cid = req.companyId;
     const { name, description = null, parent_id = null } = req.body;
-
-    if (parent_id) {
-      const { rows } = await query(
-        'SELECT id FROM categories WHERE id = $1 AND company_id = $2',
-        [parent_id, cid]
-      );
-      if (!rows[0]) return error(res, 'Parent category not found.', 400);
-    }
-
-    const slug  = await uniqueSlug('categories', cid, toSlug(name.trim()));
     const image = req.file ? `/uploads/categories/${req.file.filename}` : null;
 
-    const { rows: [row] } = await query(`
-      INSERT INTO categories (company_id, name, slug, description, parent_id, image, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6, TRUE)
-      RETURNING *
-    `, [cid, name.trim(), slug, description, parent_id || null, image]);
-
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'categories', row.id, { name: row.name });
-    return created(res, row, 'Category created successfully.');
+    const cat = await Category.create({ company_id: cid, name: name.trim(), description, parent_id: parent_id || null, image, is_active: true });
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'categories', cat._id.toString(), { name: cat.name });
+    return created(res, { ...cat.toJSON(), id: cat._id.toString() }, 'Category created successfully.');
   } catch (err) { next(err); }
 };
 
@@ -141,38 +109,24 @@ const update = async (req, res, next) => {
     if (!errs.isEmpty()) return error(res, errs.array()[0].msg, 422);
 
     const cid = req.companyId;
-    const id  = parseInt(req.params.id, 10);
-
-    const { rows: [existing] } = await query(
-      'SELECT * FROM categories WHERE id = $1 AND company_id = $2',
-      [id, cid]
-    );
+    const existing = await Category.findOne({ _id: req.params.id, company_id: cid }).lean();
     if (!existing) return error(res, 'Category not found.', 404);
 
     const { name, description, parent_id, is_active } = req.body;
 
-    if (parent_id && parseInt(parent_id, 10) === id) {
-      return error(res, 'A category cannot be its own parent.', 400);
-    }
+    if (parent_id && parent_id === req.params.id) return error(res, 'A category cannot be its own parent.', 400);
 
-    const newName  = name ? name.trim() : existing.name;
-    const newSlug  = name ? await uniqueSlug('categories', cid, toSlug(newName), id) : existing.slug;
-    const newImage = req.file ? `/uploads/categories/${req.file.filename}` : existing.image;
-    const newActive = is_active !== undefined ? Boolean(is_active) : existing.is_active;
-    const newParent = parent_id !== undefined ? (parent_id || null) : existing.parent_id;
+    const upd = {};
+    if (name        !== undefined) upd.name        = name.trim();
+    if (description !== undefined) upd.description = description;
+    if (parent_id   !== undefined) upd.parent_id   = parent_id || null;
+    if (is_active   !== undefined) upd.is_active   = is_active !== false && is_active !== 'false';
+    if (req.file)                  upd.image        = `/uploads/categories/${req.file.filename}`;
+    upd.updated_at = new Date();
 
-    const { rows: [updated] } = await query(`
-      UPDATE categories
-      SET name=$3, slug=$4, description=$5, parent_id=$6, image=$7, is_active=$8, updated_at=NOW()
-      WHERE id=$1 AND company_id=$2
-      RETURNING *
-    `, [id, cid, newName, newSlug,
-        description !== undefined ? description : existing.description,
-        newParent, newImage, newActive]);
-
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'categories', id,
-      { name: existing.name }, { name: updated.name });
-    return success(res, updated, 'Category updated successfully.');
+    const updated = await Category.findByIdAndUpdate(req.params.id, upd, { new: true }).lean();
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'categories', req.params.id);
+    return success(res, { ...updated, id: updated._id.toString() }, 'Category updated successfully.');
   } catch (err) { next(err); }
 };
 
@@ -181,28 +135,19 @@ const update = async (req, res, next) => {
 const remove = async (req, res, next) => {
   try {
     const cid = req.companyId;
-    const id  = parseInt(req.params.id, 10);
-
-    const { rows: [cat] } = await query(
-      'SELECT * FROM categories WHERE id = $1 AND company_id = $2',
-      [id, cid]
-    );
+    const cat = await Category.findOne({ _id: req.params.id, company_id: cid }).lean();
     if (!cat) return error(res, 'Category not found.', 404);
 
-    const { rows: [{ p }] } = await query(
-      'SELECT COUNT(*) AS p FROM products WHERE category_id = $1 AND company_id = $2',
-      [id, cid]
-    );
-    const { rows: [{ c }] } = await query(
-      'SELECT COUNT(*) AS c FROM categories WHERE parent_id = $1 AND company_id = $2',
-      [id, cid]
-    );
+    const [prodCnt, childCnt] = await Promise.all([
+      Product.countDocuments({ company_id: cid, category_id: cat._id }),
+      Category.countDocuments({ company_id: cid, parent_id: cat._id }),
+    ]);
 
-    if (parseInt(p, 10) > 0) return error(res, `Cannot delete: ${p} product(s) use this category.`, 409);
-    if (parseInt(c, 10) > 0) return error(res, `Cannot delete: ${c} subcategorie(s) exist here.`, 409);
+    if (prodCnt > 0)  return error(res, `Cannot delete: ${prodCnt} product(s) use this category.`, 409);
+    if (childCnt > 0) return error(res, `Cannot delete: ${childCnt} subcategory(ies) exist here.`, 409);
 
-    await query('DELETE FROM categories WHERE id = $1 AND company_id = $2', [id, cid]);
-    await logAudit(cid, req.user.id, AUDIT_ACTIONS.DELETE, 'categories', id, { name: cat.name });
+    await Category.findByIdAndDelete(req.params.id);
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.DELETE, 'categories', req.params.id, { name: cat.name });
     return success(res, null, 'Category deleted successfully.');
   } catch (err) { next(err); }
 };
@@ -223,12 +168,10 @@ const importCsv = async (req, res, next) => {
       try {
         if (!row.name) { errors.push({ row: line, message: 'Name is required' }); continue; }
         const name = row.name.trim();
-        const slug = await uniqueSlug('categories', cid, toSlug(name));
-        await query(
-          `INSERT INTO categories (company_id, name, slug, description, is_active)
-           VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
-          [cid, name, slug, row.description || null, toBoolean(row.is_active, true)]
-        );
+        const exists = await Category.findOne({ company_id: cid, name });
+        if (!exists) {
+          await Category.create({ company_id: cid, name, description: row.description || null, is_active: toBoolean(row.is_active, true) });
+        }
         imported++;
       } catch (e) { errors.push({ row: line, message: e.message }); }
     }

@@ -15,8 +15,11 @@ const env = {
   IS_DEV:   opt('NODE_ENV', 'development') !== 'production',
   PORT:     parseInt(opt('PORT', '3001'), 10),
 
-  // ── PostgreSQL ─────────────────────────────────────────────
-  DATABASE_URL: req('DATABASE_URL'),
+  // ── MongoDB ────────────────────────────────────────────────
+  MONGODB_URI: opt('MONGODB_URI', ''),
+
+  // ── PostgreSQL (kept for legacy migration tooling) ─────────
+  DATABASE_URL: opt('DATABASE_URL', ''),
   DB_POOL_MAX:  parseInt(opt('DB_POOL_MAX', '20'), 10),
   DB_SSL:       opt('DB_SSL', 'true') === 'true',
 

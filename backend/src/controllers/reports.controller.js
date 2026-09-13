@@ -1,133 +1,132 @@
 'use strict';
 
-const { query } = require('../config/database');
+const mongoose = require('mongoose');
+const Sale     = require('../models/Sale');
+const Product  = require('../models/Product');
+const Purchase = require('../models/Purchase');
+const Customer = require('../models/Customer');
+const User     = require('../models/User');
+const Return   = require('../models/Return');
+const Expense  = require('../models/Expense');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
+
+function dayRange(dateStr) {
+  const d   = new Date(dateStr);
+  const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const end   = new Date(start.getTime() + 86400000 - 1);
+  return { start, end };
+}
 
 function getDateRange(qry) {
   const today = new Date().toISOString().slice(0, 10);
   return { from: qry.from || today, to: qry.to || today };
 }
 
-// ─── mobile dashboard (single-call summary) ──────────────────────────────────
+function fromToRange(from, to) {
+  return {
+    $gte: new Date(from + 'T00:00:00.000Z'),
+    $lte: new Date(to   + 'T23:59:59.999Z'),
+  };
+}
+
+// ─── mobile dashboard ─────────────────────────────────────────────────────────
 
 exports.dashboard = async (req, res, next) => {
   try {
-    const cid   = req.companyId;
-    const today = new Date().toISOString().slice(0, 10);
-
-    // 7-day window
+    const cid     = req.companyId;
+    const today   = new Date().toISOString().slice(0, 10);
     const weekAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const todayStart = new Date(today + 'T00:00:00.000Z');
+    const todayEnd   = new Date(today + 'T23:59:59.999Z');
+    const weekStart  = new Date(weekAgo + 'T00:00:00.000Z');
 
-    const [todayRow, cogsRow, stockRow, recentRows, topRows, weekRows, paymentRow] = await Promise.all([
-      // today KPIs
-      query(`
-        SELECT
-          COUNT(*)::int                    AS today_orders,
-          COALESCE(SUM(total_amount), 0)   AS today_sales,
-          COALESCE(SUM(due_amount),   0)   AS pending_payments
-        FROM sales
-        WHERE company_id=$1 AND status='completed' AND sale_date::date = $2
-      `, [cid, today]),
-
-      // today COGS → profit
-      query(`
-        SELECT COALESCE(SUM(si.cost_price * si.quantity), 0) AS cogs
-        FROM sale_items si
-        JOIN sales s ON s.id = si.sale_id
-        WHERE s.company_id=$1 AND s.status='completed' AND s.sale_date::date=$2
-      `, [cid, today]),
-
-      // low stock + out-of-stock counts
-      query(`
-        SELECT
-          SUM(CASE WHEN track_inventory AND stock_quantity > 0
-                        AND stock_quantity <= low_stock_alert THEN 1 ELSE 0 END)::int AS low_stock_count,
-          SUM(CASE WHEN track_inventory AND stock_quantity <= 0 THEN 1 ELSE 0 END)::int AS out_of_stock_count
-        FROM products WHERE company_id=$1 AND is_active=TRUE
-      `, [cid]),
-
+    const [todayAgg, cogsAgg, stockAgg, recentSales, topProducts, weeklySales, paymentAgg] = await Promise.all([
+      // Today KPIs
+      Sale.aggregate([
+        { $match: { company_id: cid, status: 'completed', sale_date: { $gte: todayStart, $lte: todayEnd } } },
+        { $group: { _id: null, today_orders: { $sum: 1 }, today_sales: { $sum: '$total_amount' }, pending_payments: { $sum: '$due_amount' } } },
+      ]),
+      // Today COGS
+      Sale.aggregate([
+        { $match: { company_id: cid, status: 'completed', sale_date: { $gte: todayStart, $lte: todayEnd } } },
+        { $unwind: '$items' },
+        { $group: { _id: null, cogs: { $sum: { $multiply: ['$items.cost_price', '$items.quantity'] } } } },
+      ]),
+      // Stock counts
+      Product.aggregate([
+        { $match: { company_id: cid, is_active: true } },
+        { $group: {
+          _id: null,
+          low_stock_count:    { $sum: { $cond: [{ $and: [{ $eq: ['$track_inventory', true] }, { $gt: ['$stock_quantity', 0] }, { $lte: ['$stock_quantity', '$low_stock_alert'] }] }, 1, 0] } },
+          out_of_stock_count: { $sum: { $cond: [{ $and: [{ $eq: ['$track_inventory', true] }, { $lte: ['$stock_quantity', 0] }] }, 1, 0] } },
+        }},
+      ]),
       // 10 most recent sales
-      query(`
-        SELECT s.id,
-               s.reference     AS invoice_no,
-               s.total_amount,
-               s.sale_date     AS created_at,
-               c.name          AS customer_name
-        FROM sales s
-        LEFT JOIN customers c ON c.id = s.customer_id
-        WHERE s.company_id=$1 AND s.status='completed'
-        ORDER BY s.sale_date DESC LIMIT 10
-      `, [cid]),
-
-      // top 5 products (all time or last 30 days)
-      query(`
-        SELECT p.name,
-               COALESCE(SUM(si.quantity),0)::int       AS total_qty,
-               COALESCE(SUM(si.total),   0)            AS revenue
-        FROM sale_items si
-        JOIN sales    s ON s.id  = si.sale_id
-        JOIN products p ON p.id  = si.product_id
-        WHERE s.company_id=$1 AND s.status='completed'
-          AND s.sale_date::date >= (CURRENT_DATE - INTERVAL '30 days')
-        GROUP BY p.name
-        ORDER BY revenue DESC LIMIT 5
-      `, [cid]),
-
-      // weekly sales (last 7 days)
-      query(`
-        SELECT TO_CHAR(sale_date::date, 'Dy') AS day,
-               COALESCE(SUM(total_amount), 0) AS amount
-        FROM sales
-        WHERE company_id=$1 AND status='completed'
-          AND sale_date::date BETWEEN $2 AND $3
-        GROUP BY sale_date::date
-        ORDER BY sale_date::date ASC
-      `, [cid, weekAgo, today]),
-
-      // today payment method breakdown
-      query(`
-        SELECT
-          COALESCE(SUM(CASE WHEN payment_method = 'cash'   THEN total_amount END), 0) AS cash_sales,
-          COALESCE(SUM(CASE WHEN payment_method = 'card'   THEN total_amount END), 0) AS card_sales,
-          COALESCE(SUM(CASE WHEN payment_method = 'credit' THEN total_amount END), 0) AS credit_sales,
-          COALESCE(SUM(CASE WHEN payment_method = 'bank'   THEN total_amount END), 0) AS bank_sales
-        FROM sales
-        WHERE company_id=$1 AND status='completed' AND sale_date::date = $2
-      `, [cid, today]),
+      Sale.find({ company_id: cid, status: 'completed' }, { reference: 1, total_amount: 1, sale_date: 1, customer_id: 1 })
+        .sort({ sale_date: -1 }).limit(10).lean(),
+      // Top 5 products last 30 days
+      Sale.aggregate([
+        { $match: { company_id: cid, status: 'completed', sale_date: { $gte: new Date(Date.now() - 30 * 86400000) } } },
+        { $unwind: '$items' },
+        { $group: { _id: '$items.product_id', name: { $first: '$items.product_name' }, total_qty: { $sum: '$items.quantity' }, revenue: { $sum: '$items.total' } } },
+        { $sort: { revenue: -1 } },
+        { $limit: 5 },
+        { $project: { name: 1, total_qty: 1, revenue: 1 } },
+      ]),
+      // Weekly sales
+      Sale.aggregate([
+        { $match: { company_id: cid, status: 'completed', sale_date: { $gte: weekStart, $lte: todayEnd } } },
+        { $group: {
+          _id:    { $dateToString: { format: '%Y-%m-%d', date: '$sale_date' } },
+          amount: { $sum: '$total_amount' },
+        }},
+        { $sort: { _id: 1 } },
+      ]),
+      // Today payment method breakdown
+      Sale.aggregate([
+        { $match: { company_id: cid, status: 'completed', sale_date: { $gte: todayStart, $lte: todayEnd } } },
+        { $group: {
+          _id:          null,
+          cash_sales:   { $sum: { $cond: [{ $eq: ['$payment_method', 'cash'] },   '$total_amount', 0] } },
+          card_sales:   { $sum: { $cond: [{ $eq: ['$payment_method', 'card'] },   '$total_amount', 0] } },
+          credit_sales: { $sum: { $cond: [{ $eq: ['$payment_method', 'credit'] }, '$total_amount', 0] } },
+          bank_sales:   { $sum: { $cond: [{ $eq: ['$payment_method', 'bank'] },   '$total_amount', 0] } },
+        }},
+      ]),
     ]);
 
-    const t    = todayRow.rows[0];
-    const cogs = parseFloat(cogsRow.rows[0].cogs) || 0;
-    const pm   = paymentRow.rows[0];
+    // Populate customer names for recent sales
+    const custIds = [...new Set(recentSales.map(s => s.customer_id?.toString()).filter(Boolean))];
+    const custMap = await Customer.find({ _id: { $in: custIds } }, { name: 1 }).lean().then(r => Object.fromEntries(r.map(c => [c._id.toString(), c.name])));
 
-    const todaySales = parseFloat(t.today_sales) || 0;
+    const t   = todayAgg[0]  || { today_orders: 0, today_sales: 0, pending_payments: 0 };
+    const cogs = parseFloat(cogsAgg[0]?.cogs || 0);
+    const st  = stockAgg[0]  || { low_stock_count: 0, out_of_stock_count: 0 };
+    const pm  = paymentAgg[0] || { cash_sales: 0, card_sales: 0, credit_sales: 0, bank_sales: 0 };
 
     res.json({
       success: true,
       data: {
-        today_sales:       todaySales,
-        today_orders:      t.today_orders || 0,
-        today_profit:      todaySales - cogs,
-        low_stock_count:   stockRow.rows[0].low_stock_count   || 0,
-        out_of_stock_count: stockRow.rows[0].out_of_stock_count || 0,
-        pending_payments:  parseFloat(t.pending_payments) || 0,
-        cash_sales:        parseFloat(pm.cash_sales)   || 0,
-        card_sales:        parseFloat(pm.card_sales)   || 0,
-        credit_sales:      parseFloat(pm.credit_sales) || 0,
-        bank_sales:        parseFloat(pm.bank_sales)   || 0,
-        recent_sales:     recentRows.rows.map(r => ({
-          ...r,
-          total_amount: parseFloat(r.total_amount) || 0,
+        today_sales:        parseFloat(t.today_sales)        || 0,
+        today_orders:       t.today_orders                   || 0,
+        today_profit:       (parseFloat(t.today_sales) || 0) - cogs,
+        low_stock_count:    st.low_stock_count               || 0,
+        out_of_stock_count: st.out_of_stock_count            || 0,
+        pending_payments:   parseFloat(t.pending_payments)   || 0,
+        cash_sales:         parseFloat(pm.cash_sales)        || 0,
+        card_sales:         parseFloat(pm.card_sales)        || 0,
+        credit_sales:       parseFloat(pm.credit_sales)      || 0,
+        bank_sales:         parseFloat(pm.bank_sales)        || 0,
+        recent_sales: recentSales.map(s => ({
+          id:            s._id.toString(),
+          invoice_no:    s.reference,
+          total_amount:  parseFloat(s.total_amount) || 0,
+          created_at:    s.sale_date,
+          customer_name: s.customer_id ? custMap[s.customer_id.toString()] || null : null,
         })),
-        top_products: topRows.rows.map(r => ({
-          ...r,
-          revenue: parseFloat(r.revenue) || 0,
-        })),
-        weekly_sales: weekRows.rows.map(r => ({
-          ...r,
-          amount: parseFloat(r.amount) || 0,
-        })),
+        top_products: topProducts.map(p => ({ name: p.name, total_qty: p.total_qty, revenue: parseFloat(p.revenue) || 0 })),
+        weekly_sales: weeklySales.map(w => ({ day: new Date(w._id).toLocaleDateString('en-US', { weekday: 'short' }), amount: parseFloat(w.amount) || 0 })),
       },
     });
   } catch (err) { next(err); }
@@ -139,66 +138,51 @@ exports.overview = async (req, res, next) => {
   try {
     const cid = req.companyId;
     const { from, to } = getDateRange(req.query);
+    const dateRange = fromToRange(from, to);
 
-    const { rows: [sales] } = await query(`
-      SELECT
-        COUNT(*)::int                    AS sale_count,
-        COALESCE(SUM(total_amount),0)    AS revenue,
-        COALESCE(SUM(paid_amount), 0)    AS collected,
-        COALESCE(SUM(due_amount),  0)    AS outstanding,
-        COALESCE(SUM(discount_amount),0) AS total_discount,
-        COALESCE(SUM(tax_amount),  0)    AS total_tax
-      FROM sales
-      WHERE company_id=$1 AND status='completed'
-        AND sale_date::date BETWEEN $2 AND $3
-    `, [cid, from, to]);
+    const [salesAgg, cogsAgg, purchasesAgg, stockAgg] = await Promise.all([
+      Sale.aggregate([
+        { $match: { company_id: cid, status: 'completed', sale_date: dateRange } },
+        { $group: {
+          _id:            null,
+          sale_count:     { $sum: 1 },
+          revenue:        { $sum: '$total_amount' },
+          collected:      { $sum: '$paid_amount' },
+          outstanding:    { $sum: '$due_amount' },
+          total_discount: { $sum: '$discount_amount' },
+          total_tax:      { $sum: '$tax_amount' },
+        }},
+      ]),
+      Sale.aggregate([
+        { $match: { company_id: cid, status: 'completed', sale_date: dateRange } },
+        { $unwind: '$items' },
+        { $group: { _id: null, cogs: { $sum: { $multiply: ['$items.cost_price', '$items.quantity'] } } } },
+      ]),
+      Purchase.aggregate([
+        { $match: { company_id: cid, status: 'received', purchase_date: dateRange } },
+        { $group: { _id: null, purchase_count: { $sum: 1 }, purchase_total: { $sum: '$total_amount' }, purchase_paid: { $sum: '$paid_amount' }, purchase_due: { $sum: '$due_amount' } } },
+      ]),
+      Product.aggregate([
+        { $match: { company_id: cid, is_active: true } },
+        { $group: {
+          _id:           null,
+          total_products: { $sum: 1 },
+          out_of_stock:   { $sum: { $cond: [{ $and: [{ $eq: ['$track_inventory', true] }, { $lte: ['$stock_quantity', 0] }] }, 1, 0] } },
+          low_stock:      { $sum: { $cond: [{ $and: [{ $eq: ['$track_inventory', true] }, { $gt: ['$stock_quantity', 0] }, { $lte: ['$stock_quantity', '$low_stock_alert'] }] }, 1, 0] } },
+        }},
+      ]),
+    ]);
 
-    const { rows: [cogs] } = await query(`
-      SELECT COALESCE(SUM(si.cost_price * si.quantity),0) AS cogs
-      FROM sale_items si
-      JOIN sales s ON s.id = si.sale_id
-      WHERE s.company_id=$1 AND s.status='completed'
-        AND s.sale_date::date BETWEEN $2 AND $3
-    `, [cid, from, to]);
-
-    const { rows: [purchases] } = await query(`
-      SELECT
-        COUNT(*)::int                  AS purchase_count,
-        COALESCE(SUM(total_amount),0)  AS purchase_total,
-        COALESCE(SUM(paid_amount), 0)  AS purchase_paid,
-        COALESCE(SUM(due_amount),  0)  AS purchase_due
-      FROM purchases
-      WHERE company_id=$1 AND status='received'
-        AND purchase_date BETWEEN $2 AND $3
-    `, [cid, from, to]);
-
-    const { rows: [stock] } = await query(`
-      SELECT
-        COUNT(*)::int AS total_products,
-        SUM(CASE WHEN track_inventory AND stock_quantity <= 0 THEN 1 ELSE 0 END)::int AS out_of_stock,
-        SUM(CASE WHEN track_inventory AND stock_quantity > 0 AND stock_quantity <= low_stock_alert THEN 1 ELSE 0 END)::int AS low_stock
-      FROM products
-      WHERE company_id=$1 AND is_active=TRUE
-    `, [cid]);
-
-    const revenue = parseFloat(sales.revenue) || 0;
-    const cogsVal = parseFloat(cogs.cogs)     || 0;
+    const sales     = salesAgg[0]     || { sale_count: 0, revenue: 0, collected: 0, outstanding: 0, total_discount: 0, total_tax: 0 };
+    const cogsVal   = parseFloat(cogsAgg[0]?.cogs || 0);
+    const purchases = purchasesAgg[0] || { purchase_count: 0, purchase_total: 0, purchase_paid: 0, purchase_due: 0 };
+    const stock     = stockAgg[0]     || { total_products: 0, out_of_stock: 0, low_stock: 0 };
+    const revenue   = parseFloat(sales.revenue) || 0;
     const gross_profit  = revenue - cogsVal;
     const profit_margin = revenue > 0 ? (gross_profit / revenue) * 100 : 0;
     const avg_order     = sales.sale_count > 0 ? revenue / sales.sale_count : 0;
 
-    res.json({
-      success: true,
-      data: {
-        period: { from, to },
-        sales: { ...sales, avg_order_value: avg_order },
-        cogs: cogsVal,
-        gross_profit,
-        profit_margin,
-        purchases,
-        stock,
-      },
-    });
+    res.json({ success: true, data: { period: { from, to }, sales: { ...sales, avg_order_value: avg_order }, cogs: cogsVal, gross_profit, profit_margin, purchases, stock } });
   } catch (err) { next(err); }
 };
 
@@ -209,42 +193,35 @@ exports.dailySales = async (req, res, next) => {
     const cid = req.companyId;
     const { from, to } = getDateRange(req.query);
 
-    const { rows } = await query(`
-      SELECT
-        sale_date::date                  AS day,
-        COUNT(*)::int                    AS sale_count,
-        COALESCE(SUM(total_amount), 0)   AS revenue,
-        COALESCE(SUM(paid_amount),  0)   AS collected
-      FROM sales
-      WHERE company_id=$1 AND status='completed'
-        AND sale_date::date BETWEEN $2 AND $3
-      GROUP BY sale_date::date
-      ORDER BY day ASC
-    `, [cid, from, to]);
+    const rows = await Sale.aggregate([
+      { $match: { company_id: cid, status: 'completed', sale_date: fromToRange(from, to) } },
+      { $group: {
+        _id:        { $dateToString: { format: '%Y-%m-%d', date: '$sale_date' } },
+        sale_count: { $sum: 1 },
+        revenue:    { $sum: '$total_amount' },
+        collected:  { $sum: '$paid_amount' },
+      }},
+      { $sort: { _id: 1 } },
+      { $project: { day: '$_id', sale_count: 1, revenue: 1, collected: 1, _id: 0 } },
+    ]);
 
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 };
 
-// ─── sales by payment method ──────────────────────────────────────────────────
+// ─── payment methods ──────────────────────────────────────────────────────────
 
 exports.paymentMethods = async (req, res, next) => {
   try {
     const cid = req.companyId;
     const { from, to } = getDateRange(req.query);
 
-    const { rows } = await query(`
-      SELECT
-        payment_method,
-        COUNT(*)::int                    AS sale_count,
-        COALESCE(SUM(total_amount), 0)   AS revenue
-      FROM sales
-      WHERE company_id=$1 AND status='completed'
-        AND (sale_date::date BETWEEN $2 AND $3
-          OR (sale_date IS NULL AND created_at::date BETWEEN $2 AND $3))
-      GROUP BY payment_method
-      ORDER BY revenue DESC
-    `, [cid, from, to]);
+    const rows = await Sale.aggregate([
+      { $match: { company_id: cid, status: 'completed', sale_date: fromToRange(from, to) } },
+      { $group: { _id: '$payment_method', sale_count: { $sum: 1 }, revenue: { $sum: '$total_amount' } } },
+      { $sort: { revenue: -1 } },
+      { $project: { payment_method: '$_id', sale_count: 1, revenue: 1, _id: 0 } },
+    ]);
 
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }
@@ -254,36 +231,43 @@ exports.paymentMethods = async (req, res, next) => {
 
 exports.topProducts = async (req, res, next) => {
   try {
-    const cid   = req.companyId;
+    const cid = req.companyId;
     const { from, to } = getDateRange(req.query);
-    const lim   = Math.min(parseInt(req.query.limit) || 10, 50);
+    const lim = Math.min(parseInt(req.query.limit) || 10, 50);
 
-    const { rows } = await query(`
-      SELECT
-        p.id,
-        p.name,
-        p.sku,
-        c.name                                        AS category_name,
-        COALESCE(SUM(si.quantity), 0)                 AS total_qty,
-        COALESCE(SUM(si.total),    0)                 AS total_revenue,
-        COALESCE(SUM(si.cost_price * si.quantity), 0) AS total_cost,
-        COUNT(DISTINCT s.id)::int                     AS sale_count
-      FROM sale_items si
-      JOIN products p  ON p.id  = si.product_id
-      JOIN sales    s  ON s.id  = si.sale_id
-      LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
-      WHERE s.company_id=$1 AND s.status='completed'
-        AND s.sale_date::date BETWEEN $2 AND $3
-      GROUP BY p.id, p.name, p.sku, c.name
-      ORDER BY total_revenue DESC
-      LIMIT $4
-    `, [cid, from, to, lim]);
+    const rows = await Sale.aggregate([
+      { $match: { company_id: cid, status: 'completed', sale_date: fromToRange(from, to) } },
+      { $unwind: '$items' },
+      { $group: {
+        _id:           '$items.product_id',
+        name:          { $first: '$items.product_name' },
+        sku:           { $first: '$items.sku' },
+        total_qty:     { $sum: '$items.quantity' },
+        total_revenue: { $sum: '$items.total' },
+        total_cost:    { $sum: { $multiply: ['$items.cost_price', '$items.quantity'] } },
+        sale_count:    { $sum: 1 },
+      }},
+      { $sort: { total_revenue: -1 } },
+      { $limit: lim },
+    ]);
+
+    // Fetch category names
+    const productIds = rows.map(r => r._id);
+    const products   = await Product.find({ _id: { $in: productIds }, company_id: cid }, { category_id: 1 }).populate('category_id', 'name').lean();
+    const catMap     = Object.fromEntries(products.map(p => [p._id.toString(), p.category_id?.name || null]));
 
     const data = rows.map(r => {
-      const rev = parseFloat(r.total_revenue) || 0;
-      const cost = parseFloat(r.total_cost) || 0;
+      const rev  = parseFloat(r.total_revenue) || 0;
+      const cost = parseFloat(r.total_cost)    || 0;
       return {
-        ...r,
+        id:            r._id.toString(),
+        name:          r.name,
+        sku:           r.sku,
+        category_name: catMap[r._id.toString()],
+        total_qty:     r.total_qty,
+        total_revenue: rev,
+        total_cost:    cost,
+        sale_count:    r.sale_count,
         gross_profit:  rev - cost,
         profit_margin: rev > 0 ? ((rev - cost) / rev) * 100 : 0,
       };
@@ -301,27 +285,39 @@ exports.topCustomers = async (req, res, next) => {
     const { from, to } = getDateRange(req.query);
     const lim = Math.min(parseInt(req.query.limit) || 10, 50);
 
-    const { rows } = await query(`
-      SELECT
-        c.id,
-        c.name,
-        c.phone,
-        c.customer_group,
-        c.current_balance,
-        COUNT(DISTINCT s.id)::int        AS sale_count,
-        COALESCE(SUM(s.total_amount), 0) AS total_spent,
-        COALESCE(SUM(s.paid_amount),  0) AS total_paid,
-        COALESCE(SUM(s.due_amount),   0) AS total_due
-      FROM sales s
-      JOIN customers c ON c.id = s.customer_id AND c.company_id = s.company_id
-      WHERE s.company_id=$1 AND s.status='completed'
-        AND s.sale_date::date BETWEEN $2 AND $3
-      GROUP BY c.id, c.name, c.phone, c.customer_group, c.current_balance
-      ORDER BY total_spent DESC
-      LIMIT $4
-    `, [cid, from, to, lim]);
+    const rows = await Sale.aggregate([
+      { $match: { company_id: cid, status: 'completed', sale_date: fromToRange(from, to) } },
+      { $group: {
+        _id:        '$customer_id',
+        sale_count: { $sum: 1 },
+        total_spent:{ $sum: '$total_amount' },
+        total_paid: { $sum: '$paid_amount'  },
+        total_due:  { $sum: '$due_amount'   },
+      }},
+      { $sort: { total_spent: -1 } },
+      { $limit: lim },
+    ]);
 
-    res.json({ success: true, data: rows });
+    const custIds  = rows.map(r => r._id).filter(Boolean);
+    const customers = await Customer.find({ _id: { $in: custIds } }, { name: 1, phone: 1, customer_group: 1, current_balance: 1 }).lean();
+    const custMap  = Object.fromEntries(customers.map(c => [c._id.toString(), c]));
+
+    const data = rows.map(r => {
+      const c = r._id ? custMap[r._id.toString()] : null;
+      return {
+        id:              r._id?.toString(),
+        name:            c?.name            || 'Walk-in Customer',
+        phone:           c?.phone           || null,
+        customer_group:  c?.customer_group  || null,
+        current_balance: c?.current_balance || 0,
+        sale_count:      r.sale_count,
+        total_spent:     parseFloat(r.total_spent) || 0,
+        total_paid:      parseFloat(r.total_paid)  || 0,
+        total_due:       parseFloat(r.total_due)   || 0,
+      };
+    });
+
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 };
 
@@ -331,44 +327,42 @@ exports.stockValuation = async (req, res, next) => {
   try {
     const cid = req.companyId;
 
-    const { rows: [summary] } = await query(`
-      SELECT
-        COUNT(*)::int                                    AS total_products,
-        COALESCE(SUM(stock_quantity * cost_price), 0)   AS stock_value,
-        COALESCE(SUM(stock_quantity * sale_price),  0)  AS retail_value,
-        SUM(CASE WHEN track_inventory AND stock_quantity <= 0 THEN 1 ELSE 0 END)::int AS out_of_stock,
-        SUM(CASE WHEN track_inventory AND stock_quantity > 0 AND stock_quantity <= low_stock_alert THEN 1 ELSE 0 END)::int AS low_stock
-      FROM products
-      WHERE company_id=$1 AND is_active=TRUE
-    `, [cid]);
+    const [summaryAgg, byCategory, lowStockItems] = await Promise.all([
+      Product.aggregate([
+        { $match: { company_id: cid, is_active: true } },
+        { $group: {
+          _id:            null,
+          total_products: { $sum: 1 },
+          stock_value:    { $sum: { $multiply: ['$stock_quantity', '$cost_price'] } },
+          retail_value:   { $sum: { $multiply: ['$stock_quantity', '$sale_price'] } },
+          out_of_stock:   { $sum: { $cond: [{ $and: [{ $eq: ['$track_inventory', true] }, { $lte: ['$stock_quantity', 0] }] }, 1, 0] } },
+          low_stock:      { $sum: { $cond: [{ $and: [{ $eq: ['$track_inventory', true] }, { $gt: ['$stock_quantity', 0] }, { $lte: ['$stock_quantity', '$low_stock_alert'] }] }, 1, 0] } },
+        }},
+      ]),
+      Product.aggregate([
+        { $match: { company_id: cid, is_active: true } },
+        { $lookup: { from: 'categories', localField: 'category_id', foreignField: '_id', as: '_cat' } },
+        { $group: {
+          _id:           '$category_id',
+          category:      { $first: { $ifNull: [{ $arrayElemAt: ['$_cat.name', 0] }, 'Uncategorized'] } },
+          product_count: { $sum: 1 },
+          total_stock:   { $sum: '$stock_quantity' },
+          stock_value:   { $sum: { $multiply: ['$stock_quantity', '$cost_price'] } },
+          retail_value:  { $sum: { $multiply: ['$stock_quantity', '$sale_price'] } },
+        }},
+        { $sort: { stock_value: -1 } },
+      ]),
+      Product.find(
+        { company_id: cid, is_active: true, track_inventory: true, $expr: { $lte: ['$stock_quantity', '$low_stock_alert'] } },
+        { name: 1, sku: 1, stock_quantity: 1, low_stock_alert: 1, cost_price: 1, sale_price: 1, category_id: 1 }
+      ).populate('category_id', 'name').sort({ stock_quantity: 1 }).limit(20).lean(),
+    ]);
 
-    const { rows: byCategory } = await query(`
-      SELECT
-        COALESCE(c.name, 'Uncategorized')               AS category,
-        COUNT(p.id)::int                                 AS product_count,
-        COALESCE(SUM(p.stock_quantity), 0)               AS total_stock,
-        COALESCE(SUM(p.stock_quantity * p.cost_price),0) AS stock_value,
-        COALESCE(SUM(p.stock_quantity * p.sale_price),0) AS retail_value
-      FROM products p
-      LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
-      WHERE p.company_id=$1 AND p.is_active=TRUE
-      GROUP BY c.id, c.name
-      ORDER BY stock_value DESC
-    `, [cid]);
-
-    const { rows: lowStockItems } = await query(`
-      SELECT p.id, p.name, p.sku, p.stock_quantity, p.low_stock_alert, p.cost_price, p.sale_price,
-             c.name AS category_name
-      FROM products p
-      LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
-      WHERE p.company_id=$1 AND p.is_active=TRUE
-        AND p.track_inventory=TRUE
-        AND p.stock_quantity <= p.low_stock_alert
-      ORDER BY p.stock_quantity ASC
-      LIMIT 20
-    `, [cid]);
-
-    res.json({ success: true, data: { summary, byCategory, lowStockItems } });
+    res.json({ success: true, data: {
+      summary:        summaryAgg[0] || { total_products: 0, stock_value: 0, retail_value: 0, out_of_stock: 0, low_stock: 0 },
+      byCategory:     byCategory.map(c => ({ ...c, id: c._id?.toString() })),
+      lowStockItems:  lowStockItems.map(p => ({ ...p, id: p._id.toString(), category_name: p.category_id?.name || null })),
+    }});
   } catch (err) { next(err); }
 };
 
@@ -378,47 +372,45 @@ exports.purchasesSummary = async (req, res, next) => {
   try {
     const cid = req.companyId;
     const { from, to } = getDateRange(req.query);
+    const dateRange = fromToRange(from, to);
 
-    const { rows: [totals] } = await query(`
-      SELECT
-        COUNT(*)::int                  AS purchase_count,
-        COALESCE(SUM(total_amount),0)  AS total_amount,
-        COALESCE(SUM(paid_amount), 0)  AS paid_amount,
-        COALESCE(SUM(due_amount),  0)  AS due_amount
-      FROM purchases
-      WHERE company_id=$1 AND status='received'
-        AND purchase_date BETWEEN $2 AND $3
-    `, [cid, from, to]);
+    const [totalsAgg, bySupplierAgg, dailyAgg] = await Promise.all([
+      Purchase.aggregate([
+        { $match: { company_id: cid, status: 'received', purchase_date: dateRange } },
+        { $group: { _id: null, purchase_count: { $sum: 1 }, total_amount: { $sum: '$total_amount' }, paid_amount: { $sum: '$paid_amount' }, due_amount: { $sum: '$due_amount' } } },
+      ]),
+      Purchase.aggregate([
+        { $match: { company_id: cid, status: 'received', purchase_date: dateRange } },
+        { $lookup: { from: 'suppliers', localField: 'supplier_id', foreignField: '_id', as: '_supp' } },
+        { $group: {
+          _id:           '$supplier_id',
+          supplier_name: { $first: { $ifNull: [{ $arrayElemAt: ['$_supp.name', 0] }, 'Unknown'] } },
+          purchase_count:{ $sum: 1 },
+          total_amount:  { $sum: '$total_amount' },
+          paid_amount:   { $sum: '$paid_amount'  },
+          due_amount:    { $sum: '$due_amount'   },
+        }},
+        { $sort: { total_amount: -1 } },
+        { $limit: 10 },
+      ]),
+      Purchase.aggregate([
+        { $match: { company_id: cid, status: 'received', purchase_date: dateRange } },
+        { $group: {
+          _id:            { $dateToString: { format: '%Y-%m-%d', date: '$purchase_date' } },
+          purchase_count: { $sum: 1 },
+          total_amount:   { $sum: '$total_amount' },
+        }},
+        { $sort: { _id: 1 } },
+        { $project: { day: '$_id', purchase_count: 1, total_amount: 1, _id: 0 } },
+      ]),
+    ]);
 
-    const { rows: bySupplier } = await query(`
-      SELECT
-        COALESCE(s.name, 'Unknown')     AS supplier_name,
-        COUNT(p.id)::int                AS purchase_count,
-        COALESCE(SUM(p.total_amount),0) AS total_amount,
-        COALESCE(SUM(p.paid_amount), 0) AS paid_amount,
-        COALESCE(SUM(p.due_amount),  0) AS due_amount
-      FROM purchases p
-      LEFT JOIN suppliers s ON s.id = p.supplier_id AND s.company_id = p.company_id
-      WHERE p.company_id=$1 AND p.status='received'
-        AND p.purchase_date BETWEEN $2 AND $3
-      GROUP BY p.supplier_id, s.name
-      ORDER BY total_amount DESC
-      LIMIT 10
-    `, [cid, from, to]);
-
-    const { rows: daily } = await query(`
-      SELECT
-        purchase_date                  AS day,
-        COUNT(*)::int                  AS purchase_count,
-        COALESCE(SUM(total_amount),0)  AS total_amount
-      FROM purchases
-      WHERE company_id=$1 AND status='received'
-        AND purchase_date BETWEEN $2 AND $3
-      GROUP BY purchase_date
-      ORDER BY day ASC
-    `, [cid, from, to]);
-
-    res.json({ success: true, data: { period: { from, to }, totals, bySupplier, daily } });
+    res.json({ success: true, data: {
+      period:     { from, to },
+      totals:     totalsAgg[0] || { purchase_count: 0, total_amount: 0, paid_amount: 0, due_amount: 0 },
+      bySupplier: bySupplierAgg,
+      daily:      dailyAgg,
+    }});
   } catch (err) { next(err); }
 };
 
@@ -429,38 +421,36 @@ exports.staffReport = async (req, res, next) => {
     const cid = req.companyId;
     const { from, to } = getDateRange(req.query);
 
-    const { rows } = await query(`
-      SELECT
-        u.id,
-        u.name,
-        u.email,
-        r.name                            AS role,
-        COUNT(s.id)::int                  AS sale_count,
-        COALESCE(SUM(s.total_amount), 0)  AS revenue,
-        COALESCE(SUM(s.paid_amount),  0)  AS collected
-      FROM users u
-      LEFT JOIN roles r ON r.id = u.role_id
-      LEFT JOIN sales s
-        ON s.created_by = u.id
-        AND s.company_id = $1
-        AND s.status = 'completed'
-        AND s.sale_date::date BETWEEN $2 AND $3
-      WHERE u.company_id = $1
-      GROUP BY u.id, u.name, u.email, r.name
-      ORDER BY revenue DESC
-    `, [cid, from, to]);
+    const users = await User.find({ company_id: cid }, { name: 1, email: 1, role_id: 1 }).lean();
+    const roleIds = [...new Set(users.map(u => u.role_id?.toString()).filter(Boolean))];
+    const Role = require('../models/Role');
+    const roles   = await Role.find({ _id: { $in: roleIds } }, { name: 1 }).lean();
+    const roleMap = Object.fromEntries(roles.map(r => [r._id.toString(), r.name]));
 
-    const data = rows.map(r => ({
-      ...r,
-      revenue:   parseFloat(r.revenue)   || 0,
-      collected: parseFloat(r.collected) || 0,
-    }));
+    const salesAgg = await Sale.aggregate([
+      { $match: { company_id: cid, status: 'completed', sale_date: fromToRange(from, to) } },
+      { $group: { _id: '$created_by', sale_count: { $sum: 1 }, revenue: { $sum: '$total_amount' }, collected: { $sum: '$paid_amount' } } },
+    ]);
+    const salesMap = Object.fromEntries(salesAgg.map(s => [s._id?.toString(), s]));
+
+    const data = users.map(u => {
+      const s = salesMap[u._id.toString()] || {};
+      return {
+        id:         u._id.toString(),
+        name:       u.name,
+        email:      u.email,
+        role:       roleMap[u.role_id?.toString()] || null,
+        sale_count: s.sale_count || 0,
+        revenue:    parseFloat(s.revenue)   || 0,
+        collected:  parseFloat(s.collected) || 0,
+      };
+    }).sort((a, b) => b.revenue - a.revenue);
 
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
 
-// ─── sales analysis (period-based, for dashboard filter) ─────────────────────
+// ─── sales analysis ───────────────────────────────────────────────────────────
 
 exports.salesAnalysis = async (req, res, next) => {
   try {
@@ -470,75 +460,41 @@ exports.salesAnalysis = async (req, res, next) => {
     const today = new Date().toISOString().slice(0, 10);
     let from, to;
 
-    if (period === 'today') {
-      from = today; to = today;
-    } else if (period === '7days') {
-      const d = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
-      from = d.toISOString().slice(0, 10); to = today;
-    } else if (period === 'month') {
-      from = today.slice(0, 7) + '-01'; to = today;
-    } else if (period === 'year') {
-      from = today.slice(0, 4) + '-01-01'; to = today;
-    } else {
-      // custom
-      from = fromQ || today; to = toQ || today;
-    }
+    if (period === 'today')  { from = today; to = today; }
+    else if (period === '7days')  { from = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10); to = today; }
+    else if (period === 'month')  { from = today.slice(0, 7) + '-01'; to = today; }
+    else if (period === 'year')   { from = today.slice(0, 4) + '-01-01'; to = today; }
+    else                          { from = fromQ || today; to = toQ || today; }
 
-    const { rows: [totals] } = await query(`
-      SELECT
-        COALESCE(SUM(total_amount), 0)::numeric AS total_sales,
-        COUNT(*)::int                           AS order_count
-      FROM sales
-      WHERE company_id = $1 AND status = 'completed'
-        AND sale_date::date BETWEEN $2 AND $3
-    `, [cid, from, to]);
+    const dateRange = fromToRange(from, to);
 
-    const daysDiff = Math.ceil(
-      (new Date(to) - new Date(from)) / (1000 * 60 * 60 * 24)
-    ) + 1;
+    const [totalsAgg, chartAgg] = await Promise.all([
+      Sale.aggregate([
+        { $match: { company_id: cid, status: 'completed', sale_date: dateRange } },
+        { $group: { _id: null, total_sales: { $sum: '$total_amount' }, order_count: { $sum: 1 } } },
+      ]),
+      Sale.aggregate([
+        { $match: { company_id: cid, status: 'completed', sale_date: dateRange } },
+        { $group: {
+          _id:    { $dateToString: { format: '%Y-%m-%d', date: '$sale_date' } },
+          amount: { $sum: '$total_amount' },
+          orders: { $sum: 1 },
+        }},
+        { $sort: { _id: 1 } },
+        { $project: { date: '$_id', amount: 1, orders: 1, _id: 0 } },
+      ]),
+    ]);
 
-    let chartRows;
-    if (daysDiff <= 60) {
-      const { rows } = await query(`
-        SELECT
-          sale_date::date::text AS date,
-          COALESCE(SUM(total_amount), 0)::numeric AS amount,
-          COUNT(*)::int AS orders
-        FROM sales
-        WHERE company_id = $1 AND status = 'completed'
-          AND sale_date::date BETWEEN $2 AND $3
-        GROUP BY sale_date::date
-        ORDER BY sale_date::date
-      `, [cid, from, to]);
-      chartRows = rows;
-    } else {
-      const { rows } = await query(`
-        SELECT
-          TO_CHAR(sale_date, 'YYYY-MM') AS date,
-          COALESCE(SUM(total_amount), 0)::numeric AS amount,
-          COUNT(*)::int AS orders
-        FROM sales
-        WHERE company_id = $1 AND status = 'completed'
-          AND sale_date::date BETWEEN $2 AND $3
-        GROUP BY TO_CHAR(sale_date, 'YYYY-MM')
-        ORDER BY 1
-      `, [cid, from, to]);
-      chartRows = rows;
-    }
-
+    const totals = totalsAgg[0] || { total_sales: 0, order_count: 0 };
     return res.json({
       success: true,
       data: {
         period,
         from,
         to,
-        total_sales:  parseFloat(totals.total_sales)  || 0,
-        order_count:  totals.order_count  || 0,
-        chart: chartRows.map(r => ({
-          date:   r.date,
-          amount: parseFloat(r.amount) || 0,
-          orders: r.orders || 0,
-        })),
+        total_sales: parseFloat(totals.total_sales) || 0,
+        order_count: totals.order_count || 0,
+        chart: chartAgg.map(r => ({ date: r.date, amount: parseFloat(r.amount) || 0, orders: r.orders || 0 })),
       },
     });
   } catch (err) { next(err); }

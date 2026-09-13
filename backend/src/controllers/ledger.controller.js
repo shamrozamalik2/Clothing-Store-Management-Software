@@ -1,182 +1,198 @@
 'use strict';
 
-const { query } = require('../config/database');
+const Customer        = require('../models/Customer');
+const Supplier        = require('../models/Supplier');
+const Sale            = require('../models/Sale');
+const Return          = require('../models/Return');
+const Purchase        = require('../models/Purchase');
+const PurchasePayment = require('../models/PurchasePayment');
 const { success, error } = require('../utils/response');
 
 // ── Customer Ledger ────────────────────────────────────────────────────────────
 
-// GET /ledger/customers/:id
 exports.customerLedger = async (req, res, next) => {
   try {
     const cid = req.companyId;
     const id  = req.params.id;
     const { from, to } = req.query;
 
-    const { rows: [customer] } = await query(
-      'SELECT * FROM customers WHERE id=$1 AND company_id=$2', [id, cid]
-    );
+    const customer = await Customer.findOne({ _id: id, company_id: cid }).lean();
     if (!customer) return error(res, 'Customer not found.', 404);
 
-    // Sales (debit — customer owes)
-    const salesParams = [cid, id];
-    let salesWhere    = 's.company_id=$1 AND s.customer_id=$2 AND s.status=\'completed\'';
-    if (from) { salesParams.push(from); salesWhere += ` AND s.sale_date::date >= $${salesParams.length}`; }
-    if (to)   { salesParams.push(to);   salesWhere += ` AND s.sale_date::date <= $${salesParams.length}`; }
+    const saleFilter = { company_id: cid, customer_id: id, status: 'completed' };
+    if (from || to) {
+      saleFilter.sale_date = {};
+      if (from) saleFilter.sale_date.$gte = new Date(from + 'T00:00:00.000Z');
+      if (to)   saleFilter.sale_date.$lte = new Date(to   + 'T23:59:59.999Z');
+    }
 
-    const { rows: sales } = await query(`
-      SELECT s.id, s.reference, s.sale_date AS date,
-             'sale'::text AS type,
-             s.total_amount AS debit,
-             s.paid_amount  AS credit,
-             s.due_amount   AS balance_impact,
-             s.payment_method, s.notes
-      FROM sales s
-      WHERE ${salesWhere}
-    `, salesParams);
+    const sales = await Sale.find(saleFilter, { reference: 1, sale_date: 1, total_amount: 1, paid_amount: 1, due_amount: 1, payment_method: 1, notes: 1 }).lean();
 
-    // Returns (credit — refund back to customer)
-    const { rows: returns } = await query(`
-      SELECT r.id, r.reference, r.return_date AS date,
-             'return'::text AS type,
-             0::numeric AS debit,
-             r.total_amount AS credit,
-             (-r.total_amount) AS balance_impact,
-             r.refund_method AS payment_method, r.notes
-      FROM returns r
-      JOIN sales s ON s.id = r.sale_id
-      WHERE r.company_id=$1 AND s.customer_id=$2
-        ${from ? `AND r.return_date::date >= '${from}'` : ''}
-        ${to   ? `AND r.return_date::date <= '${to}'`   : ''}
-    `, [cid, id]);
+    // Get all returns for this customer's sales
+    const saleIds = sales.map(s => s._id);
+    const retFilter = { company_id: cid, sale_id: { $in: saleIds } };
+    if (from || to) {
+      retFilter.return_date = {};
+      if (from) retFilter.return_date.$gte = new Date(from + 'T00:00:00.000Z');
+      if (to)   retFilter.return_date.$lte = new Date(to   + 'T23:59:59.999Z');
+    }
+    const returns = await Return.find(retFilter, { reference: 1, return_date: 1, total_amount: 1, refund_method: 1, notes: 1 }).lean();
 
-    const entries = [...sales, ...returns].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const salesEntries = sales.map(s => ({
+      id:              s._id.toString(),
+      reference:       s.reference,
+      date:            s.sale_date,
+      type:            'sale',
+      debit:           parseFloat(s.total_amount)  || 0,
+      credit:          parseFloat(s.paid_amount)   || 0,
+      balance_impact:  parseFloat(s.due_amount)    || 0,
+      payment_method:  s.payment_method,
+      notes:           s.notes,
+    }));
 
-    // Running balance
+    const returnEntries = returns.map(r => ({
+      id:             r._id.toString(),
+      reference:      r.reference,
+      date:           r.return_date,
+      type:           'return',
+      debit:          0,
+      credit:         parseFloat(r.total_amount) || 0,
+      balance_impact: -(parseFloat(r.total_amount) || 0),
+      payment_method: r.refund_method,
+      notes:          r.notes,
+    }));
+
+    const entries = [...salesEntries, ...returnEntries].sort((a, b) => new Date(a.date) - new Date(b.date));
+
     let runningBalance = 0;
     const ledger = entries.map(e => {
-      runningBalance += parseFloat(e.balance_impact) || 0;
+      runningBalance += e.balance_impact;
       return { ...e, running_balance: runningBalance };
     });
 
     return success(res, {
-      customer,
+      customer: { ...customer, id: customer._id.toString() },
       ledger,
       summary: {
-        total_sales:    sales.reduce((s, r) => s + parseFloat(r.debit), 0),
-        total_paid:     sales.reduce((s, r) => s + parseFloat(r.credit), 0),
-        total_returns:  returns.reduce((s, r) => s + parseFloat(r.credit), 0),
-        current_balance: parseFloat(customer.current_balance),
+        total_sales:     salesEntries.reduce((s, r) => s + r.debit, 0),
+        total_paid:      salesEntries.reduce((s, r) => s + r.credit, 0),
+        total_returns:   returnEntries.reduce((s, r) => s + r.credit, 0),
+        current_balance: parseFloat(customer.current_balance) || 0,
       },
     });
   } catch (err) { next(err); }
 };
 
-// GET /ledger/customers  — all customers with balance summary
 exports.customersSummary = async (req, res, next) => {
   try {
-    const cid = req.companyId;
-    const { type = '' } = req.query; // 'payable' | 'receivable' | ''
+    const cid  = req.companyId;
+    const { type = '' } = req.query;
 
-    let where = 'company_id=$1 AND is_active=TRUE';
-    if (type === 'receivable') where += ' AND current_balance > 0';
-    if (type === 'payable')    where += ' AND current_balance < 0';
+    const filter = { company_id: cid, is_active: true };
+    if (type === 'receivable') filter.current_balance = { $gt: 0 };
+    if (type === 'payable')    filter.current_balance = { $lt: 0 };
 
-    const { rows } = await query(`
-      SELECT id, name, phone, email, customer_group, credit_limit, current_balance,
-             (SELECT COUNT(*) FROM sales s WHERE s.customer_id = customers.id AND s.company_id = customers.company_id) AS total_sales
-      FROM customers
-      WHERE ${where}
-      ORDER BY current_balance DESC
-    `, [cid]);
+    const customers = await Customer.find(filter, { name: 1, phone: 1, email: 1, customer_group: 1, credit_limit: 1, current_balance: 1 }).sort({ current_balance: -1 }).lean();
 
-    return success(res, rows);
+    const custIds   = customers.map(c => c._id);
+    const saleCounts = await Sale.aggregate([
+      { $match: { company_id: cid, customer_id: { $in: custIds } } },
+      { $group: { _id: '$customer_id', total_sales: { $sum: 1 } } },
+    ]);
+    const cntMap = Object.fromEntries(saleCounts.map(s => [s._id.toString(), s.total_sales]));
+
+    return success(res, customers.map(c => ({ ...c, id: c._id.toString(), total_sales: cntMap[c._id.toString()] || 0 })));
   } catch (err) { next(err); }
 };
 
-// GET /ledger/suppliers/:id
+// ── Supplier Ledger ────────────────────────────────────────────────────────────
+
 exports.supplierLedger = async (req, res, next) => {
   try {
     const cid = req.companyId;
     const id  = req.params.id;
     const { from, to } = req.query;
 
-    const { rows: [supplier] } = await query(
-      'SELECT * FROM suppliers WHERE id=$1 AND company_id=$2', [id, cid]
-    );
+    const supplier = await Supplier.findOne({ _id: id, company_id: cid }).lean();
     if (!supplier) return error(res, 'Supplier not found.', 404);
 
-    // Purchases (credit — we owe supplier)
-    const { rows: purchases } = await query(`
-      SELECT p.id, p.reference, p.purchase_date AS date,
-             'purchase'::text AS type,
-             p.total_amount  AS credit,
-             p.paid_amount   AS debit,
-             p.due_amount    AS balance_impact,
-             p.notes
-      FROM purchases p
-      WHERE p.company_id=$1 AND p.supplier_id=$2
-        ${from ? `AND p.purchase_date >= '${from}'` : ''}
-        ${to   ? `AND p.purchase_date <= '${to}'`   : ''}
-      ORDER BY p.purchase_date
-    `, [cid, id]);
+    const purchFilter = { company_id: cid, supplier_id: id };
+    if (from || to) {
+      purchFilter.purchase_date = {};
+      if (from) purchFilter.purchase_date.$gte = new Date(from + 'T00:00:00.000Z');
+      if (to)   purchFilter.purchase_date.$lte = new Date(to   + 'T23:59:59.999Z');
+    }
+    const purchases = await Purchase.find(purchFilter, { reference: 1, purchase_date: 1, total_amount: 1, paid_amount: 1, due_amount: 1, notes: 1 }).lean();
 
-    // Payments to supplier
-    const { rows: payments } = await query(`
-      SELECT pp.id, pp.reference, pp.paid_at AS date,
-             'payment'::text AS type,
-             pp.amount AS debit,
-             0::numeric AS credit,
-             (-pp.amount) AS balance_impact,
-             pp.payment_method, pp.notes
-      FROM purchase_payments pp
-      JOIN purchases p ON p.id = pp.purchase_id
-      WHERE pp.company_id=$1 AND p.supplier_id=$2
-        ${from ? `AND pp.paid_at::date >= '${from}'` : ''}
-        ${to   ? `AND pp.paid_at::date <= '${to}'`   : ''}
-    `, [cid, id]);
+    const purchaseIds = purchases.map(p => p._id);
+    const payFilter   = { company_id: cid, purchase_id: { $in: purchaseIds } };
+    if (from || to) {
+      payFilter.paid_at = {};
+      if (from) payFilter.paid_at.$gte = new Date(from + 'T00:00:00.000Z');
+      if (to)   payFilter.paid_at.$lte = new Date(to   + 'T23:59:59.999Z');
+    }
+    const payments = await PurchasePayment.find(payFilter, { reference: 1, paid_at: 1, amount: 1, payment_method: 1, notes: 1 }).lean();
 
-    const entries = [...purchases, ...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const purchaseEntries = purchases.map(p => ({
+      id:             p._id.toString(),
+      reference:      p.reference,
+      date:           p.purchase_date,
+      type:           'purchase',
+      credit:         parseFloat(p.total_amount) || 0,
+      debit:          parseFloat(p.paid_amount)  || 0,
+      balance_impact: parseFloat(p.due_amount)   || 0,
+      notes:          p.notes,
+    }));
+
+    const paymentEntries = payments.map(p => ({
+      id:             p._id.toString(),
+      reference:      p.reference,
+      date:           p.paid_at,
+      type:           'payment',
+      debit:          parseFloat(p.amount) || 0,
+      credit:         0,
+      balance_impact: -(parseFloat(p.amount) || 0),
+      payment_method: p.payment_method,
+      notes:          p.notes,
+    }));
+
+    const entries = [...purchaseEntries, ...paymentEntries].sort((a, b) => new Date(a.date) - new Date(b.date));
 
     let runningBalance = 0;
     const ledger = entries.map(e => {
-      runningBalance += parseFloat(e.balance_impact) || 0;
+      runningBalance += e.balance_impact;
       return { ...e, running_balance: runningBalance };
     });
 
     return success(res, {
-      supplier,
+      supplier: { ...supplier, id: supplier._id.toString() },
       ledger,
       summary: {
-        total_purchases: purchases.reduce((s, r) => s + parseFloat(r.credit), 0),
-        total_paid:      payments.reduce((s, r) => s + parseFloat(r.debit), 0),
-        current_balance: parseFloat(supplier.current_balance),
+        total_purchases: purchaseEntries.reduce((s, r) => s + r.credit, 0),
+        total_paid:      paymentEntries.reduce((s, r) => s + r.debit, 0),
+        current_balance: parseFloat(supplier.current_balance) || 0,
       },
     });
   } catch (err) { next(err); }
 };
 
-// GET /ledger/suppliers  — all suppliers with balance
 exports.suppliersSummary = async (req, res, next) => {
   try {
-    const { rows } = await query(`
-      SELECT id, name, phone, email, current_balance, opening_balance
-      FROM suppliers WHERE company_id=$1 AND is_active=TRUE ORDER BY current_balance DESC
-    `, [req.companyId]);
-    return success(res, rows);
+    const suppliers = await Supplier.find({ company_id: req.companyId, is_active: true }, { name: 1, phone: 1, email: 1, current_balance: 1, opening_balance: 1 }).sort({ current_balance: -1 }).lean();
+    return success(res, suppliers.map(s => ({ ...s, id: s._id.toString() })));
   } catch (err) { next(err); }
 };
 
-// GET /ledger/ar-ap  — accounts receivable / payable summary
 exports.arApSummary = async (req, res, next) => {
   try {
     const cid = req.companyId;
-    const [arRow, apRow] = await Promise.all([
-      query(`SELECT COALESCE(SUM(due_amount),0) AS total_ar FROM sales WHERE company_id=$1 AND status='completed'`, [cid]),
-      query(`SELECT COALESCE(SUM(due_amount),0) AS total_ap FROM purchases WHERE company_id=$1`, [cid]),
+    const [arAgg, apAgg] = await Promise.all([
+      Sale.aggregate([{ $match: { company_id: cid, status: 'completed' } }, { $group: { _id: null, total_ar: { $sum: '$due_amount' } } }]),
+      Purchase.aggregate([{ $match: { company_id: cid } }, { $group: { _id: null, total_ap: { $sum: '$due_amount' } } }]),
     ]);
     return success(res, {
-      accounts_receivable: parseFloat(arRow.rows[0].total_ar),
-      accounts_payable:    parseFloat(apRow.rows[0].total_ap),
+      accounts_receivable: parseFloat(arAgg[0]?.total_ar || 0),
+      accounts_payable:    parseFloat(apAgg[0]?.total_ap || 0),
     });
   } catch (err) { next(err); }
 };
