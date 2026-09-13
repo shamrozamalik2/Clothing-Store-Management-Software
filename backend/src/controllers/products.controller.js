@@ -298,4 +298,133 @@ const updateVariant = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { list, getOne, createProduct, updateProduct, deleteProduct, listVariants, addVariant, updateVariant };
+// ─── stats ────────────────────────────────────────────────────────────────────
+
+const stats = async (req, res, next) => {
+  try {
+    const cid = req.companyId;
+    const [total, active, outOfStock, lowStockCount, valueAgg] = await Promise.all([
+      Product.countDocuments({ company_id: cid }),
+      Product.countDocuments({ company_id: cid, is_active: true }),
+      Product.countDocuments({ company_id: cid, stock_quantity: { $lte: 0 } }),
+      Product.countDocuments({ company_id: cid, is_active: true, $expr: { $and: [{ $gt: ['$stock_quantity', 0] }, { $lte: ['$stock_quantity', '$low_stock_alert'] }] } }),
+      Product.aggregate([{ $match: { company_id: cid, is_active: true } }, { $group: { _id: null, total_value: { $sum: { $multiply: ['$cost_price', '$stock_quantity'] } }, total_sale_value: { $sum: { $multiply: ['$sale_price', '$stock_quantity'] } } } }]),
+    ]);
+    const vals = valueAgg[0] || { total_value: 0, total_sale_value: 0 };
+    return success(res, { total, active, out_of_stock: outOfStock, low_stock: lowStockCount, stock_value: vals.total_value, sale_value: vals.total_sale_value });
+  } catch (err) { next(err); }
+};
+
+// ─── low-stock ────────────────────────────────────────────────────────────────
+
+const lowStock = async (req, res, next) => {
+  try {
+    const cid = req.companyId;
+    const { limit: lim = 50 } = req.query;
+    const products = await Product.find({
+      company_id: cid,
+      is_active: true,
+      track_inventory: true,
+      $expr: { $lte: ['$stock_quantity', '$low_stock_alert'] },
+    })
+      .sort({ stock_quantity: 1 })
+      .limit(parseInt(lim, 10))
+      .populate('category_id', 'name')
+      .lean();
+    return success(res, products.map(p => ({ ...p, id: p._id.toString(), category_name: p.category_id?.name })));
+  } catch (err) { next(err); }
+};
+
+// ─── getByBarcode ─────────────────────────────────────────────────────────────
+
+const getByBarcode = async (req, res, next) => {
+  try {
+    const cid  = req.companyId;
+    const code = req.params.code;
+    let product = await Product.findOne({ company_id: cid, barcode: code }).populate('category_id', 'name').populate('brand_id', 'name').lean();
+    let variant = null;
+    if (!product) {
+      product = await Product.findOne({ company_id: cid, 'variants.barcode': code }).populate('category_id', 'name').populate('brand_id', 'name').lean();
+      if (product) variant = product.variants.find(v => v.barcode === code);
+    }
+    if (!product) return error(res, 'Product not found.', 404);
+    return success(res, { ...product, id: product._id.toString(), matched_variant: variant || null });
+  } catch (err) { next(err); }
+};
+
+// ─── updateBarcode ────────────────────────────────────────────────────────────
+
+const updateBarcode = async (req, res, next) => {
+  try {
+    const cid     = req.companyId;
+    const { barcode } = req.body;
+    const product = await Product.findOne({ _id: req.params.id, company_id: cid }).lean();
+    if (!product) return error(res, 'Product not found.', 404);
+    if (barcode) {
+      const dup = await Product.findOne({ company_id: cid, barcode, _id: { $ne: product._id } }).lean();
+      if (dup) return error(res, 'Barcode already in use.', 409);
+    }
+    await Product.findByIdAndUpdate(req.params.id, { barcode: barcode || null, updated_at: new Date() });
+    return success(res, null, 'Barcode updated.');
+  } catch (err) { next(err); }
+};
+
+// ─── deleteVariant ────────────────────────────────────────────────────────────
+
+const deleteVariant = async (req, res, next) => {
+  try {
+    const { id: productId, variantId } = req.params;
+    const cid = req.companyId;
+    const product = await Product.findOne({ _id: productId, company_id: cid, 'variants._id': variantId }).lean();
+    if (!product) return error(res, 'Variant not found.', 404);
+    await Product.findByIdAndUpdate(productId, { $pull: { variants: { _id: variantId } }, $set: { updated_at: new Date() } });
+    return success(res, null, 'Variant deleted.');
+  } catch (err) { next(err); }
+};
+
+// ─── importCsv ────────────────────────────────────────────────────────────────
+
+const importCsv = async (req, res, next) => {
+  try {
+    if (!req.file) return error(res, 'No file uploaded.', 422);
+    const cid  = req.companyId;
+    const rows = req.file.buffer.toString('utf8').split('\n').filter(Boolean);
+    const headers = rows.shift().split(',').map(h => h.trim().toLowerCase());
+    const results = { created: 0, skipped: 0, errors: [] };
+
+    for (const row of rows) {
+      const cols = row.split(',');
+      const data = Object.fromEntries(headers.map((h, i) => [h, cols[i]?.trim()]));
+      if (!data.name) continue;
+      try {
+        let sku = data.sku || await generateSku(data.name, cid);
+        sku = await uniqueSku(sku, cid);
+        const exists = await Product.findOne({ company_id: cid, sku }).lean();
+        if (exists) { results.skipped++; continue; }
+        await Product.create({
+          company_id: cid, name: data.name, sku,
+          barcode: data.barcode || null,
+          sale_price: parseFloat(data.sale_price) || 0,
+          cost_price: parseFloat(data.cost_price) || 0,
+          stock_quantity: parseFloat(data.stock_quantity) || 0,
+          unit: data.unit || 'pcs',
+        });
+        results.created++;
+      } catch (e) { results.errors.push({ row: data.name, error: e.message }); }
+    }
+    return success(res, results, `Import complete. ${results.created} created, ${results.skipped} skipped.`);
+  } catch (err) { next(err); }
+};
+
+module.exports = {
+  list, getOne,
+  create: createProduct,
+  update: updateProduct,
+  remove: deleteProduct,
+  stats, lowStock, getByBarcode, updateBarcode,
+  listVariants,
+  upsertVariant: addVariant,
+  updateVariant,
+  deleteVariant,
+  importCsv,
+};

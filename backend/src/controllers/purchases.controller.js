@@ -253,4 +253,4 @@ const addPayment = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { list, getOne, createPurchase, updateStatus, addPayment };
+module.exports = { list, getOne, create: createPurchase, updateStatus, recordPayment: addPayment };

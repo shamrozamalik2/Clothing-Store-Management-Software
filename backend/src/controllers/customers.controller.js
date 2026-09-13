@@ -120,4 +120,34 @@ const getLedger = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { list, getOne, createCustomer, updateCustomer, deleteCustomer, getLedger };
+const importCsv = async (req, res, next) => {
+  try {
+    if (!req.file) return error(res, 'No file uploaded.', 422);
+    const cid  = req.companyId;
+    const rows = req.file.buffer.toString('utf8').split('\n').filter(Boolean);
+    const headers = rows.shift().split(',').map(h => h.trim().toLowerCase());
+    const results = { created: 0, skipped: 0, errors: [] };
+
+    for (const row of rows) {
+      const cols = row.split(',');
+      const data = Object.fromEntries(headers.map((h, i) => [h, cols[i]?.trim()]));
+      if (!data.name) continue;
+      try {
+        const exists = data.phone ? await Customer.findOne({ company_id: cid, phone: data.phone }).lean() : null;
+        if (exists) { results.skipped++; continue; }
+        await Customer.create({ company_id: cid, name: data.name, phone: data.phone || null, email: data.email || null, address: data.address || null });
+        results.created++;
+      } catch (e) { results.errors.push({ row: data.name, error: e.message }); }
+    }
+    return success(res, results, `Import complete. ${results.created} created, ${results.skipped} skipped.`);
+  } catch (err) { next(err); }
+};
+
+module.exports = {
+  list, getOne,
+  create: createCustomer,
+  update: updateCustomer,
+  remove: deleteCustomer,
+  getLedger,
+  importCsv,
+};
