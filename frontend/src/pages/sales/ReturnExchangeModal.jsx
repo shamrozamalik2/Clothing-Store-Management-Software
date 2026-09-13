@@ -84,7 +84,7 @@ export default function ReturnExchangeModal({ sale, onClose, onSuccess }) {
   // Each row: { sale_item_id, product_name, max_qty, qty, unit_price }
   const [returnRows, setReturnRows] = useState(() =>
     (sale?.items ?? []).map((item) => ({
-      sale_item_id:  item.id,
+      sale_item_id:  item._id?.toString() ?? item.id,
       product_name:  item.product_name,
       variant_label: [item.size, item.color].filter(Boolean).join(' · '),
       max_qty:       parseFloat(item.quantity),

@@ -137,10 +137,9 @@ export default function BarcodePage() {
   // ── Save barcode mutation ──
   const saveMutation = useMutation({
     mutationFn: ({ id, barcode }) => productsApi.updateBarcode(id, barcode),
-    onSuccess: (res) => {
+    onSuccess: () => {
       toast.success('Barcode saved to product.');
-      const updated = res.data;
-      setProduct(p => ({ ...p, barcode: updated.barcode }));
+      setProduct(p => ({ ...p, barcode: barcodeValue }));
       qc.invalidateQueries({ queryKey: ['products'] });
     },
     onError: (err) => toast.error(err.message),

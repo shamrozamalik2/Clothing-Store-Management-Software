@@ -140,18 +140,18 @@ export default function PurchaseDetailPage() {
             </thead>
             <tbody className="divide-y divide-surface-700/30">
               {(purchase.items ?? []).map(item => (
-                <tr key={item.id} className="hover:bg-surface-800/20">
+                <tr key={item._id ?? item.id} className="hover:bg-surface-800/20">
                   <td className="px-4 py-2.5">
                     <p className="font-medium text-surface-100">{item.product_name}</p>
                     <div className="flex gap-2 mt-0.5">
-                      <span className="text-xs text-surface-500 font-mono">{item.product_sku}</span>
+                      <span className="text-xs text-surface-500 font-mono">{item.sku}</span>
                       {item.size  && <span className="text-xs text-primary-400">{item.size}</span>}
                       {item.color && <span className="text-xs text-purple-400">{item.color}</span>}
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-right text-surface-300">{item.quantity}</td>
                   <td className="px-4 py-2.5 text-right text-surface-300">{formatCurrency(item.unit_cost)}</td>
-                  <td className="px-4 py-2.5 text-right font-medium text-surface-100">{formatCurrency(item.subtotal)}</td>
+                  <td className="px-4 py-2.5 text-right font-medium text-surface-100">{formatCurrency(item.total)}</td>
                 </tr>
               ))}
             </tbody>
@@ -164,7 +164,7 @@ export default function PurchaseDetailPage() {
             <p className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">Summary</p>
             <Row label="Supplier"   value={purchase.supplier_name ?? 'Walk-in'} />
             <Row label="Created by" value={purchase.created_by_name} />
-            <Row label="Payment"    value={purchase.payment_method.replace('_',' ')} />
+            {purchase.payment_method && <Row label="Payment" value={purchase.payment_method.replace('_',' ')} />}
           </div>
 
           <div className="card space-y-2 text-sm">

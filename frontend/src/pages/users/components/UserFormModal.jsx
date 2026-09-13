@@ -46,7 +46,7 @@ export default function UserFormModal({ open, onClose, editUser = null }) {
     mutationFn: (data) => {
       const payload = {
         ...data,
-        role_id:   parseInt(data.role_id, 10),
+        role_id:   data.role_id,
         is_active: data.is_active === '1',
         phone:     data.phone || null,
       };
