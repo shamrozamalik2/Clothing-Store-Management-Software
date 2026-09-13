@@ -26,7 +26,6 @@ const companySchema = new Schema(
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 
-companySchema.index({ slug: 1 }, { unique: true });
 companySchema.index({ subscription_status: 1 });
 
 companySchema.plugin(basePlugin);

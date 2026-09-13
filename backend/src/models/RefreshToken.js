@@ -14,7 +14,6 @@ const refreshTokenSchema = new Schema(
 );
 
 refreshTokenSchema.index({ user_id: 1 });
-refreshTokenSchema.index({ token_hash: 1 }, { unique: true });
 // TTL index — MongoDB auto-deletes tokens 30 days after expiry
 refreshTokenSchema.index({ expires_at: 1 }, { expireAfterSeconds: 30 * 24 * 3600 });
 refreshTokenSchema.plugin(basePlugin);
