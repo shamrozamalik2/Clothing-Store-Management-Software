@@ -311,7 +311,17 @@ const stats = async (req, res, next) => {
       Product.aggregate([{ $match: { company_id: cid, is_active: true } }, { $group: { _id: null, total_value: { $sum: { $multiply: ['$cost_price', '$stock_quantity'] } }, total_sale_value: { $sum: { $multiply: ['$sale_price', '$stock_quantity'] } } } }]),
     ]);
     const vals = valueAgg[0] || { total_value: 0, total_sale_value: 0 };
-    return success(res, { total, active, out_of_stock: outOfStock, low_stock: lowStockCount, stock_value: vals.total_value, sale_value: vals.total_sale_value });
+    return success(res, {
+      total,
+      active,
+      inactive:        total - active,
+      out_of_stock:    outOfStock,
+      low_stock:       lowStockCount,
+      stock_value:     vals.total_value,
+      sale_value:      vals.total_sale_value,
+      inventory_cost:  vals.total_value,
+      inventory_value: vals.total_sale_value,
+    });
   } catch (err) { next(err); }
 };
 

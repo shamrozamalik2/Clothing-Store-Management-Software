@@ -119,9 +119,7 @@ const create = async (req, res, next) => {
             if (ei.variant_id) {
               const variant = product.variants?.find(v => v._id.toString() === ei.variant_id);
               if (!variant) throw new Error(`Variant ${ei.variant_id} not found.`);
-              if (product.track_inventory && !product.allow_negative && parseFloat(variant.stock_quantity) < qty) {
-                throw new Error(`Insufficient stock for "${product.name} (${[variant.size, variant.color].filter(Boolean).join(' ')})"`);
-              }
+              // Exchanges always deduct stock regardless of allow_negative (stock is tracked but not blocked)
               await Product.updateOne(
                 { _id: product._id, company_id: cid, 'variants._id': ei.variant_id },
                 { $inc: { 'variants.$.stock_quantity': -qty } },
@@ -135,9 +133,6 @@ const create = async (req, res, next) => {
                 sku: variant.sku, quantity: qty, unit_price: price, total,
               });
             } else {
-              if (product.track_inventory && !product.allow_negative && parseFloat(product.stock_quantity) < qty) {
-                throw new Error(`Insufficient stock for "${product.name}".`);
-              }
               if (product.track_inventory) {
                 await Product.updateOne({ _id: product._id, company_id: cid }, { $inc: { stock_quantity: -qty } }, { session });
               }

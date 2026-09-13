@@ -56,7 +56,7 @@ export default function PurchaseDetailPage() {
   });
 
   const payMutation = useMutation({
-    mutationFn: () => purchasesApi.recordPayment(id, { amount: parseFloat(payAmount), method: payMethod, notes: payNotes }),
+    mutationFn: () => purchasesApi.recordPayment(id, { amount: parseFloat(payAmount), payment_method: payMethod, notes: payNotes }),
     onSuccess: (res) => {
       toast.success(res.message);
       qc.invalidateQueries({ queryKey: ['purchase', id] });
