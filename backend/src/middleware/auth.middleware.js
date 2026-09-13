@@ -21,9 +21,12 @@ async function authenticate(req, res, next) {
     return res.status(401).json({ success: false, message, code });
   }
 
+  const { Types } = require('mongoose');
   req.user      = payload;
-  req.companyId = payload.companyId; // now a string ObjectId
-  req.branchId  = payload.branchId || null;
+  // Cast to ObjectId so aggregation $match works (plain strings don't match ObjectId in pipelines)
+  req.companyId = payload.companyId ? new Types.ObjectId(payload.companyId) : null;
+  req.branchId  = payload.branchId  ? new Types.ObjectId(payload.branchId)  : null;
+  if (payload.id) req.user.id = new Types.ObjectId(payload.id);
 
   // Check company subscription status (non-fatal if DB is down)
   if (payload.companyId && !payload.impersonated) {
