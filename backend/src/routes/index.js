@@ -7,9 +7,9 @@ const router = Router();
 
 router.get('/health', async (req, res) => {
   try {
-    const { query } = require('../config/database');
+    const mongoose = require('mongoose');
     const t0 = Date.now();
-    await query('SELECT 1');
+    await mongoose.connection.db.admin().ping();
     return res.json({
       success:   true,
       message:   'SAS Garments API is running.',
