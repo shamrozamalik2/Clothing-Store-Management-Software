@@ -1,21 +1,18 @@
 'use strict';
 
-const { query } = require('../config/database');
-const logger    = require('../config/logger');
+const AuditLog = require('../models/AuditLog');
+const logger   = require('../config/logger');
 
 const RETENTION_DAYS   = 90;
-const INTERVAL_MS      = 24 * 60 * 60 * 1000; // 24 hours
-const STARTUP_DELAY_MS = 3  * 60 * 1000;       // wait 3 min after boot (after backup scheduler)
+const INTERVAL_MS      = 24 * 60 * 60 * 1000;
+const STARTUP_DELAY_MS = 3  * 60 * 1000;
 
 async function runAuditCleanup() {
   try {
-    const { rowCount } = await query(
-      `DELETE FROM audit_logs
-       WHERE created_at < NOW() - ($1 || ' days')::INTERVAL`,
-      [RETENTION_DAYS]
-    );
-    if (rowCount > 0) {
-      logger.info(`[AuditCleanup] Deleted ${rowCount} audit log rows older than ${RETENTION_DAYS} days.`);
+    const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const result = await AuditLog.deleteMany({ created_at: { $lt: cutoff } });
+    if (result.deletedCount > 0) {
+      logger.info(`[AuditCleanup] Deleted ${result.deletedCount} audit log entries older than ${RETENTION_DAYS} days.`);
     }
   } catch (err) {
     logger.error(`[AuditCleanup] Error: ${err.message}`);

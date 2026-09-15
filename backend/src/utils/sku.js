@@ -1,6 +1,6 @@
 'use strict';
 
-const { query } = require('../config/database');
+const Product = require('../models/Product');
 
 function generateSku(name) {
   const words = name.toUpperCase().trim().split(/\s+/);
@@ -9,16 +9,15 @@ function generateSku(name) {
   return `${abbr}-${num}`;
 }
 
-async function uniqueSku(companyId, base, excludeId = null) {
+// base: candidate SKU string, companyId: ObjectId or string
+async function uniqueSku(base, companyId, excludeId = null) {
   let candidate = base;
   let counter   = 1;
   while (true) {
-    const sql    = excludeId
-      ? 'SELECT id FROM products WHERE company_id = $1 AND sku = $2 AND id != $3'
-      : 'SELECT id FROM products WHERE company_id = $1 AND sku = $2';
-    const params = excludeId ? [companyId, candidate, excludeId] : [companyId, candidate];
-    const { rows } = await query(sql, params);
-    if (!rows[0]) return candidate;
+    const filter = { company_id: companyId, sku: candidate };
+    if (excludeId) filter._id = { $ne: excludeId };
+    const exists = await Product.findOne(filter, { _id: 1 }).lean();
+    if (!exists) return candidate;
     counter++;
     candidate = `${base}-${counter}`;
   }

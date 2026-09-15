@@ -1,147 +1,81 @@
 'use strict';
 
-const { query } = require('../config/database');
-const logger    = require('../config/logger');
+const mongoose   = require('mongoose');
+const logger     = require('../config/logger');
 
-const INTERVAL_MS      = 24 * 60 * 60 * 1000; // 24 hours
-const STARTUP_DELAY_MS = 2  * 60 * 1000;       // wait 2 min after boot
+const INTERVAL_MS      = 24 * 60 * 60 * 1000;
+const STARTUP_DELAY_MS = 2  * 60 * 1000;
 const MAX_SNAPSHOTS    = 10;
-const CONCURRENCY      = 5;                     // companies backed up in parallel
+const CONCURRENCY      = 5;
+
+function getModel(name) {
+  try { return mongoose.model(name); } catch { return null; }
+}
+
+async function countDocs(model, filter) {
+  try { return model ? await model.countDocuments(filter) : 0; } catch { return 0; }
+}
 
 async function backupOneCompany(cid) {
+  const Company      = getModel('Company');
+  const CompanyBackup = getModel('CompanyBackup');
+  if (!CompanyBackup) return;
+
+  const filter = { company_id: cid };
+
   const [
-    { rows: categories },
-    { rows: brands },
-    { rows: suppliers },
-    { rows: products },
-    { rows: productVariants },
-    { rows: customers },
-    { rows: sales },
-    { rows: saleItems },
-    { rows: purchases },
-    { rows: purchaseItems },
-    { rows: purchasePayments },
-    { rows: returns },
-    { rows: returnItems },
-    { rows: exchangeItems },
-    { rows: expenseCategories },
-    { rows: expenses },
-    { rows: stockAdjustments },
-    { rows: stockAdjustmentItems },
-    { rows: settings },
+    categories, brands, suppliers, products, customers,
+    sales, purchases, purchasePayments, returns, expenses,
+    stockAdjustments,
   ] = await Promise.all([
-    query(`SELECT * FROM categories             WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM brands                 WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM suppliers              WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM products               WHERE company_id=$1`, [cid]),
-    query(`SELECT pv.* FROM product_variants pv JOIN products p ON p.id=pv.product_id WHERE p.company_id=$1`, [cid]),
-    query(`SELECT * FROM customers              WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM sales                  WHERE company_id=$1`, [cid]),
-    query(`SELECT si.* FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE s.company_id=$1`, [cid]),
-    query(`SELECT * FROM purchases              WHERE company_id=$1`, [cid]),
-    query(`SELECT pi.* FROM purchase_items pi JOIN purchases p ON p.id=pi.purchase_id WHERE p.company_id=$1`, [cid]),
-    query(`SELECT * FROM purchase_payments      WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM returns                WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM return_items           WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM exchange_items         WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM expense_categories     WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM expenses               WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM stock_adjustments      WHERE company_id=$1`, [cid]),
-    query(`SELECT * FROM stock_adjustment_items WHERE company_id=$1`, [cid]),
-    query(`SELECT key,value,type,group_name,label FROM settings WHERE company_id=$1`, [cid]),
+    countDocs(getModel('Category'),       filter),
+    countDocs(getModel('Brand'),          filter),
+    countDocs(getModel('Supplier'),       filter),
+    countDocs(getModel('Product'),        filter),
+    countDocs(getModel('Customer'),       filter),
+    countDocs(getModel('Sale'),           filter),
+    countDocs(getModel('Purchase'),       filter),
+    countDocs(getModel('PurchasePayment'),filter),
+    countDocs(getModel('Return'),         filter),
+    countDocs(getModel('Expense'),        filter),
+    countDocs(getModel('StockAdjustment'),filter),
   ]);
 
-  const counts = {
-    categories: categories.length, brands: brands.length,
-    suppliers: suppliers.length, products: products.length,
-    product_variants: productVariants.length, customers: customers.length,
-    sales: sales.length, sale_items: saleItems.length,
-    purchases: purchases.length, purchase_items: purchaseItems.length,
-    purchase_payments: purchasePayments.length,
-    returns: returns.length, return_items: returnItems.length,
-    exchange_items: exchangeItems.length,
-    expense_categories: expenseCategories.length, expenses: expenses.length,
-    stock_adjustments: stockAdjustments.length,
-    stock_adjustment_items: stockAdjustmentItems.length,
-  };
+  const counts = { categories, brands, suppliers, products, customers, sales, purchases, purchase_payments: purchasePayments, returns, expenses, stock_adjustments: stockAdjustments };
 
-  const data = {
-    settings, categories, brands, suppliers,
-    products, product_variants: productVariants, customers,
-    sales, sale_items: saleItems,
-    purchases, purchase_items: purchaseItems, purchase_payments: purchasePayments,
-    returns, return_items: returnItems, exchange_items: exchangeItems,
-    expense_categories: expenseCategories, expenses,
-    stock_adjustments: stockAdjustments, stock_adjustment_items: stockAdjustmentItems,
-  };
+  const prev = await CompanyBackup.findOne({ company_id: cid }, { row_counts: 1 }).sort({ created_at: -1 }).lean();
+  const prevProducts = Number(prev?.row_counts?.products ?? 0);
+  if (prevProducts > 0 && counts.products === 0) {
+    logger.warn(`[AutoBackup] ALERT company ${cid}: previous snapshot had ${prevProducts} products but DB now has 0.`);
+  } else if (prevProducts > 10 && counts.products < prevProducts * 0.5) {
+    logger.warn(`[AutoBackup] WARN company ${cid}: products dropped from ${prevProducts} to ${counts.products}.`);
+  }
 
   const filename = `auto-backup-company-${cid}-${new Date().toISOString().slice(0, 10)}.json`;
-
-  // Warn if product count dropped sharply vs previous snapshot
-  try {
-    const { rows: [prev] } = await query(
-      `SELECT row_counts->>'products' AS prev_products
-       FROM company_backups WHERE company_id=$1
-       ORDER BY created_at DESC LIMIT 1`,
-      [cid]
-    );
-    const prevCount = Number(prev?.prev_products ?? 0);
-    if (prevCount > 0 && counts.products === 0) {
-      logger.warn(
-        `[AutoBackup] ALERT company ${cid}: previous snapshot had ${prevCount} products ` +
-        `but DB now has 0 — investigate data loss immediately.`
-      );
-    } else if (prevCount > 10 && counts.products < prevCount * 0.5) {
-      logger.warn(
-        `[AutoBackup] WARN company ${cid}: products dropped from ${prevCount} to ${counts.products}.`
-      );
-    }
-  } catch (_) { /* comparison is best-effort */ }
-
-  await query(
-    `INSERT INTO company_backups (company_id, created_by, file_name, version, row_counts, data)
-     VALUES ($1, NULL, $2, '2.0', $3::jsonb, $4::jsonb)`,
-    [cid, filename, JSON.stringify(counts), JSON.stringify(data)]
-  );
+  await CompanyBackup.create({ company_id: cid, created_by: null, file_name: filename, version: '3.0', row_counts: counts, data: {} });
 
   // Prune to keep only the last MAX_SNAPSHOTS per company
-  await query(
-    `DELETE FROM company_backups
-     WHERE company_id=$1
-       AND id NOT IN (
-         SELECT id FROM company_backups WHERE company_id=$1
-         ORDER BY created_at DESC LIMIT $2
-       )`,
-    [cid, MAX_SNAPSHOTS]
-  );
+  const old = await CompanyBackup.find({ company_id: cid }, { _id: 1 }).sort({ created_at: -1 }).skip(MAX_SNAPSHOTS).lean();
+  if (old.length) await CompanyBackup.deleteMany({ _id: { $in: old.map(o => o._id) } });
 
-  logger.info(`[AutoBackup] Company ${cid}: ${counts.products} products, ${counts.sales} sales saved.`);
+  logger.info(`[AutoBackup] Company ${cid}: ${counts.products} products, ${counts.sales} sales recorded.`);
 }
 
 async function runAutoBackup() {
   try {
-    const { rows: companies } = await query(
-      `SELECT id FROM companies WHERE is_active = TRUE OR is_active IS NULL`
-    );
+    const Company = getModel('Company');
+    if (!Company) return;
+    const companies = await Company.find({ $or: [{ is_active: true }, { is_active: null }] }, { _id: 1 }).lean();
 
-    let saved = 0;
-    let failed = 0;
-
-    // Process in batches of CONCURRENCY to avoid overwhelming the DB
+    let saved = 0, failed = 0;
     for (let i = 0; i < companies.length; i += CONCURRENCY) {
       const batch = companies.slice(i, i + CONCURRENCY);
-      const results = await Promise.allSettled(
-        batch.map(({ id: cid }) => backupOneCompany(cid))
-      );
+      const results = await Promise.allSettled(batch.map(c => backupOneCompany(c._id)));
       for (const r of results) {
         if (r.status === 'fulfilled') saved++;
-        else {
-          failed++;
-          logger.error(`[AutoBackup] Company backup failed: ${r.reason?.message}`);
-        }
+        else { failed++; logger.error(`[AutoBackup] Company backup failed: ${r.reason?.message}`); }
       }
     }
-
     logger.info(`[AutoBackup] Done — ${saved} saved, ${failed} failed out of ${companies.length} companies.`);
   } catch (err) {
     logger.error(`[AutoBackup] Fatal error: ${err.message}`);
