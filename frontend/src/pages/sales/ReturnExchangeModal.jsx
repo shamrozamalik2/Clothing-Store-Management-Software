@@ -82,16 +82,21 @@ export default function ReturnExchangeModal({ sale, onClose, onSuccess }) {
   const [refundMethod, setRefundMethod] = useState('cash');
 
   // Each row: { sale_item_id, product_name, max_qty, qty, unit_price }
-  const [returnRows, setReturnRows] = useState(() =>
-    (sale?.items ?? []).map((item) => ({
+  const [returnRows, setReturnRows] = useState(() => {
+    // Distribute sale-level discount proportionally across items
+    const subtotal = parseFloat(sale?.subtotal) || 0;
+    const saleRatio = subtotal > 0
+      ? parseFloat(sale?.total_amount) / subtotal
+      : 1;
+    return (sale?.items ?? []).map((item) => ({
       sale_item_id:  item._id?.toString() ?? item.id,
       product_name:  item.product_name,
       variant_label: [item.size, item.color].filter(Boolean).join(' · '),
       max_qty:       parseFloat(item.quantity),
       qty:           0,
-      unit_price:    parseFloat(item.total) / parseFloat(item.quantity), // effective price paid (after discount)
-    }))
-  );
+      unit_price:    (parseFloat(item.total) / parseFloat(item.quantity)) * saleRatio,
+    }));
+  });
 
   // Each row: { product_id, product_name, sku, quantity, unit_price }
   const [exchangeRows, setExchangeRows] = useState([]);

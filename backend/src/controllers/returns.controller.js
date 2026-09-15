@@ -46,6 +46,10 @@ const create = async (req, res, next) => {
         if (sale.status === 'cancelled') throw new Error('Cannot return a cancelled sale.');
 
         // 2. Process return items
+        // Distribute sale-level discount proportionally: each item's refund value = item.total * (total_amount / subtotal)
+        const saleSubtotal = parseFloat(sale.subtotal) || 0;
+        const saleRatio    = saleSubtotal > 0 ? parseFloat(sale.total_amount) / saleSubtotal : 1;
+
         let returnTotal = 0;
         const resolvedReturn = [];
 
@@ -89,7 +93,9 @@ const create = async (req, res, next) => {
             }
           }
 
-          const lineTotal = qty * (parseFloat(saleItem.total) / parseFloat(saleItem.quantity));
+          // Effective paid price per unit = item line total (after item discount) × sale-level discount ratio ÷ qty
+          const paidPerUnit = (parseFloat(saleItem.total) / parseFloat(saleItem.quantity)) * saleRatio;
+          const lineTotal   = qty * paidPerUnit;
           returnTotal += lineTotal;
           resolvedReturn.push({
             product_id:   saleItem.product_id,
@@ -98,7 +104,7 @@ const create = async (req, res, next) => {
             product_name: saleItem.product_name,
             sku:          saleItem.sku,
             quantity:     qty,
-            unit_price:   saleItem.unit_price,
+            unit_price:   paidPerUnit,
             total:        lineTotal,
           });
         }
