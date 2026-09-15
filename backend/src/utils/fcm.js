@@ -2,7 +2,8 @@
 
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getMessaging }                  = require('firebase-admin/messaging');
-const { query }                         = require('../config/database');
+const User = require('../models/User');
+const Role = require('../models/Role');
 
 // ── Lazy initialise Firebase Admin SDK ─────────────────────────────────────
 
@@ -86,14 +87,11 @@ async function sendPush(tokens, notification, data = {}) {
  */
 async function notifySale(companyId, saleData) {
   try {
-    const { rows } = await query(
-      `SELECT u.fcm_token FROM users u
-       JOIN roles r ON r.id = u.role_id
-       WHERE u.company_id = $1 AND u.is_active = TRUE
-         AND LOWER(r.name) = 'admin' AND u.fcm_token IS NOT NULL`,
-      [companyId]
-    );
-    const tokens = rows.map(r => r.fcm_token).filter(Boolean);
+    const adminRole = await Role.findOne({ company_id: companyId, name: /^admin$/i }, { _id: 1 }).lean();
+    const users = adminRole
+      ? await User.find({ company_id: companyId, role_id: adminRole._id, is_active: true, fcm_token: { $ne: null } }, { fcm_token: 1 }).lean()
+      : [];
+    const tokens = users.map(u => u.fcm_token).filter(Boolean);
     if (!tokens.length) return;
 
     await sendPush(
