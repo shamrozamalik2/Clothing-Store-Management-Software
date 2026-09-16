@@ -159,6 +159,8 @@ async function performRestore(cid, d, userId) {
   const report = {};
 
   // Upsert by natural key. Returns document. Tracks provided/inserted in report.
+  // IMPORTANT: buildSetOnInsert must NOT include fields that are already in buildFilter or buildSet,
+  // otherwise MongoDB 5+ throws "Cannot update 'X' and 'X' at the same time" on insert.
   async function upsert(Model, key, reportKey, rows, buildFilter, buildSet, buildSetOnInsert) {
     report[reportKey] = { provided: (rows || []).length, inserted: 0 };
     const map = {};
@@ -169,7 +171,9 @@ async function performRestore(cid, d, userId) {
           { $set: buildSet(r), $setOnInsert: buildSetOnInsert(r) },
           { upsert: true, new: true }
         ).lean();
-        map[r[key]] = doc._id;
+        // Handle both SQLite (integer r.id) and MongoDB JSON (r._id hex string) backups
+        const srcId = r[key] ?? r._id?.toString();
+        if (srcId != null) map[srcId] = doc._id;
         report[reportKey].inserted++;
       } catch (e) { logger.warn(`[Backup] ${reportKey} skip: ${e.message}`); }
     }
@@ -183,7 +187,9 @@ async function performRestore(cid, d, userId) {
     for (const r of (rows || [])) {
       try {
         const doc = await Model.create(buildDoc(r));
-        map[r.id] = doc._id;
+        // Handle both SQLite (integer r.id) and MongoDB JSON (r._id hex string) backups
+        const srcId = r.id ?? r._id?.toString();
+        if (srcId != null) map[srcId] = doc._id;
         report[reportKey].inserted++;
       } catch (e) { logger.warn(`[Backup] ${reportKey} skip: ${e.message}`); }
     }
@@ -194,21 +200,21 @@ async function performRestore(cid, d, userId) {
   const catMap = await upsert(Category, 'id', 'categories', d.categories,
     r => ({ company_id: oid, name: r.name }),
     r => ({ description: r.description ?? null, is_active: r.is_active ?? true, updated_at: new Date() }),
-    r => ({ company_id: oid, name: r.name, description: r.description ?? null, is_active: r.is_active ?? true, created_at: ts(r.created_at) })
+    r => ({ created_at: ts(r.created_at) })
   );
 
   // ── 2. Brands ──────────────────────────────────────────────────────────────
   const brandMap = await upsert(Brand, 'id', 'brands', d.brands,
     r => ({ company_id: oid, name: r.name }),
     r => ({ description: r.description ?? null, is_active: r.is_active ?? true, updated_at: new Date() }),
-    r => ({ company_id: oid, name: r.name, description: r.description ?? null, is_active: r.is_active ?? true, created_at: ts(r.created_at) })
+    r => ({ created_at: ts(r.created_at) })
   );
 
   // ── 3. Suppliers ───────────────────────────────────────────────────────────
   const suppMap = await upsert(Supplier, 'id', 'suppliers', d.suppliers,
     r => ({ company_id: oid, name: r.name }),
     r => ({ email: r.email ?? null, phone: r.phone ?? null, address: r.address ?? null, city: r.city ?? null, is_active: r.is_active ?? true, updated_at: new Date() }),
-    r => ({ company_id: oid, name: r.name, email: r.email ?? null, phone: r.phone ?? null, address: r.address ?? null, city: r.city ?? null, current_balance: r.current_balance ?? 0, opening_balance: r.opening_balance ?? r.current_balance ?? 0, is_active: r.is_active ?? true, created_at: ts(r.created_at) })
+    r => ({ current_balance: r.current_balance ?? 0, opening_balance: r.opening_balance ?? r.current_balance ?? 0, created_at: ts(r.created_at) })
   );
 
   // ── 4. Products (set variants:[] first, then push in step 5) ──────────────
@@ -480,7 +486,7 @@ async function performRestore(cid, d, userId) {
   const expCatMap = await upsert(ExpenseCategory, 'id', 'expense_categories', d.expense_categories,
     r => ({ company_id: oid, name: r.name }),
     r => ({ is_active: r.is_active ?? true, updated_at: new Date() }),
-    r => ({ company_id: oid, name: r.name, is_active: r.is_active ?? true, created_at: ts(r.created_at) })
+    r => ({ created_at: ts(r.created_at) })
   );
 
   // ── 12. Expenses (no unique key — insert fresh) ────────────────────────────

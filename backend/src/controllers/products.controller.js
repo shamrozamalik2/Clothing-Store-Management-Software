@@ -24,8 +24,8 @@ const list = async (req, res, next) => {
 
     const filter = { company_id: cid };
     if (search)   filter.$or = [{ name: { $regex: search, $options: 'i' } }, { sku: { $regex: search, $options: 'i' } }, { barcode: { $regex: search, $options: 'i' } }];
-    if (category) filter.category_id = category;
-    if (brand)    filter.brand_id    = brand;
+    if (category) { try { filter.category_id = new mongoose.Types.ObjectId(category); } catch {} }
+    if (brand)    { try { filter.brand_id    = new mongoose.Types.ObjectId(brand);    } catch {} }
     if (status !== '') filter.is_active = status === 'active';
     if (stock_status === 'out_of_stock') { filter.stock_quantity = { $lte: 0 }; }
     else if (stock_status === 'low_stock')    { filter.stock_quantity = { $gt: 0, $lte: mongoose.Types.Decimal128.fromString ? undefined : undefined }; /* handled below */ }
