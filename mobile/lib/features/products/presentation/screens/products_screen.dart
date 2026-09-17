@@ -134,7 +134,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                         );
                       }
                       final cat = _categories[i - 1];
-                      final id  = cat['id'] as int?;
+                      final id  = cat['id']?.toString();
                       return FilterChip(
                         label:    Text(cat['name']?.toString() ?? ''),
                         selected: selectedCatId == id,

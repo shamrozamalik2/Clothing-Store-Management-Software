@@ -12,7 +12,7 @@ class ProductsRemoteSource {
     int    limit    = 20,
     String? search,
     String? barcode,
-    int?    categoryId,
+    String? categoryId,
     bool?   lowStock,
   }) async {
     final res = await _api.get(ApiEndpoints.products, queryParameters: {

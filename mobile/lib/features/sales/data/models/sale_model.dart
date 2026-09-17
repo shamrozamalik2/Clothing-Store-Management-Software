@@ -13,35 +13,33 @@ class SaleModel {
     this.customerName,
   });
 
-  final int    id;
-  final String invoiceNo;
-  final int?   customerId;
+  final String  id;
+  final String  invoiceNo;
+  final String? customerId;
   final String? customerName;
-  final double subtotal;
-  final double discountAmount;
-  final double taxAmount;
-  final double totalAmount;
-  final String paymentMethod;
-  final String status;
-  final String createdAt;
+  final double  subtotal;
+  final double  discountAmount;
+  final double  taxAmount;
+  final double  totalAmount;
+  final String  paymentMethod;
+  final String  status;
+  final String  createdAt;
 
   static double _d(dynamic v) =>
       v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
-  static int _i(dynamic v) =>
-      v is num ? v.toInt() : int.tryParse('$v') ?? 0;
 
   factory SaleModel.fromJson(Map<String, dynamic> j) => SaleModel(
-    id:             _i(j['id']),
-    invoiceNo:      j['invoice_no']?.toString() ?? j['reference']?.toString() ?? '#${j['id']}',
-    customerId:     j['customer_id'] != null ? _i(j['customer_id']) : null,
+    id:             j['id']?.toString()           ?? '',
+    invoiceNo:      j['invoice_no']?.toString()   ?? j['reference']?.toString() ?? '#${j['id']}',
+    customerId:     j['customer_id']?.toString(),
     customerName:   j['customer_name']?.toString(),
     subtotal:       _d(j['subtotal']),
     discountAmount: _d(j['discount_amount']),
     taxAmount:      _d(j['tax_amount']),
     totalAmount:    _d(j['total_amount']),
     paymentMethod:  j['payment_method']?.toString() ?? 'cash',
-    status:         j['status']?.toString() ?? 'completed',
-    createdAt:      j['created_at']?.toString() ?? '',
+    status:         j['status']?.toString()          ?? 'completed',
+    createdAt:      j['created_at']?.toString()      ?? '',
   );
 }
 
@@ -56,8 +54,8 @@ class SaleItemModel {
     required this.total,
   });
 
-  final int    id;
-  final int    productId;
+  final String id;
+  final String productId;
   final String productName;
   final int    quantity;
   final double unitPrice;
@@ -65,10 +63,10 @@ class SaleItemModel {
   final double total;
 
   factory SaleItemModel.fromJson(Map<String, dynamic> j) => SaleItemModel(
-    id:          SaleModel._i(j['id']),
-    productId:   SaleModel._i(j['product_id']),
+    id:          j['id']?.toString()           ?? '',
+    productId:   j['product_id']?.toString()   ?? '',
     productName: j['product_name']?.toString() ?? '',
-    quantity:    SaleModel._i(j['quantity']),
+    quantity:    SaleModel._d(j['quantity']).toInt(),
     unitPrice:   SaleModel._d(j['unit_price']),
     discount:    SaleModel._d(j['discount']),
     total:       SaleModel._d(j['total']),

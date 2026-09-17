@@ -9,7 +9,7 @@ class StaffStat {
     required this.collected,
   });
 
-  final int    id;
+  final String id;
   final String name;
   final String email;
   final String role;
@@ -23,7 +23,7 @@ class StaffStat {
       v is num ? v.toInt() : int.tryParse('$v') ?? 0;
 
   factory StaffStat.fromJson(Map<String, dynamic> j) => StaffStat(
-    id:        _i(j['id']),
+    id:        j['id']?.toString()  ?? '',
     name:      j['name']?.toString()  ?? '',
     email:     j['email']?.toString() ?? '',
     role:      j['role']?.toString()  ?? 'staff',

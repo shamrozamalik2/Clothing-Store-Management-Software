@@ -10,7 +10,7 @@ class ApiEndpoints {
 
   // Products
   static const String products       = '/products';
-  static String product(int id)      => '/products/$id';
+  static String product(String id)   => '/products/$id';
 
   // Categories
   static const String categories     = '/categories';
@@ -20,11 +20,11 @@ class ApiEndpoints {
 
   // Customers
   static const String customers      = '/customers';
-  static String customer(int id)     => '/customers/$id';
+  static String customer(String id)  => '/customers/$id';
 
   // Sales
   static const String sales          = '/sales';
-  static String sale(int id)         => '/sales/$id';
+  static String sale(String id)      => '/sales/$id';
 
   // Purchases
   static const String purchases      = '/purchases';
@@ -39,7 +39,6 @@ class ApiEndpoints {
   static const String reportPaymentMethods  = '/reports/payment-methods';
   static const String reportStock           = '/reports/stock';
   static const String reportStaff          = '/reports/staff';
-  // legacy aliases kept for reference
   static const String reportSales    = '/reports/overview';
   static const String reportProducts = '/reports/top-products';
   static const String reportProfit   = '/reports/payment-methods';
@@ -59,7 +58,7 @@ class ApiEndpoints {
   static const String stockAdjustments   = '/stock-adjustments';
 
   // Collect credit payment on a sale
-  static String saleCollectPayment(int id) => '/sales/$id/collect-payment';
+  static String saleCollectPayment(String id) => '/sales/$id/collect-payment';
 
   // Returns
   static const String returns        = '/returns';

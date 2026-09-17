@@ -39,21 +39,21 @@ class LowStockItem {
     this.categoryName,
   });
 
-  final int    id;
-  final String name;
-  final String sku;
-  final int    stockQuantity;
-  final int    lowStockAlert;
-  final double costPrice;
-  final double salePrice;
+  final String  id;
+  final String  name;
+  final String  sku;
+  final int     stockQuantity;
+  final int     lowStockAlert;
+  final double  costPrice;
+  final double  salePrice;
   final String? categoryName;
 
   bool get isOutOfStock => stockQuantity <= 0;
 
   factory LowStockItem.fromJson(Map<String, dynamic> j) => LowStockItem(
-    id:            StockSummary._i(j['id']),
-    name:          j['name']?.toString()          ?? '',
-    sku:           j['sku']?.toString()           ?? '',
+    id:            j['id']?.toString()               ?? '',
+    name:          j['name']?.toString()             ?? '',
+    sku:           j['sku']?.toString()              ?? '',
     stockQuantity: StockSummary._i(j['stock_quantity']),
     lowStockAlert: StockSummary._i(j['low_stock_alert']),
     costPrice:     StockSummary._d(j['cost_price']),

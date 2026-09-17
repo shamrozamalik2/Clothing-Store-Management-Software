@@ -14,10 +14,10 @@ class UserEntity extends Equatable {
     this.phone,
   });
 
-  final int    id;
+  final String id;
   final String name;
   final String email;
-  final int    companyId;
+  final String companyId;
   final String companySlug;
   final String companyName;
   final String roleName;

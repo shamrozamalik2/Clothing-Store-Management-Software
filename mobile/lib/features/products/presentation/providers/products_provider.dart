@@ -10,7 +10,7 @@ final productsSourceProvider = Provider<ProductsRemoteSource>((ref) {
 
 final productSearchProvider = StateProvider<String>((ref) => '');
 
-final productCategoryProvider = StateProvider<int?>((ref) => null);
+final productCategoryProvider = StateProvider<String?>((ref) => null);
 
 final productsProvider = FutureProvider.autoDispose<PaginatedResponse<ProductModel>>((ref) {
   final search     = ref.watch(productSearchProvider);

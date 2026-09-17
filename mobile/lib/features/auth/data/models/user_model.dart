@@ -14,24 +14,25 @@ class UserModel extends UserEntity {
     super.phone,
   });
 
+  static String _s(dynamic v) => v?.toString() ?? '';
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
-    // Backend returns role as a flat string and permissions as a flat object
     final roleName  = json['role']        as String?
                    ?? json['role_name']   as String? ?? '';
     final perms     = json['permissions'] as Map<String, dynamic>? ?? {};
-    final companyId = (json['companyId']  ?? json['company_id']) as int;
+    final companyId = _s(json['companyId'] ?? json['company_id']);
 
     return UserModel(
-      id:          json['id'] as int,
-      name:        json['name'] as String,
-      email:       json['email'] as String,
+      id:          _s(json['id']),
+      name:        json['name']?.toString()  ?? '',
+      email:       json['email']?.toString() ?? '',
       companyId:   companyId,
-      companySlug: json['companySlug'] as String? ?? json['company_slug'] as String? ?? '',
-      companyName: json['companyName'] as String? ?? json['company_name'] as String? ?? '',
+      companySlug: json['companySlug']?.toString()  ?? json['company_slug']?.toString()  ?? '',
+      companyName: json['companyName']?.toString() ?? json['company_name']?.toString() ?? '',
       roleName:    roleName,
       permissions: perms,
-      avatar:      json['avatar'] as String?,
-      phone:       json['phone']  as String?,
+      avatar:      json['avatar']?.toString(),
+      phone:       json['phone']?.toString(),
     );
   }
 

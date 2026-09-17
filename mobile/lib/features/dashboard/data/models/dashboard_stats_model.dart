@@ -66,17 +66,17 @@ class RecentSale {
     this.paymentMethod,
     this.cashierName,
   });
-  final int    id;
-  final String invoiceNo;
-  final double total;
-  final String createdAt;
+  final String  id;
+  final String  invoiceNo;
+  final double  total;
+  final String  createdAt;
   final String? customerName;
   final String? paymentMethod;
   final String? cashierName;
 
   factory RecentSale.fromJson(Map<String, dynamic> j) => RecentSale(
-    id:            DashboardStats._i(j['id']),
-    invoiceNo:     j['invoice_no']?.toString() ?? '#${j['id']}',
+    id:            j['id']?.toString() ?? '',
+    invoiceNo:     j['invoice_no']?.toString() ?? j['reference']?.toString() ?? '#${j['id']}',
     total:         DashboardStats._d(j['total_amount']),
     createdAt:     j['created_at']?.toString() ?? '',
     customerName:  j['customer_name']?.toString(),

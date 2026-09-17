@@ -55,14 +55,14 @@ class ProductReport {
     required this.profit,
   });
 
-  final int    productId;
+  final String productId;
   final String name;
   final int    qtySold;
   final double revenue;
   final double profit;
 
   factory ProductReport.fromJson(Map<String, dynamic> json) => ProductReport(
-        productId: SalesSummary._i(json['product_id'] ?? json['id'] ?? 0),
+        productId: (json['product_id'] ?? json['id'])?.toString() ?? '',
         name:      json['name']?.toString() ?? '',
         qtySold:   SalesSummary._i(json['qty_sold']  ?? json['total_qty']),
         revenue:   SalesSummary._d(json['revenue']   ?? json['total_revenue']),

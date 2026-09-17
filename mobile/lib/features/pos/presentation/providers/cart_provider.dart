@@ -9,7 +9,7 @@ import '../../../products/data/sources/products_remote_source.dart';
 
 class CartState {
   final List<CartItemModel> items;
-  final int? customerId;
+  final String? customerId;
   final String? customerName;
 
   /// Overall cart discount as a percentage 0–100.
@@ -62,7 +62,7 @@ class CartState {
         items: items ?? this.items,
         customerId: customerId == _kSentinel
             ? this.customerId
-            : customerId as int?,
+            : customerId as String?,
         customerName: customerName == _kSentinel
             ? this.customerName
             : customerName as String?,
@@ -86,7 +86,7 @@ class CartState {
         items: (json['items'] as List? ?? [])
             .map((e) => CartItemModel.fromJson(e as Map<String, dynamic>))
             .toList(),
-        customerId: json['customerId'] as int?,
+        customerId: json['customerId']?.toString(),
         customerName: json['customerName'] as String?,
         discountPercent:
             (json['discountPercent'] as num?)?.toDouble() ?? 0.0,
@@ -170,7 +170,7 @@ class CartNotifier extends StateNotifier<CartState> {
     state = state.copyWith(taxPercent: percent.clamp(0.0, 100.0));
   }
 
-  void setCustomer(int id, String name) {
+  void setCustomer(String id, String name) {
     state = state.copyWith(customerId: id, customerName: name);
   }
 

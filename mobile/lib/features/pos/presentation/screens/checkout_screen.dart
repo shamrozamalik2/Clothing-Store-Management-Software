@@ -103,7 +103,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       if (cart.note.isNotEmpty) 'notes': cart.note,
       'items': cart.items
           .map((item) => {
-                'product_id': int.tryParse(item.productId) ?? 0,
+                'product_id': item.productId,
                 'quantity': item.quantity,
                 'unit_price': item.price,
                 'discount': item.discount,
@@ -470,8 +470,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                             .read(cartProvider
                                                 .notifier)
                                             .setCustomer(
-                                              c['id'] as int,
-                                              c['name'] as String,
+                                              c['id']?.toString() ?? '',
+                                              c['name']?.toString() ?? '',
                                             );
                                         _customerSearchCtrl.clear();
                                         setState(

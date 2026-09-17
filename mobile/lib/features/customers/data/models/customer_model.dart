@@ -11,7 +11,7 @@ class CustomerModel {
     this.isActive,
   });
 
-  final int     id;
+  final String  id;
   final String  name;
   final String? email;
   final String? phone;
@@ -21,16 +21,21 @@ class CustomerModel {
   final double? totalPurchases;
   final bool?   isActive;
 
+  static double _d(dynamic v) =>
+      v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+  static int _i(dynamic v) =>
+      v is num ? v.toInt() : int.tryParse('$v') ?? 0;
+
   factory CustomerModel.fromJson(Map<String, dynamic> j) => CustomerModel(
-    id:                 j['id']                  as int,
-    name:               j['name']?.toString()    ?? '',
+    id:                 j['id']?.toString()             ?? '',
+    name:               j['name']?.toString()           ?? '',
     email:              j['email']?.toString(),
     phone:              j['phone']?.toString(),
     address:            j['address']?.toString(),
-    loyaltyPoints:      (j['loyalty_points']      as num?)?.toInt(),
-    outstandingBalance: (j['outstanding_balance'] as num?)?.toDouble(),
-    totalPurchases:     (j['total_purchases']     as num?)?.toDouble(),
-    isActive:           j['is_active']            as bool?,
+    loyaltyPoints:      j['loyalty_points']      != null ? _i(j['loyalty_points'])      : null,
+    outstandingBalance: j['outstanding_balance'] != null ? _d(j['outstanding_balance']) : null,
+    totalPurchases:     j['total_purchases']     != null ? _d(j['total_purchases'])     : null,
+    isActive:           j['is_active']           as bool?,
   );
 
   Map<String, dynamic> toJson() => {

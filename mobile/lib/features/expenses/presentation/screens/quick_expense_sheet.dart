@@ -26,7 +26,7 @@ class QuickExpenseSheet extends ConsumerStatefulWidget {
 class _QuickExpenseSheetState extends ConsumerState<QuickExpenseSheet> {
   final _amountCtrl = TextEditingController();
   final _noteCtrl   = TextEditingController();
-  int?   _categoryId;
+  String? _categoryId;
   String _method     = 'cash';
   String _date       = DateFormat('yyyy-MM-dd').format(DateTime.now());
   bool   _saving     = false;
@@ -122,7 +122,7 @@ class _QuickExpenseSheetState extends ConsumerState<QuickExpenseSheet> {
             cats.when(
               loading: () => const LinearProgressIndicator(),
               error:   (_, __) => const SizedBox.shrink(),
-              data: (list) => DropdownButtonFormField<int>(
+              data: (list) => DropdownButtonFormField<String>(
                 value:      _categoryId,
                 decoration: const InputDecoration(
                   labelText:  'Category (optional)',
@@ -130,9 +130,9 @@ class _QuickExpenseSheetState extends ConsumerState<QuickExpenseSheet> {
                 ),
                 hint: const Text('Select category'),
                 items: [
-                  const DropdownMenuItem<int>(value: null, child: Text('— None —')),
-                  ...list.map((c) => DropdownMenuItem<int>(
-                        value: c['id'] as int?,
+                  const DropdownMenuItem<String>(value: null, child: Text('— None —')),
+                  ...list.map((c) => DropdownMenuItem<String>(
+                        value: c['id']?.toString(),
                         child: Text(c['name']?.toString() ?? ''),
                       )),
                 ],

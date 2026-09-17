@@ -229,8 +229,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     );
     if (result != null) {
       ref.read(cartProvider.notifier).setCustomer(
-            result['id'] as int,
-            result['name'] as String,
+            result['id']?.toString() ?? '',
+            result['name']?.toString() ?? '',
           );
     }
   }
