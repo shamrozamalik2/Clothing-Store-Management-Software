@@ -23,7 +23,7 @@ class CustomersRemoteSource {
     );
   }
 
-  Future<CustomerModel> getCustomer(int id) async {
+  Future<CustomerModel> getCustomer(String id) async {
     final res  = await _api.get(ApiEndpoints.customer(id));
     final data = (res.data as Map<String, dynamic>)['data'] as Map<String, dynamic>;
     return CustomerModel.fromJson(data);
@@ -35,7 +35,7 @@ class CustomersRemoteSource {
     return CustomerModel.fromJson(data);
   }
 
-  Future<CustomerModel> updateCustomer(int id, Map<String, dynamic> body) async {
+  Future<CustomerModel> updateCustomer(String id, Map<String, dynamic> body) async {
     final res  = await _api.put(ApiEndpoints.customer(id), data: body);
     final data = (res.data as Map<String, dynamic>)['data'] as Map<String, dynamic>;
     return CustomerModel.fromJson(data);

@@ -64,7 +64,7 @@ class ReportsRemoteSource {
     return list.map((e) {
       final m = e as Map<String, dynamic>;
       return ProductReport(
-        productId: _i(m['id']),
+        productId: m['id']?.toString() ?? '',
         name:      m['name']?.toString() ?? '',
         qtySold:   _i(m['total_qty']),
         revenue:   _d(m['total_revenue']),
