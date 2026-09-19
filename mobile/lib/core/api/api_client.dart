@@ -7,7 +7,9 @@ import '../storage/secure_storage.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 
-final _cookieJar = CookieJar();
+/// Initialized once in main() before runApp — persists cookies (including the
+/// HttpOnly refresh_token cookie) across app restarts.
+late final CookieJar appCookieJar;
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(ref.watch(secureStorageProvider));
@@ -23,13 +25,13 @@ class ApiClient {
     ));
 
     _dio.interceptors.addAll([
-      CookieManager(_cookieJar),
+      CookieManager(appCookieJar),
       AuthInterceptor(storage, _dio),
       ErrorInterceptor(),
       LogInterceptor(
         requestBody:  false,
         responseBody: false,
-        logPrint: (obj) {}, // silence in prod
+        logPrint: (obj) {},
       ),
     ]);
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/user_model.dart';
@@ -5,6 +6,7 @@ import '../../data/sources/auth_remote_source.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
+import '../../../../core/auth/auth_event_bus.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/services/notification_service.dart';
@@ -42,11 +44,27 @@ class AuthError extends AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._source, this._storage, this._api) : super(AuthLoading()) {
     _tryRestore();
+    _eventSub = AuthEventBus.instance.stream.listen(_onAuthEvent);
   }
 
   final AuthRemoteSource     _source;
   final SecureStorageService _storage;
   final ApiClient            _api;
+
+  late final StreamSubscription<AuthEvent> _eventSub;
+
+  @override
+  void dispose() {
+    _eventSub.cancel();
+    super.dispose();
+  }
+
+  void _onAuthEvent(AuthEvent event) {
+    if (event == AuthEvent.sessionExpired) {
+      // Tokens already cleared by the interceptor — just update UI state.
+      state = AuthUnauthenticated();
+    }
+  }
 
   Future<void> _tryRestore() async {
     try {

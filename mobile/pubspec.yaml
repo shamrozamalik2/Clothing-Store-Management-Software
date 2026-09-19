@@ -69,6 +69,9 @@ dependencies:
   # Bluetooth printing (ESC/POS thermal receipts)
   print_bluetooth_thermal: ^1.2.2
 
+  # File system path (needed for PersistCookieJar)
+  path_provider: ^2.1.4
+
   # Utilities
   uuid: ^4.4.0
   equatable: ^2.0.5

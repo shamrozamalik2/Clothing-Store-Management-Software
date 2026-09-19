@@ -1,8 +1,10 @@
+import 'package:cookie_jar/cookie_jar.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'core/api/api_client.dart';
 import 'core/api/api_endpoints.dart';
@@ -21,6 +23,13 @@ final _container = ProviderContainer();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize the persistent cookie jar BEFORE any providers are created.
+  // This keeps the HttpOnly refresh_token cookie alive across app restarts.
+  final cookieDir = await getApplicationDocumentsDirectory();
+  appCookieJar = PersistCookieJar(
+    storage: FileStorage('${cookieDir.path}/.cookies/'),
+  );
 
   await HiveStorage.init();
 
