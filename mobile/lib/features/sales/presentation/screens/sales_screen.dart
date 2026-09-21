@@ -13,7 +13,6 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/sale_model.dart';
 import '../providers/sales_provider.dart';
 import '../../../printer/presentation/providers/printer_provider.dart';
-import '../../../shell/main_shell.dart';
 
 final _shopNameProvider = Provider<String>((ref) {
   final user = ref.watch(currentUserProvider);
@@ -114,10 +113,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                   ),
                 ),
               ),
-              leading: IconButton(
-                icon: const Icon(Icons.menu_rounded),
-                onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
-              ),
+              automaticallyImplyLeading: false,
               title: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -251,10 +247,10 @@ class _AppBarAction extends StatelessWidget {
         child: Container(
           width: 36, height: 36,
           decoration: BoxDecoration(
-            color:        const Color(0xFF4F46E5).withValues(alpha: 0.1),
+            color:        const Color(0xFF2C6BF5).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
             border:       Border.all(
-              color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
+              color: const Color(0xFF2C6BF5).withValues(alpha: 0.2),
             ),
           ),
           child: Icon(icon, size: 18,

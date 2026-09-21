@@ -214,14 +214,14 @@ class _Placeholder extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1E1B3A), Color(0xFF312E81)],
+          colors: [Color(0xFF0D2260), Color(0xFF1A3D8F)],
         ),
       ),
       child: const Center(
         child: Icon(
           Icons.inventory_2_rounded,
           size: 36,
-          color: Color(0x606366F1),
+          color: Color(0x602C6BF5),
         ),
       ),
     );

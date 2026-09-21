@@ -1,15 +1,18 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
-const _kGradStart  = Color(0xFF0D0B2A);
-const _kGradMid    = Color(0xFF160D3B);
-const _kGradEnd    = Color(0xFF231B4F);
-const _kGlowIndigo = Color(0xFF4F46E5);
+const _kBg    = Color(0xFF05091A);
+const _kBrand = Color(0xFF2C6BF5);
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -18,7 +21,9 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with TickerProviderStateMixin {
+
   final _form      = GlobalKey<FormState>();
   final _slugCtrl  = TextEditingController();
   final _emailCtrl = TextEditingController();
@@ -26,21 +31,53 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool  _remember  = false;
   bool  _obscure   = true;
 
+  late final AnimationController _entryCtrl;
+  late final AnimationController _bgCtrl;
+
+  late final List<Animation<double>>  _fades;
+  late final List<Animation<Offset>>  _slides;
+
   @override
   void initState() {
     super.initState();
+
+    // Entry animations — 5 staggered slots
+    _entryCtrl = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 1000));
+
+    _bgCtrl = AnimationController(vsync: this,
+        duration: const Duration(seconds: 9))
+      ..repeat(reverse: true);
+
+    _fades  = [];
+    _slides = [];
+    for (var i = 0; i < 5; i++) {
+      final start = i * 0.09;
+      final end   = start + 0.40;
+      _fades.add(
+        Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(parent: _entryCtrl,
+              curve: Interval(start, end, curve: Curves.easeOut))),
+      );
+      _slides.add(
+        Tween<Offset>(
+          begin: const Offset(0, 0.07),
+          end:   Offset.zero,
+        ).animate(CurvedAnimation(parent: _entryCtrl,
+            curve: Interval(start, end, curve: Curves.easeOutCubic))),
+      );
+    }
+
+    Future.microtask(() { if (mounted) _entryCtrl.forward(); });
     _loadSaved();
   }
 
   Future<void> _loadSaved() async {
-    final storage = ref.read(secureStorageProvider);
+    final storage  = ref.read(secureStorageProvider);
     final remember = await storage.read(kKeyRememberLogin);
     if (remember == 'true') {
       final slug = await storage.read(kKeyCompanySlug) ?? '';
-      setState(() {
-        _slugCtrl.text = slug;
-        _remember      = true;
-      });
+      if (mounted) setState(() { _slugCtrl.text = slug; _remember = true; });
     }
   }
 
@@ -56,11 +93,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
+    _entryCtrl.dispose();
+    _bgCtrl.dispose();
     _slugCtrl.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
   }
+
+  Widget _wrap(int slot, Widget child) => FadeTransition(
+    opacity: _fades[slot],
+    child:   SlideTransition(position: _slides[slot], child: child),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -72,140 +116,96 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Theme(
       data: AppTheme.dark(),
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: _kBg,
         resizeToAvoidBottomInset: true,
-        body: Container(
-          width:  double.infinity,
-          height: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin:  Alignment.topLeft,
-              end:    Alignment.bottomRight,
-              colors: [_kGradStart, _kGradMid, _kGradEnd],
-              stops:  [0.0, 0.5, 1.0],
-            ),
-          ),
-          child: Stack(
+        body: AnimatedBuilder(
+          animation: _bgCtrl,
+          builder: (context, child) => Stack(
+            fit: StackFit.expand,
             children: [
-              // ── Decorative glow blobs ─────────────────────────────────────
-              Positioned(
-                top:   -100,
-                left:  -80,
-                child: Container(
-                  width:  320,
-                  height: 320,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        _kGlowIndigo.withValues(alpha: 0.18),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: -120,
-                right:  -80,
-                child: Container(
-                  width:  280,
-                  height: 280,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFF7C3AED).withValues(alpha: 0.14),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
 
-              // ── Scrollable content ────────────────────────────────────────
-              SafeArea(
-                child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: size.height
-                          - MediaQuery.of(context).padding.top
-                          - MediaQuery.of(context).padding.bottom,
-                    ),
-                    child: IntrinsicHeight(
-                      child: Form(
-                        key: _form,
-                        child: Column(
-                          children: [
+              // ── Animated background ────────────────────────────────────
+              _AnimatedBackground(t: _bgCtrl.value),
 
-                            // ── Top spacer ────────────────────────────────
-                            SizedBox(height: size.height * 0.07),
+              // ── Dot grid ──────────────────────────────────────────────
+              CustomPaint(painter: _DotGridPainter()),
 
-                            // ── Logo hero ─────────────────────────────────
-                            _LogoHero(),
+              // ── Form content ──────────────────────────────────────────
+              child!,
 
-                            SizedBox(height: size.height * 0.05),
-
-                            // ── Heading ───────────────────────────────────
-                            const _Heading(),
-
-                            const SizedBox(height: 28),
-
-                            // ── Error banner ──────────────────────────────
-                            if (error != null) ...[
-                              _ErrorBanner(message: error),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // ── Form card ─────────────────────────────────
-                            _FormCard(
-                              slugCtrl:  _slugCtrl,
-                              emailCtrl: _emailCtrl,
-                              passCtrl:  _passCtrl,
-                              obscure:   _obscure,
-                              onToggleObscure: () =>
-                                  setState(() => _obscure = !_obscure),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // ── Remember me ───────────────────────────────
-                            _RememberRow(
-                              value:     _remember,
-                              onChanged: (v) => setState(() => _remember = v),
-                            ),
-
-                            const SizedBox(height: 24),
-
-                            // ── Sign in button ────────────────────────────
-                            _SignInButton(loading: loading, onPressed: _submit),
-
-                            const Spacer(),
-
-                            // ── Footer ────────────────────────────────────
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 24, top: 32),
-                              child: Text(
-                                'ProBusinessCloud · Secure Business Platform',
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize:   11,
-                                  color:      Colors.white.withValues(alpha: 0.28),
-                                  letterSpacing: 0.2,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
+          ),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: size.height
+                      - MediaQuery.of(context).padding.top
+                      - MediaQuery.of(context).padding.bottom,
+                ),
+                child: IntrinsicHeight(
+                  child: Form(
+                    key: _form,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+
+                        SizedBox(height: size.height * 0.07),
+
+                        // ── Logo block ──────────────────────────────────
+                        _wrap(0, _LogoBlock()),
+
+                        SizedBox(height: size.height * 0.05),
+
+                        // ── Heading ─────────────────────────────────────
+                        _wrap(1, const _Heading()),
+
+                        const SizedBox(height: 32),
+
+                        // ── Error banner ─────────────────────────────────
+                        if (error != null)
+                          _wrap(2, Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _ErrorBanner(message: error),
+                          )),
+
+                        // ── Glassmorphism form card ───────────────────────
+                        _wrap(2, _GlassFormCard(
+                          slugCtrl:        _slugCtrl,
+                          emailCtrl:       _emailCtrl,
+                          passCtrl:        _passCtrl,
+                          obscure:         _obscure,
+                          onToggleObscure: () =>
+                              setState(() => _obscure = !_obscure),
+                        )),
+
+                        const SizedBox(height: 16),
+
+                        // ── Remember me ──────────────────────────────────
+                        _wrap(3, _RememberRow(
+                          value:     _remember,
+                          onChanged: (v) => setState(() => _remember = v),
+                        )),
+
+                        const SizedBox(height: 28),
+
+                        // ── Sign in button ───────────────────────────────
+                        _wrap(4, _PressButton(
+                          loading:   loading,
+                          onPressed: _submit,
+                        )),
+
+                        const Spacer(),
+                        const SizedBox(height: 36),
+
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -213,71 +213,138 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-// ── Logo Hero ─────────────────────────────────────────────────────────────────
+// ── Animated background ───────────────────────────────────────────────────────
 
-class _LogoHero extends StatelessWidget {
+class _AnimatedBackground extends StatelessWidget {
+  const _AnimatedBackground({required this.t});
+  final double t;
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        children: [
-          // Logo card with glow
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color:      _kGlowIndigo.withValues(alpha: 0.35),
-                  blurRadius: 40,
-                  spreadRadius: 4,
-                  offset:     const Offset(0, 8),
-                ),
-                BoxShadow(
-                  color:      Colors.black.withValues(alpha: 0.4),
-                  blurRadius: 20,
-                  offset:     const Offset(0, 6),
-                ),
-              ],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Base gradient
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin:  Alignment.topLeft,
+              end:    Alignment.bottomRight,
+              colors: [Color(0xFF05091A), Color(0xFF080E26)],
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end:   Alignment.bottomRight,
-                    colors: [Color(0xFF1E1B6B), Color(0xFF312E81)],
-                  ),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Image.asset(
-                  'assets/images/newlogo.png',
-                  height: 52,
-                  fit:    BoxFit.contain,
-                  color:  Colors.white,
-                  colorBlendMode: BlendMode.srcIn,
-                ),
+          ),
+        ),
+        // Moving blob top-left
+        Positioned(
+          top:  -80 + t * 50,
+          left: -80 + t * 40,
+          child: Container(
+            width: 360, height: 360,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(colors: [
+                _kBrand.withValues(alpha: 0.08 + t * 0.05),
+                Colors.transparent,
+              ]),
+            ),
+          ),
+        ),
+        // Moving blob bottom-right
+        Positioned(
+          bottom: -100 + t * 40,
+          right:  -80 + t * 30,
+          child: Container(
+            width: 300, height: 300,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(colors: [
+                const Color(0xFF1A3BA0).withValues(alpha: 0.10 + t * 0.04),
+                Colors.transparent,
+              ]),
+            ),
+          ),
+        ),
+        // Accent blob top-right (moves opposite)
+        Positioned(
+          top:   -40 + (1 - t) * 60,
+          right: -60 + (1 - t) * 40,
+          child: Container(
+            width: 240, height: 240,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(colors: [
+                const Color(0xFF1E4FD0).withValues(alpha: 0.07 + (1 - t) * 0.04),
+                Colors.transparent,
+              ]),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Logo block ────────────────────────────────────────────────────────────────
+
+class _LogoBlock extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Logo icon with glow
+        Container(
+          width:  72,
+          height: 72,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color:      _kBrand.withValues(alpha: 0.50),
+                blurRadius: 32,
+                offset:     const Offset(0, 6),
+              ),
+              BoxShadow(
+                color:      Colors.black.withValues(alpha: 0.35),
+                blurRadius: 16,
+                offset:     const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: SvgPicture.asset(
+              'assets/images/logo-mark.svg',
+              width: 72, height: 72, fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        // Wordmark
+        RichText(
+          text: TextSpan(children: [
+            TextSpan(
+              text:  'ProBusiness',
+              style: TextStyle(
+                fontFamily:    'Inter',
+                fontSize:      17,
+                fontWeight:    FontWeight.w700,
+                color:         Colors.white.withValues(alpha: 0.92),
+                letterSpacing: -0.3,
               ),
             ),
-          ),
-          const SizedBox(height: 14),
-          // PBC wordmark below logo
-          Text(
-            'ProBusinessCloud',
-            style: TextStyle(
-              fontFamily:    'Inter',
-              fontSize:      13,
-              fontWeight:    FontWeight.w600,
-              color:         Colors.white.withValues(alpha: 0.45),
-              letterSpacing: 0.5,
+            const TextSpan(
+              text:  'Cloud',
+              style: TextStyle(
+                fontFamily:    'Inter',
+                fontSize:      17,
+                fontWeight:    FontWeight.w700,
+                color:         _kBrand,
+                letterSpacing: -0.3,
+              ),
             ),
-          ),
-        ],
-      ),
+          ]),
+        ),
+      ],
     );
   }
 }
@@ -290,31 +357,33 @@ class _Heading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ShaderMask(
           shaderCallback: (bounds) => const LinearGradient(
-            colors: [Color(0xFFF0F5FF), Color(0xFFC7D2FE)],
+            begin:  Alignment.topLeft,
+            end:    Alignment.bottomRight,
+            colors: [Color(0xFFFFFFFF), Color(0xFF8AB4FF)],
           ).createShader(bounds),
-          child: const Text(
+          child: Text(
             'Welcome back',
-            style: TextStyle(
-              fontFamily:    'Inter',
-              fontSize:      28,
-              fontWeight:    FontWeight.w900,
-              letterSpacing: -0.8,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize:      34,
+              fontWeight:    FontWeight.w800,
               color:         Colors.white,
+              letterSpacing: -1.0,
               height:        1.1,
             ),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Text(
           'Sign in to your business account',
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Inter',
             fontSize:   14,
-            color:      Colors.white.withValues(alpha: 0.50),
+            color:      Colors.white.withValues(alpha: 0.48),
             height:     1.4,
           ),
         ),
@@ -334,105 +403,107 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color:        const Color(0xFF7F1D1D).withValues(alpha: 0.30),
+        color:        const Color(0xFF7F1D1D).withValues(alpha: 0.26),
         borderRadius: BorderRadius.circular(12),
-        border:       Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.40)),
+        border: Border.all(
+            color: const Color(0xFFEF4444).withValues(alpha: 0.36)),
       ),
       child: Row(children: [
-        const Icon(Icons.error_outline_rounded, color: Color(0xFFFCA5A5), size: 18),
+        const Icon(Icons.error_outline_rounded,
+            color: Color(0xFFFCA5A5), size: 18),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            message,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize:   13,
-              color:      Color(0xFFFCA5A5),
-            ),
-          ),
+          child: Text(message,
+              style: const TextStyle(
+                fontFamily: 'Inter', fontSize: 13,
+                color: Color(0xFFFCA5A5))),
         ),
       ]),
     );
   }
 }
 
-// ── Form Card ─────────────────────────────────────────────────────────────────
+// ── Glassmorphism Form Card ───────────────────────────────────────────────────
 
-class _FormCard extends StatelessWidget {
-  const _FormCard({
+class _GlassFormCard extends StatelessWidget {
+  const _GlassFormCard({
     required this.slugCtrl,
     required this.emailCtrl,
     required this.passCtrl,
     required this.obscure,
     required this.onToggleObscure,
   });
+
   final TextEditingController slugCtrl;
   final TextEditingController emailCtrl;
   final TextEditingController passCtrl;
-  final bool   obscure;
+  final bool         obscure;
   final VoidCallback onToggleObscure;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color:        Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.09),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color:      Colors.black.withValues(alpha: 0.18),
-            blurRadius: 20,
-            offset:     const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _Field(
-            controller:     slugCtrl,
-            label:          'Company Code',
-            hint:           'e.g. my-company',
-            icon:           Icons.business_rounded,
-            inputAction:    TextInputAction.next,
-            validator:      (v) => v!.trim().isEmpty ? 'Company code is required' : null,
-          ),
-          const SizedBox(height: 14),
-          _Field(
-            controller:     emailCtrl,
-            label:          'Email Address',
-            hint:           'you@company.com',
-            icon:           Icons.email_rounded,
-            keyboardType:   TextInputType.emailAddress,
-            inputAction:    TextInputAction.next,
-            validator:      (v) {
-              if (v!.trim().isEmpty) return 'Email is required';
-              if (!v.contains('@'))  return 'Enter a valid email';
-              return null;
-            },
-          ),
-          const SizedBox(height: 14),
-          _Field(
-            controller:     passCtrl,
-            label:          'Password',
-            hint:           'Enter your password',
-            icon:           Icons.lock_rounded,
-            obscureText:    obscure,
-            inputAction:    TextInputAction.done,
-            suffix: IconButton(
-              icon: Icon(
-                obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-                color: Colors.white.withValues(alpha: 0.40),
-                size:  20,
-              ),
-              onPressed: onToggleObscure,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.062),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.13),
             ),
-            validator: (v) => v!.isEmpty ? 'Password is required' : null,
           ),
-        ],
+          child: Column(
+            children: [
+              _Field(
+                controller:  slugCtrl,
+                label:       'Company Code',
+                hint:        'e.g. my-company',
+                icon:        Icons.business_rounded,
+                inputAction: TextInputAction.next,
+                validator:   (v) =>
+                    v!.trim().isEmpty ? 'Company code is required' : null,
+              ),
+              const SizedBox(height: 14),
+              _Field(
+                controller:   emailCtrl,
+                label:        'Email Address',
+                hint:         'you@company.com',
+                icon:         Icons.email_rounded,
+                keyboardType: TextInputType.emailAddress,
+                inputAction:  TextInputAction.next,
+                validator: (v) {
+                  if (v!.trim().isEmpty) return 'Email is required';
+                  if (!v.contains('@'))  return 'Enter a valid email';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+              _Field(
+                controller:  passCtrl,
+                label:       'Password',
+                hint:        'Enter your password',
+                icon:        Icons.lock_rounded,
+                obscureText: obscure,
+                inputAction: TextInputAction.done,
+                suffix: IconButton(
+                  icon: Icon(
+                    obscure
+                        ? Icons.visibility_rounded
+                        : Icons.visibility_off_rounded,
+                    color: Colors.white.withValues(alpha: 0.38),
+                    size:  20,
+                  ),
+                  onPressed: onToggleObscure,
+                ),
+                validator: (v) =>
+                    v!.isEmpty ? 'Password is required' : null,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -450,14 +521,15 @@ class _Field extends StatelessWidget {
     this.suffix,
     this.validator,
   });
-  final TextEditingController    controller;
-  final String                   label;
-  final String                   hint;
-  final IconData                 icon;
-  final TextInputType?           keyboardType;
-  final TextInputAction          inputAction;
-  final bool                     obscureText;
-  final Widget?                  suffix;
+
+  final TextEditingController       controller;
+  final String                      label;
+  final String                      hint;
+  final IconData                    icon;
+  final TextInputType?              keyboardType;
+  final TextInputAction             inputAction;
+  final bool                        obscureText;
+  final Widget?                     suffix;
   final FormFieldValidator<String>? validator;
 
   @override
@@ -469,58 +541,61 @@ class _Field extends StatelessWidget {
       obscureText:     obscureText,
       style: const TextStyle(
         fontFamily: 'Inter',
-        color:      Color(0xFFF0F5FF),
+        color:      Color(0xFFEEF2FF),
         fontSize:   14,
       ),
       decoration: InputDecoration(
-        labelText:   label,
-        hintText:    hint,
-        labelStyle:  TextStyle(
+        labelText:  label,
+        hintText:   hint,
+        labelStyle: TextStyle(
           fontFamily: 'Inter',
-          color:      Colors.white.withValues(alpha: 0.50),
+          color:      Colors.white.withValues(alpha: 0.46),
           fontSize:   13,
         ),
-        hintStyle:   TextStyle(
+        hintStyle: TextStyle(
           fontFamily: 'Inter',
-          color:      Colors.white.withValues(alpha: 0.22),
+          color:      Colors.white.withValues(alpha: 0.20),
         ),
-        prefixIcon:  Icon(icon, color: Colors.white.withValues(alpha: 0.38), size: 19),
-        suffixIcon:  suffix,
-        filled:      true,
-        fillColor:   Colors.white.withValues(alpha: 0.06),
+        prefixIcon: Icon(icon,
+            color: Colors.white.withValues(alpha: 0.38), size: 19),
+        suffixIcon: suffix,
+        filled:     true,
+        fillColor:  Colors.white.withValues(alpha: 0.065),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:   BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.09)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:   BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.09)),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide:   const BorderSide(color: Color(0xFF818CF8), width: 1.5),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: _kBrand, width: 1.6),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:   const BorderSide(color: Color(0xFFEF4444)),
+          borderSide: const BorderSide(color: Color(0xFFEF4444)),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:   const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.6),
         ),
-        errorStyle:     const TextStyle(color: Color(0xFFFCA5A5), fontSize: 11),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        errorStyle:     const TextStyle(
+            color: Color(0xFFFCA5A5), fontSize: 11),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 14),
       ),
       validator: validator,
     );
   }
 }
 
-// ── Remember Me Row ───────────────────────────────────────────────────────────
+// ── Remember Me ───────────────────────────────────────────────────────────────
 
 class _RememberRow extends StatelessWidget {
   const _RememberRow({required this.value, required this.onChanged});
-  final bool value;
+  final bool               value;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -537,10 +612,11 @@ class _RememberRow extends StatelessWidget {
               onChanged: (v) => onChanged(v!),
               fillColor: WidgetStateProperty.resolveWith((s) =>
                 s.contains(WidgetState.selected)
-                    ? const Color(0xFF818CF8)
+                    ? _kBrand
                     : Colors.transparent),
-              side:  BorderSide(color: Colors.white.withValues(alpha: 0.32)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              side:  BorderSide(color: Colors.white.withValues(alpha: 0.28)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4)),
             ),
           ),
           const SizedBox(width: 10),
@@ -548,9 +624,8 @@ class _RememberRow extends StatelessWidget {
             child: Text(
               'Remember company & stay signed in',
               style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize:   13,
-                color:      Colors.white.withValues(alpha: 0.52),
+                fontFamily: 'Inter', fontSize: 13,
+                color: Colors.white.withValues(alpha: 0.48),
               ),
             ),
           ),
@@ -560,64 +635,110 @@ class _RememberRow extends StatelessWidget {
   }
 }
 
-// ── Sign In Button ────────────────────────────────────────────────────────────
+// ── Press Button ──────────────────────────────────────────────────────────────
 
-class _SignInButton extends StatelessWidget {
-  const _SignInButton({required this.loading, required this.onPressed});
+class _PressButton extends StatefulWidget {
+  const _PressButton({required this.loading, required this.onPressed});
   final bool         loading;
   final VoidCallback onPressed;
 
   @override
+  State<_PressButton> createState() => _PressButtonState();
+}
+
+class _PressButtonState extends State<_PressButton>
+    with SingleTickerProviderStateMixin {
+
+  late final AnimationController _scaleCtrl;
+  late final Animation<double>   _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleCtrl = AnimationController(vsync: this,
+        duration: const Duration(milliseconds: 110));
+    _scale = Tween<double>(begin: 1.0, end: 0.96).animate(
+      CurvedAnimation(parent: _scaleCtrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() { _scaleCtrl.dispose(); super.dispose(); }
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width:  double.infinity,
-      height: 52,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin:  Alignment.topLeft,
-            end:    Alignment.bottomRight,
-            colors: [Color(0xFF4338CA), Color(0xFF4F46E5), Color(0xFF7C3AED)],
-          ),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color:      const Color(0xFF4F46E5).withValues(alpha: 0.45),
-              blurRadius: 22,
-              offset:     const Offset(0, 8),
+    return GestureDetector(
+      onTapDown:  (_) => _scaleCtrl.forward(),
+      onTapUp:    (_) {
+        _scaleCtrl.reverse();
+        if (!widget.loading) {
+          HapticFeedback.lightImpact();
+          widget.onPressed();
+        }
+      },
+      onTapCancel: () => _scaleCtrl.reverse(),
+      child: AnimatedBuilder(
+        animation: _scale,
+        builder: (_, child) =>
+            Transform.scale(scale: _scale.value, child: child),
+        child: Container(
+          width:  double.infinity,
+          height: 54,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin:  Alignment.topLeft,
+              end:    Alignment.bottomRight,
+              colors: [Color(0xFF2460E0), Color(0xFF2C6BF5), Color(0xFF4D87FF)],
             ),
-          ],
-        ),
-        child: ElevatedButton(
-          onPressed: loading ? null : onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor:     Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            disabledBackgroundColor: Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color:      _kBrand.withValues(alpha: 0.42),
+                blurRadius: 24,
+                offset:     const Offset(0, 8),
+              ),
+              BoxShadow(
+                color:      _kBrand.withValues(alpha: 0.20),
+                blurRadius: 48,
+                offset:     const Offset(0, 12),
+              ),
+            ],
           ),
-          child: loading
-              ? const SizedBox(
-                  width: 22, height: 22,
+          alignment: Alignment.center,
+          child: widget.loading
+              ? const SizedBox(width: 22, height: 22,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color:       Colors.white,
-                  ),
-                )
-              : const Text(
-                  'Sign In',
+                      strokeWidth: 2.5, color: Colors.white))
+              : const Text('Sign In',
                   style: TextStyle(
                     fontFamily:    'Inter',
                     fontSize:      15,
                     fontWeight:    FontWeight.w700,
                     color:         Colors.white,
-                    letterSpacing: 0.2,
-                  ),
-                ),
+                    letterSpacing: 0.4,
+                  )),
         ),
       ),
     );
   }
+}
+
+// ── Dot grid ──────────────────────────────────────────────────────────────────
+
+class _DotGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.025)
+      ..style  = PaintingStyle.fill;
+    const spacing = 28.0;
+    const r       = 1.0;
+    for (double x = spacing; x < size.width;  x += spacing) {
+      for (double y = spacing; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), r, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotGridPainter _) => false;
 }

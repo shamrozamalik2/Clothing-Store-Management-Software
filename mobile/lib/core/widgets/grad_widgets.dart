@@ -3,14 +3,14 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 // ── PBC gradient palette ──────────────────────────────────────────────────────
 
-const kGradPrimary  = [Color(0xFF4F46E5), Color(0xFF7C3AED)];
-const kGradElectric = [Color(0xFF3B82F6), Color(0xFF8B5CF6)];
+const kGradPrimary  = [Color(0xFF2C6BF5), Color(0xFF1A53D0)];
+const kGradElectric = [Color(0xFF2C6BF5), Color(0xFF3B82F6)];
 const kGradCyan     = [Color(0xFF06B6D4), Color(0xFF3B82F6)];
-const kGradBlue     = [Color(0xFF3B82F6), Color(0xFF8B5CF6)];
+const kGradBlue     = [Color(0xFF3B82F6), Color(0xFF2C6BF5)];
 const kGradGreen    = [Color(0xFF10B981), Color(0xFF3B82F6)];
-const kGradViolet   = [Color(0xFF8B5CF6), Color(0xFF6366F1)];
+const kGradViolet   = [Color(0xFF6366F1), Color(0xFF8B5CF6)];
 const kGradAmber    = [Color(0xFFF59E0B), Color(0xFFF97316)];
-const kGradSky      = [Color(0xFF0EA5E9), Color(0xFF6366F1)];
+const kGradSky      = [Color(0xFF0EA5E9), Color(0xFF2C6BF5)];
 
 // ── GradButton ────────────────────────────────────────────────────────────────
 
@@ -296,7 +296,7 @@ class GradSectionLabel extends StatelessWidget {
             style: tt.labelSmall?.copyWith(
               fontWeight:    FontWeight.w700,
               letterSpacing: 0.8,
-              color:         const Color(0xFF6366F1),
+              color:         const Color(0xFF2C6BF5),
             ),
           ),
         ],

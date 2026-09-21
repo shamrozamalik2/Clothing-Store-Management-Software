@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
+import '../../../../core/widgets/grad_widgets.dart';
 
 // ── Category provider ─────────────────────────────────────────────────────────
 
@@ -184,15 +185,11 @@ class _QuickExpenseSheetState extends ConsumerState<QuickExpenseSheet> {
             ),
             const SizedBox(height: 24),
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _submit,
-                child: _saving
-                    ? const SizedBox(height: 22, width: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                    : const Text('Save Expense'),
-              ),
+            GradButton(
+              label:     'Save Expense',
+              icon:      Icons.check_circle_outline_rounded,
+              onPressed: _submit,
+              loading:   _saving,
             ),
           ],
         ),

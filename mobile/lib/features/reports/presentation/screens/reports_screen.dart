@@ -9,7 +9,6 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/grad_widgets.dart';
 import '../../data/models/report_model.dart';
 import '../providers/reports_provider.dart';
-import '../../../shell/main_shell.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root screen
@@ -48,10 +47,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen>
         backgroundColor:  cs.surface,
         surfaceTintColor: Colors.transparent,
         elevation:        0,
-        leading: IconButton(
-          icon:      const Icon(Icons.menu_rounded),
-          onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
-        ),
+        automaticallyImplyLeading: false,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -816,7 +812,7 @@ class _ProfitTab extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const _kChartColors = [
-  Color(0xFF6366F1),
+  Color(0xFF2C6BF5),
   Color(0xFF0EA5E9),
   Color(0xFF10B981),
   Color(0xFFF59E0B),

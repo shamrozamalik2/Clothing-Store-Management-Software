@@ -5,10 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 // ── Brand seeds ───────────────────────────────────────────────────────────────
 
-const _kPrimary           = Color(0xFF4F46E5); // indigo-600
-const _kPrimaryContainer  = Color(0xFFE8E7FF);
-const _kSecondary         = Color(0xFF7C3AED); // violet-600
-const _kSecondaryContainer= Color(0xFFF3E8FF);
+const _kPrimary           = Color(0xFF2C6BF5); // brand blue
+const _kPrimaryContainer  = Color(0xFFDEEAFF);
+const _kSecondary         = Color(0xFF1A53D0); // deep brand blue
+const _kSecondaryContainer= Color(0xFFD6E4FF);
 const _kTertiary          = Color(0xFF0EA5E9); // sky-500
 const _kTertiaryContainer = Color(0xFFE0F2FE);
 const _kError             = Color(0xFFEF4444);
@@ -77,7 +77,7 @@ const _kOverlayLight = SystemUiOverlayStyle(
 const _kOverlayDark = SystemUiOverlayStyle(
   statusBarColor:                    Colors.transparent,
   statusBarIconBrightness:           Brightness.light,
-  systemNavigationBarColor:          Color(0xFF0F172A),
+  systemNavigationBarColor:          Color(0xFF07101F),
   systemNavigationBarIconBrightness: Brightness.light,
 );
 
@@ -98,7 +98,7 @@ class AppTheme {
         errorContainer:     Color(0xFFFFEDED),
       ),
       surface:             const Color(0xFFFFFFFF),
-      scaffoldBackground:  const Color(0xFFF1F5F9),
+      scaffoldBackground:  const Color(0xFFF4F7FF),
       surfaceMode:         FlexSurfaceMode.levelSurfacesLowScaffold,
       blendLevel:          7,
       subThemesData:       _kSubThemes,
@@ -131,17 +131,17 @@ class AppTheme {
     final tt = _buildTextTheme();
     final base = FlexThemeData.dark(
       colors: const FlexSchemeColor(
-        primary:            Color(0xFF818CF8),
-        primaryContainer:   Color(0xFF3730A3),
-        secondary:          Color(0xFFA78BFA),
-        secondaryContainer: Color(0xFF5B21B6),
+        primary:            Color(0xFF5B90FF),
+        primaryContainer:   Color(0xFF1A3D8F),
+        secondary:          Color(0xFF4D80FF),
+        secondaryContainer: Color(0xFF0D2460),
         tertiary:           Color(0xFF38BDF8),
         tertiaryContainer:  Color(0xFF0369A1),
         error:              Color(0xFFF87171),
         errorContainer:     Color(0xFF7F1D1D),
       ),
-      surface:             const Color(0xFF1E293B),
-      scaffoldBackground:  const Color(0xFF0F172A),
+      surface:             const Color(0xFF0C1428),
+      scaffoldBackground:  const Color(0xFF07101F),
       surfaceMode:         FlexSurfaceMode.levelSurfacesLowScaffold,
       blendLevel:          13,
       subThemesData:       _kSubThemes,

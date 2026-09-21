@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/grad_widgets.dart';
-import '../../../shell/main_shell.dart';
 import '../../data/models/sale_notification_model.dart';
 import '../providers/notifications_provider.dart';
 
@@ -27,11 +26,9 @@ class NotificationsScreen extends ConsumerWidget {
             backgroundColor:   cs.surface,
             surfaceTintColor:  Colors.transparent,
             elevation:         0,
-            leading: IconButton(
-              icon:      const Icon(Icons.menu_rounded),
-              onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
-            ),
+            automaticallyImplyLeading: false,
             title: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const GradIconBox(
                   icon:         Icons.notifications_rounded,
@@ -53,24 +50,6 @@ class NotificationsScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                if (unread > 0) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      gradient:     const LinearGradient(colors: kGradPrimary),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$unread',
-                      style: const TextStyle(
-                        color:      Colors.white,
-                        fontSize:   11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
             actions: [
@@ -117,7 +96,7 @@ class NotificationsScreen extends ConsumerWidget {
               hasScrollBody: false,
               child: _EmptyState(),
             )
-          else
+          else ...[
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, i) {
@@ -142,8 +121,8 @@ class NotificationsScreen extends ConsumerWidget {
                 childCount: notifications.length + 1,
               ),
             ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
         ],
       ),
     );
@@ -152,18 +131,18 @@ class NotificationsScreen extends ConsumerWidget {
   void _confirmClear(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title:   const Text('Clear notifications?'),
         content: const Text('All notification history will be deleted.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx),
             child:     const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () {
+              Navigator.pop(ctx);
               ref.read(notificationsProvider.notifier).clear();
-              Navigator.pop(context);
             },
             child: const Text('Clear'),
           ),

@@ -110,11 +110,11 @@ class _LockScreen extends ConsumerWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                    colors: [Color(0xFF2C6BF5), Color(0xFF1A53D0)],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color:      const Color(0xFF4F46E5).withValues(alpha: 0.35),
+                      color:      const Color(0xFF2C6BF5).withValues(alpha: 0.35),
                       blurRadius: 32,
                       offset:     const Offset(0, 8),
                     ),
@@ -150,7 +150,7 @@ class _LockScreen extends ConsumerWidget {
                 icon:  const Icon(Icons.fingerprint_rounded),
                 label: const Text('Authenticate'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF4F46E5),
+                  backgroundColor: const Color(0xFF2C6BF5),
                   foregroundColor: Colors.white,
                   minimumSize:    const Size(200, 52),
                   shape: RoundedRectangleBorder(

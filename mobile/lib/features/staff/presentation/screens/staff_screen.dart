@@ -5,7 +5,6 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/grad_widgets.dart';
-import '../../../shell/main_shell.dart';
 import '../../data/models/staff_model.dart';
 import '../providers/staff_provider.dart';
 
@@ -65,11 +64,7 @@ class _StaffScreenState extends ConsumerState<StaffScreen> {
               backgroundColor:  cs.surface,
               surfaceTintColor: Colors.transparent,
               elevation:        0,
-              leading: IconButton(
-                icon:      const Icon(Icons.menu_rounded),
-                onPressed: () =>
-                    MainShell.scaffoldKey.currentState?.openDrawer(),
-              ),
+              automaticallyImplyLeading: false,
               title: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -280,7 +275,7 @@ class _SummaryBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color:      const Color(0xFF4F46E5).withValues(alpha: 0.25),
+            color:      const Color(0xFF2C6BF5).withValues(alpha: 0.25),
             blurRadius: 16,
             offset:     const Offset(0, 4),
           ),

@@ -2,4 +2,5 @@
 <resources>
     <!-- Matches the in-app splash gradient start color -->
     <color name="splash_bg">#14122D</color>
+	<color name="ic_launcher_background">#2C6BF5</color>
 </resources>

@@ -12,7 +12,6 @@ import '../../../sales/data/models/sale_model.dart';
 import '../../../sales/data/sources/sales_remote_source.dart';
 import '../../data/models/customer_model.dart';
 import '../providers/customers_provider.dart';
-import '../../../shell/main_shell.dart';
 
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
@@ -58,11 +57,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
               backgroundColor:  cs.surface,
               surfaceTintColor: Colors.transparent,
               elevation:        0,
-              leading: IconButton(
-                icon:      const Icon(Icons.menu_rounded),
-                onPressed: () =>
-                    MainShell.scaffoldKey.currentState?.openDrawer(),
-              ),
+              automaticallyImplyLeading: false,
               title: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

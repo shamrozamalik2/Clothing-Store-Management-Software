@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:barcode_scan2/barcode_scan2.dart';
 
 import '../providers/cart_provider.dart';
 import '../../data/models/cart_item_model.dart';
@@ -14,7 +14,6 @@ import '../../../products/presentation/providers/products_provider.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/grad_widgets.dart';
-import '../../../shell/main_shell.dart';
 
 // ---------------------------------------------------------------------------
 // PosScreen
@@ -118,15 +117,18 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   // -------------------------------------------------------------------------
 
   Future<void> _openBarcodeScanner() async {
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => _BarcodeScanDialog(
-        onDetected: (barcode) {
-          Navigator.pop(ctx);
-          _applyBarcode(barcode);
-        },
-      ),
-    );
+    try {
+      final result = await BarcodeScanner.scan(
+        options: const ScanOptions(
+          strings: {'cancel': 'Cancel', 'flash_on': 'Flash on', 'flash_off': 'Flash off'},
+          autoEnableFlash: false,
+          useCamera: -1,
+        ),
+      );
+      if (result.type == ResultType.Barcode && result.rawContent.isNotEmpty) {
+        _applyBarcode(result.rawContent);
+      }
+    } catch (_) {}
   }
 
   void _applyBarcode(String barcode) {
@@ -305,7 +307,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                borderSide: const BorderSide(color: Color(0xFF2C6BF5), width: 1.5),
               ),
               filled: true,
               contentPadding:
@@ -471,7 +473,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       ),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                          color: const Color(0xFF4F46E5)
+                          color: const Color(0xFF2C6BF5)
                               .withValues(alpha: 0.3)),
                     ),
                     child: Row(
@@ -490,7 +492,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
-                              color: Color(0xFF6366F1),
+                              color: Color(0xFF2C6BF5),
                             ),
                           ),
                         ),
@@ -498,7 +500,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           onTap: () =>
                               ref.read(cartProvider.notifier).clearCustomer(),
                           child: const Icon(Icons.close_rounded,
-                              size: 14, color: Color(0xFF6366F1)),
+                              size: 14, color: Color(0xFF2C6BF5)),
                         ),
                       ],
                     ),
@@ -617,11 +619,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       appBar: AppBar(
         toolbarHeight: 60,
         centerTitle: false,
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          onPressed: () =>
-              MainShell.scaffoldKey.currentState?.openDrawer(),
-        ),
+        automaticallyImplyLeading: false,
         title: Row(
           children: [
             Container(
@@ -765,12 +763,12 @@ class _AppBarAction extends StatelessWidget {
             width:  36,
             height: 36,
             decoration: BoxDecoration(
-              color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+              color: const Color(0xFF2C6BF5).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                  color: const Color(0xFF4F46E5).withValues(alpha: 0.2)),
+                  color: const Color(0xFF2C6BF5).withValues(alpha: 0.2)),
             ),
-            child: Icon(icon, size: 18, color: const Color(0xFF6366F1)),
+            child: Icon(icon, size: 18, color: const Color(0xFF2C6BF5)),
           ),
         ),
       ),
@@ -836,7 +834,7 @@ class _GradCartFab extends StatelessWidget {
                     child: Text(
                       '$itemCount',
                       style: const TextStyle(
-                        color:      Color(0xFF4F46E5),
+                        color:      Color(0xFF2C6BF5),
                         fontSize:   9,
                         fontWeight: FontWeight.w800,
                       ),
@@ -1143,7 +1141,7 @@ class _StepBtn extends StatelessWidget {
         child: SizedBox(
           width:  28,
           height: 28,
-          child: Icon(icon, size: 15, color: const Color(0xFF6366F1)),
+          child: Icon(icon, size: 15, color: const Color(0xFF2C6BF5)),
         ),
       );
 }
@@ -1252,96 +1250,6 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// _BarcodeScanDialog
-// ---------------------------------------------------------------------------
-
-class _BarcodeScanDialog extends StatefulWidget {
-  final void Function(String barcode) onDetected;
-  const _BarcodeScanDialog({required this.onDetected});
-
-  @override
-  State<_BarcodeScanDialog> createState() => _BarcodeScanDialogState();
-}
-
-class _BarcodeScanDialogState extends State<_BarcodeScanDialog> {
-  bool _detected = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: SizedBox(
-        width:  320,
-        height: 400,
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 8, 12),
-              child: Row(
-                children: [
-                  const GradIconBox(
-                    icon:         Icons.qr_code_scanner_rounded,
-                    colors:       kGradPrimary,
-                    size:         36,
-                    iconSize:     18,
-                    borderRadius: 10,
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Scan Barcode',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(Icons.close_rounded,
-                        color: cs.onSurfaceVariant),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            // Gradient divider
-            Container(
-              height: 1,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    Color(0x334F46E5),
-                    Color(0x338B5CF6),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-            // Scanner
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(20)),
-                child: MobileScanner(
-                  onDetect: (capture) {
-                    if (_detected) return;
-                    final raw =
-                        capture.barcodes.firstOrNull?.rawValue;
-                    if (raw != null && raw.isNotEmpty) {
-                      _detected = true;
-                      widget.onDetected(raw);
-                    }
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ---------------------------------------------------------------------------
 // _HeldCartsSheet
@@ -1613,7 +1521,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(
-                        color: Color(0xFF4F46E5), width: 1.5),
+                        color: Color(0xFF2C6BF5), width: 1.5),
                   ),
                 ),
               ),

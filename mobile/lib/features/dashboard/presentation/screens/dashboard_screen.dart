@@ -1,8 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
+
+import '../../../../core/errors/app_exception.dart';
 
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -19,9 +22,9 @@ import '../widgets/stat_card.dart';
 
 // ── Brand constants ───────────────────────────────────────────────────────────
 
-const _kIndigo  = Color(0xFF4F46E5);
-const _kViolet  = Color(0xFF7C3AED);
-const _kIndigoLight = Color(0xFF6366F1);
+const _kIndigo      = Color(0xFF2C6BF5);
+const _kViolet      = Color(0xFF1A53D0);
+const _kIndigoLight = Color(0xFF5B90FF);
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -63,7 +66,7 @@ class DashboardScreen extends ConsumerWidget {
             ),
             statsAsync.when(
               loading: () => const SliverToBoxAdapter(child: _Shimmer()),
-              error:   (e, _) => SliverToBoxAdapter(child: _ErrorCard(error: e.toString())),
+              error:   (e, _) => SliverToBoxAdapter(child: _ErrorCard(error: _friendlyError(e))),
               data:    (stats) => SliverList(
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: 16),
@@ -128,7 +131,7 @@ class _PremiumAppBar extends StatelessWidget {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end:   Alignment.bottomRight,
-                colors: [Color(0xFF3730A3), _kIndigo],
+                colors: [Color(0xFF1A53D0), _kIndigo],
               ),
               boxShadow: [
                 BoxShadow(
@@ -257,7 +260,7 @@ class _HeroSalesCard extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end:   Alignment.bottomRight,
-            colors: [Color(0xFF312E81), Color(0xFF4338CA), Color(0xFF6366F1)],
+            colors: [Color(0xFF0D3A9E), Color(0xFF1A53D0), Color(0xFF2C6BF5)],
             stops:  [0.0, 0.5, 1.0],
           ),
           boxShadow: [
@@ -583,7 +586,7 @@ class _PaymentBreakdown extends StatelessWidget {
                       children: [
                         _PmTile(label: 'Cash',   amount: stats.cashSales,   icon: Icons.payments_outlined,               color: const Color(0xFF10B981)),
                         const SizedBox(width: 8),
-                        _PmTile(label: 'Card',   amount: stats.cardSales,   icon: Icons.credit_card_rounded,             color: const Color(0xFF6366F1)),
+                        _PmTile(label: 'Card',   amount: stats.cardSales,   icon: Icons.credit_card_rounded,             color: const Color(0xFF2C6BF5)),
                         const SizedBox(width: 8),
                         _PmTile(label: 'Credit', amount: stats.creditSales, icon: Icons.account_balance_wallet_outlined,  color: const Color(0xFFF59E0B)),
                         if (stats.bankSales > 0) ...[
@@ -890,7 +893,7 @@ class _RecentSales extends StatelessWidget {
                   final i    = entry.key;
                   final sale = entry.value;
                   final pm   = sale.paymentMethod?.toLowerCase() ?? 'cash';
-                  final pmColor = pm.contains('card')   ? const Color(0xFF6366F1)
+                  final pmColor = pm.contains('card')   ? const Color(0xFF2C6BF5)
                                : pm.contains('credit') ? const Color(0xFFF59E0B)
                                : pm.contains('bank')   ? const Color(0xFF0EA5E9)
                                :                         const Color(0xFF10B981);
@@ -1167,6 +1170,18 @@ class _Shimmer extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Error helpers ─────────────────────────────────────────────────────────────
+
+String _friendlyError(Object e) {
+  if (e is DioException) {
+    final inner = e.error;
+    if (inner is AppException) return inner.message;
+    return 'Unable to connect. Please check your internet connection.';
+  }
+  if (e is AppException) return e.message;
+  return 'Something went wrong. Please try again.';
 }
 
 // ── Error card ────────────────────────────────────────────────────────────────

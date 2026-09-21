@@ -1,6 +1,6 @@
+import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/api/api_client.dart';
@@ -12,12 +12,20 @@ import '../../../../core/widgets/grad_widgets.dart';
 final _scannedProductProvider =
     FutureProvider.autoDispose.family<List<_ScannedProduct>, String>((ref, code) async {
   if (code.isEmpty) return [];
-  final res  = await ref.watch(apiClientProvider).get(
+  final res = await ref.watch(apiClientProvider).get(
     ApiEndpoints.products,
     queryParameters: {'search': code, 'limit': 5},
   );
-  final data = (res.data as Map<String, dynamic>)['data'] as Map<String, dynamic>? ?? {};
-  final items = (data['items'] as List?) ?? (data['data'] as List?) ?? [];
+  final body = res.data as Map<String, dynamic>? ?? {};
+  final dataField = body['data'];
+  final List<dynamic> items;
+  if (dataField is List) {
+    items = dataField;
+  } else if (dataField is Map<String, dynamic>) {
+    items = (dataField['items'] as List?) ?? (dataField['data'] as List?) ?? [];
+  } else {
+    items = [];
+  }
   return items.map((j) => _ScannedProduct.fromJson(j as Map<String, dynamic>)).toList();
 });
 
@@ -47,12 +55,12 @@ class _ScannedProduct {
   });
 
   factory _ScannedProduct.fromJson(Map<String, dynamic> j) => _ScannedProduct(
-    id:            j['id']?.toString()                    ?? '',
-    name:          j['name']?.toString()                  ?? '',
-    sku:           j['sku']?.toString()                   ?? '',
-    salePrice:     (j['sale_price']    as num?)?.toDouble() ?? 0,
-    costPrice:     (j['cost_price']    as num?)?.toDouble() ?? 0,
-    stockQuantity: (j['stock_quantity'] as num?)?.toInt()  ?? 0,
+    id:            j['id']?.toString()                     ?? '',
+    name:          j['name']?.toString()                   ?? '',
+    sku:           j['sku']?.toString()                    ?? '',
+    salePrice:     (j['sale_price']     as num?)?.toDouble() ?? 0,
+    costPrice:     (j['cost_price']     as num?)?.toDouble() ?? 0,
+    stockQuantity: (j['stock_quantity'] as num?)?.toInt()   ?? 0,
     categoryName:  j['category_name']?.toString(),
     brandName:     j['brand_name']?.toString(),
     unit:          j['unit']?.toString(),
@@ -72,64 +80,31 @@ class BarcodeScannerScreen extends ConsumerStatefulWidget {
   ConsumerState<BarcodeScannerScreen> createState() => _BarcodeScannerScreenState();
 }
 
-class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
-    with WidgetsBindingObserver {
+class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
 
   _PermState _permState = _PermState.checking;
-  MobileScannerController? _controller;
-  String? _cameraError;
-
-  String _lastCode = '';
-  bool   _torchOn  = false;
-  bool   _paused   = false;
+  bool _scanning = false;
 
   // ── Lifecycle ───────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _checkPermission();
+    _checkPermissionThenScan();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.resumed:
-        if (_permState == _PermState.granted) {
-          // Camera was already running — restart after background
-          _controller?.start();
-        } else {
-          // User may have just enabled camera in system settings
-          _checkPermission();
-        }
-      case AppLifecycleState.paused:
-      case AppLifecycleState.inactive:
-        _controller?.stop();
-      default:
-        break;
-    }
-  }
+  // ── Permission → auto-launch scanner ────────────────────────────────────────
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  // ── Permission flow ─────────────────────────────────────────────────────────
-
-  Future<void> _checkPermission() async {
+  Future<void> _checkPermissionThenScan() async {
     if (!mounted) return;
     setState(() => _permState = _PermState.checking);
 
     var status = await Permission.camera.status;
-
     if (!mounted) return;
 
     if (status.isGranted || status.isLimited) {
-      _startCamera();
+      setState(() => _permState = _PermState.granted);
+      _launchScanner();
       return;
     }
 
@@ -138,13 +113,12 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
       return;
     }
 
-    // Status is denied — request from the user
     status = await Permission.camera.request();
-
     if (!mounted) return;
 
     if (status.isGranted || status.isLimited) {
-      _startCamera();
+      setState(() => _permState = _PermState.granted);
+      _launchScanner();
     } else if (status.isPermanentlyDenied || status.isRestricted) {
       setState(() => _permState = _PermState.permanentlyDenied);
     } else {
@@ -152,45 +126,36 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     }
   }
 
-  void _startCamera() {
-    // Re-use existing controller so we don't dispose + recreate unnecessarily
-    _controller ??= MobileScannerController(
-      detectionSpeed: DetectionSpeed.noDuplicates,
-    );
-    setState(() {
-      _permState   = _PermState.granted;
-      _cameraError = null;
-    });
-  }
+  // ── ZXing native scanner ─────────────────────────────────────────────────────
 
-  Future<void> _retryCamera() async {
-    // Full controller reset — dispose old, create fresh
-    _controller?.dispose();
-    _controller = null;
-    setState(() => _cameraError = null);
-    _startCamera();
-  }
+  Future<void> _launchScanner() async {
+    if (_scanning || !mounted) return;
+    setState(() => _scanning = true);
 
-  // ── Scanning callbacks ──────────────────────────────────────────────────────
+    try {
+      final result = await BarcodeScanner.scan(
+        options: const ScanOptions(
+          strings: {'cancel': 'Cancel', 'flash_on': 'Flash on', 'flash_off': 'Flash off'},
+          autoEnableFlash: false,
+          useCamera: -1,
+        ),
+      );
 
-  void _onDetect(BarcodeCapture capture) {
-    final code = capture.barcodes.firstOrNull?.rawValue ?? '';
-    if (code.isEmpty || code == _lastCode) return;
-    setState(() {
-      _lastCode = code;
-      _paused   = true;
-    });
-    _controller?.stop();
-    _showProductSheet(code);
-  }
+      if (!mounted) return;
+      setState(() => _scanning = false);
 
-  void _resumeScanning() {
-    setState(() {
-      _lastCode    = '';
-      _paused      = false;
-      _cameraError = null;
-    });
-    _controller?.start();
+      if (result.type == ResultType.Cancelled) {
+        Navigator.of(context).pop();
+        return;
+      }
+
+      final code = result.rawContent;
+      if (code.isEmpty) return;
+
+      _showProductSheet(code);
+    } catch (_) {
+      if (mounted) setState(() => _scanning = false);
+    }
   }
 
   void _showProductSheet(String code) {
@@ -200,16 +165,22 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
       showDragHandle:     true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => _ProductResultSheet(barcode: code, onScanAgain: _resumeScanning),
-    ).whenComplete(_resumeScanning);
+      builder: (_) => _ProductResultSheet(
+        barcode:     code,
+        onScanAgain: _launchScanner,
+      ),
+    ).whenComplete(() {
+      // Auto-relaunch scanner when sheet is dismissed
+      if (mounted && _permState == _PermState.granted) {
+        _launchScanner();
+      }
+    });
   }
 
   // ── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -217,31 +188,12 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
         foregroundColor: Colors.white,
         title: const Text('Barcode Scanner',
             style: TextStyle(color: Colors.white)),
-        actions: [
-          if (_permState == _PermState.granted && _cameraError == null) ...[
-            IconButton(
-              icon: Icon(
-                _torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                color: _torchOn ? Colors.amber : Colors.white,
-              ),
-              onPressed: () {
-                _controller?.toggleTorch();
-                setState(() => _torchOn = !_torchOn);
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.flip_camera_ios_rounded, color: Colors.white),
-              onPressed: () => _controller?.switchCamera(),
-            ),
-          ],
-          const SizedBox(width: 4),
-        ],
       ),
-      body: _buildBody(cs),
+      body: _buildBody(),
     );
   }
 
-  Widget _buildBody(ColorScheme cs) {
+  Widget _buildBody() {
     switch (_permState) {
       case _PermState.checking:
         return const Center(
@@ -259,77 +211,46 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
       case _PermState.denied:
         return _PermissionCard(
           permanentlyDenied: false,
-          onRequest:  _checkPermission,
-          onSettings: () async { await openAppSettings(); },
+          onRequest:  _checkPermissionThenScan,
+          onSettings: () async => openAppSettings(),
         );
 
       case _PermState.permanentlyDenied:
         return _PermissionCard(
           permanentlyDenied: true,
-          onRequest:  _checkPermission,
-          onSettings: () async { await openAppSettings(); },
+          onRequest:  _checkPermissionThenScan,
+          onSettings: () async => openAppSettings(),
         );
 
       case _PermState.granted:
-        if (_cameraError != null) {
-          return _CameraErrorCard(
-            message:  _cameraError!,
-            onRetry:  _retryCamera,
-          );
-        }
-        return _buildScannerView(cs);
+        // Native ZXing scanner is open or about to open.
+        // Show a friendly placeholder while it's running.
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.qr_code_scanner_rounded,
+                  size: 72, color: Colors.white24),
+              const SizedBox(height: 20),
+              Text(
+                _scanning ? 'Scanner open…' : 'Tap to scan',
+                style: const TextStyle(color: Colors.white60, fontSize: 15),
+              ),
+              const SizedBox(height: 28),
+              if (!_scanning)
+                FilledButton.icon(
+                  onPressed: _launchScanner,
+                  icon:  const Icon(Icons.qr_code_scanner_rounded),
+                  label: const Text('Open Scanner'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF2C6BF5),
+                    minimumSize:     const Size(200, 48),
+                  ),
+                ),
+            ],
+          ),
+        );
     }
-  }
-
-  Widget _buildScannerView(ColorScheme cs) {
-    return Stack(
-      children: [
-        // Camera feed
-        MobileScanner(
-          controller: _controller!,
-          onDetect:   _onDetect,
-          errorBuilder: (context, error, child) {
-            // Permission is already confirmed — this is a camera hardware/init error
-            final msg = error.errorDetails?.toString() ?? error.errorCode.toString();
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) setState(() => _cameraError = msg);
-            });
-            return const SizedBox.shrink();
-          },
-        ),
-
-        // Scanning frame overlay
-        if (!_paused)
-          IgnorePointer(
-            child: CustomPaint(
-              painter: _ScanOverlayPainter(cs.primary),
-              child: const SizedBox.expand(),
-            ),
-          ),
-
-        // Instruction label at bottom
-        Positioned(
-          bottom: 40,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color:        Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Text(
-                _paused ? 'Product found — swipe down to scan again'
-                        : 'Point camera at a barcode or QR code',
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
   }
 }
 
@@ -397,7 +318,7 @@ class _PermissionCard extends StatelessWidget {
                   icon:  const Icon(Icons.settings_rounded),
                   label: const Text('Open Settings'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF4F46E5),
+                    backgroundColor: const Color(0xFF2C6BF5),
                     minimumSize:     const Size(200, 48),
                   ),
                 ),
@@ -415,7 +336,7 @@ class _PermissionCard extends StatelessWidget {
                   icon:  const Icon(Icons.camera_alt_rounded),
                   label: const Text('Grant Camera Permission'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF4F46E5),
+                    backgroundColor: const Color(0xFF2C6BF5),
                     minimumSize:     const Size(200, 48),
                   ),
                 ),
@@ -434,118 +355,6 @@ class _PermissionCard extends StatelessWidget {
       ),
     );
   }
-}
-
-// ── Camera error card ─────────────────────────────────────────────────────────
-
-class _CameraErrorCard extends StatelessWidget {
-  const _CameraErrorCard({required this.message, required this.onRetry});
-  final String       message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.videocam_off_outlined,
-                  color: Colors.white38, size: 56),
-              const SizedBox(height: 20),
-              const Text(
-                'Unable to start camera',
-                style: TextStyle(
-                    color:      Colors.white,
-                    fontSize:   18,
-                    fontWeight: FontWeight.w700),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                style: const TextStyle(
-                    color: Colors.white54, fontSize: 12, height: 1.4),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 28),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon:  const Icon(Icons.refresh_rounded),
-                label: const Text('Retry'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF4F46E5),
-                  minimumSize:     const Size(160, 48),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () async => openAppSettings(),
-                child: const Text(
-                  'Open Settings',
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Scan overlay painter ──────────────────────────────────────────────────────
-
-class _ScanOverlayPainter extends CustomPainter {
-  const _ScanOverlayPainter(this.color);
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cutW  = size.width  * 0.75;
-    final cutH  = size.height * 0.30;
-    final left  = (size.width  - cutW) / 2;
-    final top   = (size.height - cutH) / 2;
-    final rect  = Rect.fromLTWH(left, top, cutW, cutH);
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(16));
-
-    final dim  = Paint()..color = Colors.black.withValues(alpha: 0.58);
-    final full = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    final hole = Path()..addRRect(rrect);
-    canvas.drawPath(Path.combine(PathOperation.difference, full, hole), dim);
-
-    final border = Paint()
-      ..color       = color
-      ..style       = PaintingStyle.stroke
-      ..strokeWidth = 3;
-    canvas.drawRRect(rrect, border);
-
-    // Corner accents
-    const c = 22.0;
-    final cp = Paint()
-      ..color       = color
-      ..style       = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..strokeCap   = StrokeCap.round;
-    // TL
-    canvas.drawLine(Offset(left, top + c),          Offset(left, top), cp);
-    canvas.drawLine(Offset(left, top),               Offset(left + c, top), cp);
-    // TR
-    canvas.drawLine(Offset(left + cutW - c, top),   Offset(left + cutW, top), cp);
-    canvas.drawLine(Offset(left + cutW, top),        Offset(left + cutW, top + c), cp);
-    // BL
-    canvas.drawLine(Offset(left, top + cutH - c),   Offset(left, top + cutH), cp);
-    canvas.drawLine(Offset(left, top + cutH),        Offset(left + c, top + cutH), cp);
-    // BR
-    canvas.drawLine(Offset(left + cutW - c, top + cutH), Offset(left + cutW, top + cutH), cp);
-    canvas.drawLine(Offset(left + cutW, top + cutH - c), Offset(left + cutW, top + cutH), cp);
-  }
-
-  @override
-  bool shouldRepaint(_ScanOverlayPainter o) => color != o.color;
 }
 
 // ── Product result bottom sheet ───────────────────────────────────────────────

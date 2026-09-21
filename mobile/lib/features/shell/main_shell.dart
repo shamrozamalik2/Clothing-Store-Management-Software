@@ -149,7 +149,7 @@ class _NavBtn extends StatelessWidget {
                 fontSize:   10,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
                 color:      selected
-                    ? const Color(0xFF6366F1)
+                    ? const Color(0xFF2C6BF5)
                     : cs.onSurfaceVariant,
                 letterSpacing: selected ? 0.1 : 0,
               ),

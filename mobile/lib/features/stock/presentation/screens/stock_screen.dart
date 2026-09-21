@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/widgets/grad_widgets.dart';
-import '../../../shell/main_shell.dart';
 import '../../data/models/stock_model.dart';
 import '../providers/stock_provider.dart';
 import 'stock_adjustment_sheet.dart';
@@ -64,10 +63,7 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                   ),
                 ),
               ),
-              leading: IconButton(
-                icon:      const Icon(Icons.menu_rounded),
-                onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
-              ),
+              automaticallyImplyLeading: false,
               title: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

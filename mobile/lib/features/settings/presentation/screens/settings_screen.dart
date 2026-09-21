@@ -32,7 +32,7 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 const GradIconBox(
                   icon:         Icons.settings_rounded,
-                  colors:       kGradViolet,
+                  colors:       kGradPrimary,
                   size:         32,
                   iconSize:     16,
                   borderRadius: 9,
@@ -40,7 +40,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(width: 10),
                 ShaderMask(
                   shaderCallback: (b) =>
-                      const LinearGradient(colors: kGradViolet)
+                      const LinearGradient(colors: kGradPrimary)
                           .createShader(b),
                   child: const Text(
                     'Settings',
@@ -58,7 +58,7 @@ class SettingsScreen extends ConsumerWidget {
               child: Container(
                 height: 1,
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: kGradViolet),
+                  gradient: LinearGradient(colors: kGradPrimary),
                 ),
               ),
             ),
@@ -101,7 +101,7 @@ class SettingsScreen extends ConsumerWidget {
                 // ── Appearance ────────────────────────────────────────────
                 const _SectionLabel('Appearance'),
                 _GradCard(
-                  colors: kGradViolet,
+                  colors: kGradPrimary,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -111,7 +111,7 @@ class SettingsScreen extends ConsumerWidget {
                           children: [
                             GradIconBox(
                               icon:         Icons.palette_outlined,
-                              colors:       kGradViolet,
+                              colors:       kGradPrimary,
                               size:         32,
                               iconSize:     16,
                               borderRadius: 9,
@@ -129,7 +129,7 @@ class SettingsScreen extends ConsumerWidget {
                               label:    'Light',
                               icon:     Icons.light_mode_rounded,
                               selected: themeMode == ThemeMode.light,
-                              colors:   kGradViolet,
+                              colors:   kGradPrimary,
                               onTap:    () => ref
                                   .read(themeModeProvider.notifier)
                                   .setMode(ThemeMode.light),
@@ -139,7 +139,7 @@ class SettingsScreen extends ConsumerWidget {
                               label:    'Dark',
                               icon:     Icons.dark_mode_rounded,
                               selected: themeMode == ThemeMode.dark,
-                              colors:   kGradViolet,
+                              colors:   kGradPrimary,
                               onTap:    () => ref
                                   .read(themeModeProvider.notifier)
                                   .setMode(ThemeMode.dark),
@@ -149,7 +149,7 @@ class SettingsScreen extends ConsumerWidget {
                               label:    'System',
                               icon:     Icons.brightness_auto_rounded,
                               selected: themeMode == ThemeMode.system,
-                              colors:   kGradViolet,
+                              colors:   kGradPrimary,
                               onTap:    () => ref
                                   .read(themeModeProvider.notifier)
                                   .setMode(ThemeMode.system),
@@ -165,39 +165,19 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: GestureDetector(
-                    onTap: () => _confirmLogout(context, ref),
-                    child: Container(
-                      height: 52,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
-                        ),
+                  child: OutlinedButton.icon(
+                    onPressed: () => _confirmLogout(context, ref),
+                    icon: const Icon(Icons.logout_rounded, size: 18),
+                    label: const Text(
+                      'Logout',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFEF4444),
+                      side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color:      const Color(0xFFEF4444)
-                                .withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset:     const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.logout_rounded,
-                              color: Colors.white, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Logout',
-                            style: TextStyle(
-                              color:      Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize:   15,
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ),
@@ -208,7 +188,7 @@ class SettingsScreen extends ConsumerWidget {
                 Center(
                   child: ShaderMask(
                     shaderCallback: (b) =>
-                        const LinearGradient(colors: kGradViolet)
+                        const LinearGradient(colors: kGradPrimary)
                             .createShader(b),
                     child: Text(
                       'v1.0.0',
@@ -637,7 +617,7 @@ class _SectionLabel extends StatelessWidget {
               fontSize:      11,
               fontWeight:    FontWeight.w700,
               letterSpacing: 0.8,
-              color:         Color(0xFF6366F1),
+              color:         Color(0xFF2C6BF5),
             ),
           ),
         ],

@@ -9,7 +9,6 @@ import '../../../../core/widgets/grad_widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../sales/data/models/sale_model.dart';
 import '../../../sales/data/sources/sales_remote_source.dart';
-import '../../../shell/main_shell.dart';
 import '../providers/printer_provider.dart';
 
 // ── Local providers ───────────────────────────────────────────────────────────
@@ -98,10 +97,7 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen> {
             backgroundColor:  cs.surface,
             surfaceTintColor: Colors.transparent,
             elevation:        0,
-            leading: IconButton(
-              icon:      const Icon(Icons.menu_rounded),
-              onPressed: () => MainShell.scaffoldKey.currentState?.openDrawer(),
-            ),
+            automaticallyImplyLeading: false,
             title: Row(
               children: [
                 const GradIconBox(
