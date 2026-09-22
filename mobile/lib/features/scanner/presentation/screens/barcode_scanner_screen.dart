@@ -1,6 +1,6 @@
-import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/api/api_client.dart';
@@ -55,21 +55,17 @@ class _ScannedProduct {
   });
 
   factory _ScannedProduct.fromJson(Map<String, dynamic> j) => _ScannedProduct(
-    id:            j['id']?.toString()                     ?? '',
-    name:          j['name']?.toString()                   ?? '',
-    sku:           j['sku']?.toString()                    ?? '',
+    id:            j['id']?.toString()                       ?? '',
+    name:          j['name']?.toString()                     ?? '',
+    sku:           j['sku']?.toString()                      ?? '',
     salePrice:     (j['sale_price']     as num?)?.toDouble() ?? 0,
     costPrice:     (j['cost_price']     as num?)?.toDouble() ?? 0,
-    stockQuantity: (j['stock_quantity'] as num?)?.toInt()   ?? 0,
+    stockQuantity: (j['stock_quantity'] as num?)?.toInt()    ?? 0,
     categoryName:  j['category_name']?.toString(),
     brandName:     j['brand_name']?.toString(),
     unit:          j['unit']?.toString(),
   );
 }
-
-// ── Permission state ──────────────────────────────────────────────────────────
-
-enum _PermState { checking, granted, denied, permanentlyDenied }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -81,81 +77,33 @@ class BarcodeScannerScreen extends ConsumerStatefulWidget {
 }
 
 class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
-
-  _PermState _permState = _PermState.checking;
-  bool _scanning = false;
-
-  // ── Lifecycle ───────────────────────────────────────────────────────────────
+  late final MobileScannerController _ctrl;
+  bool _sheetOpen = false;
 
   @override
   void initState() {
     super.initState();
-    _checkPermissionThenScan();
+    _ctrl = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+    );
   }
 
-  // ── Permission → auto-launch scanner ────────────────────────────────────────
-
-  Future<void> _checkPermissionThenScan() async {
-    if (!mounted) return;
-    setState(() => _permState = _PermState.checking);
-
-    var status = await Permission.camera.status;
-    if (!mounted) return;
-
-    if (status.isGranted || status.isLimited) {
-      setState(() => _permState = _PermState.granted);
-      _launchScanner();
-      return;
-    }
-
-    if (status.isPermanentlyDenied || status.isRestricted) {
-      setState(() => _permState = _PermState.permanentlyDenied);
-      return;
-    }
-
-    status = await Permission.camera.request();
-    if (!mounted) return;
-
-    if (status.isGranted || status.isLimited) {
-      setState(() => _permState = _PermState.granted);
-      _launchScanner();
-    } else if (status.isPermanentlyDenied || status.isRestricted) {
-      setState(() => _permState = _PermState.permanentlyDenied);
-    } else {
-      setState(() => _permState = _PermState.denied);
-    }
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
   }
 
-  // ── ZXing native scanner ─────────────────────────────────────────────────────
+  void _onDetect(BarcodeCapture capture) {
+    if (_sheetOpen) return;
+    final barcodes = capture.barcodes;
+    if (barcodes.isEmpty) return;
+    final code = barcodes.first.rawValue;
+    if (code == null || code.isEmpty) return;
 
-  Future<void> _launchScanner() async {
-    if (_scanning || !mounted) return;
-    setState(() => _scanning = true);
-
-    try {
-      final result = await BarcodeScanner.scan(
-        options: const ScanOptions(
-          strings: {'cancel': 'Cancel', 'flash_on': 'Flash on', 'flash_off': 'Flash off'},
-          autoEnableFlash: false,
-          useCamera: -1,
-        ),
-      );
-
-      if (!mounted) return;
-      setState(() => _scanning = false);
-
-      if (result.type == ResultType.Cancelled) {
-        Navigator.of(context).pop();
-        return;
-      }
-
-      final code = result.rawContent;
-      if (code.isEmpty) return;
-
-      _showProductSheet(code);
-    } catch (_) {
-      if (mounted) setState(() => _scanning = false);
-    }
+    _sheetOpen = true;
+    _ctrl.stop();
+    _showProductSheet(code);
   }
 
   void _showProductSheet(String code) {
@@ -164,111 +112,94 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
       isScrollControlled: true,
       showDragHandle:     true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (_) => _ProductResultSheet(
         barcode:     code,
-        onScanAgain: _launchScanner,
+        onScanAgain: () => Navigator.of(context).pop(),
       ),
     ).whenComplete(() {
-      // Auto-relaunch scanner when sheet is dismissed
-      if (mounted && _permState == _PermState.granted) {
-        _launchScanner();
-      }
+      _sheetOpen = false;
+      if (mounted) _ctrl.start();
     });
   }
-
-  // ── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        backgroundColor:  Colors.black,
+        foregroundColor:  Colors.white,
+        automaticallyImplyLeading: true,
         title: const Text('Barcode Scanner',
             style: TextStyle(color: Colors.white)),
-      ),
-      body: _buildBody(),
-    );
-  }
-
-  Widget _buildBody() {
-    switch (_permState) {
-      case _PermState.checking:
-        return const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: Colors.white),
-              SizedBox(height: 16),
-              Text('Checking camera permission…',
-                  style: TextStyle(color: Colors.white60, fontSize: 13)),
-            ],
-          ),
-        );
-
-      case _PermState.denied:
-        return _PermissionCard(
-          permanentlyDenied: false,
-          onRequest:  _checkPermissionThenScan,
-          onSettings: () async => openAppSettings(),
-        );
-
-      case _PermState.permanentlyDenied:
-        return _PermissionCard(
-          permanentlyDenied: true,
-          onRequest:  _checkPermissionThenScan,
-          onSettings: () async => openAppSettings(),
-        );
-
-      case _PermState.granted:
-        // Native ZXing scanner is open or about to open.
-        // Show a friendly placeholder while it's running.
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.qr_code_scanner_rounded,
-                  size: 72, color: Colors.white24),
-              const SizedBox(height: 20),
-              Text(
-                _scanning ? 'Scanner open…' : 'Tap to scan',
-                style: const TextStyle(color: Colors.white60, fontSize: 15),
+        actions: [
+          ValueListenableBuilder<MobileScannerState>(
+            valueListenable: _ctrl,
+            builder: (_, state, __) => IconButton(
+              icon: Icon(
+                state.torchState == TorchState.on
+                    ? Icons.flash_on_rounded
+                    : Icons.flash_off_rounded,
+                color: Colors.white,
               ),
-              const SizedBox(height: 28),
-              if (!_scanning)
-                FilledButton.icon(
-                  onPressed: _launchScanner,
-                  icon:  const Icon(Icons.qr_code_scanner_rounded),
-                  label: const Text('Open Scanner'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF2C6BF5),
-                    minimumSize:     const Size(200, 48),
-                  ),
-                ),
-            ],
+              onPressed: _ctrl.toggleTorch,
+            ),
           ),
-        );
-    }
+        ],
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller:   _ctrl,
+            onDetect:     _onDetect,
+            errorBuilder: (_, error, __) => _ScanError(error: error),
+          ),
+          // Aiming guide overlay
+          Center(
+            child: Container(
+              width:  260,
+              height: 260,
+              decoration: BoxDecoration(
+                border:       Border.all(color: const Color(0xFF2C6BF5), width: 2.5),
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 52,
+            left:   0,
+            right:  0,
+            child: const Text(
+              'Aim at a barcode or QR code',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-// ── Permission card ───────────────────────────────────────────────────────────
+// ── Scanner error state ───────────────────────────────────────────────────────
 
-class _PermissionCard extends StatelessWidget {
-  const _PermissionCard({
-    required this.permanentlyDenied,
-    required this.onRequest,
-    required this.onSettings,
-  });
-
-  final bool             permanentlyDenied;
-  final VoidCallback     onRequest;
-  final VoidCallback     onSettings;
+class _ScanError extends StatelessWidget {
+  const _ScanError({required this.error});
+  final MobileScannerException error;
 
   @override
   Widget build(BuildContext context) {
+    final String msg;
+    switch (error.errorCode) {
+      case MobileScannerErrorCode.permissionDenied:
+        msg = 'Camera permission denied.\nOpen Settings → Privacy → Camera and enable it for this app.';
+      case MobileScannerErrorCode.unsupported:
+        msg = 'Camera is not supported on this device.';
+      default:
+        msg = 'Camera error. Please try again.';
+    }
     return Container(
       color: Colors.black,
       child: Center(
@@ -277,78 +208,25 @@ class _PermissionCard extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width:  72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.08),
-                ),
-                child: const Icon(
-                  Icons.camera_alt_outlined,
-                  color: Colors.white54,
-                  size:  36,
-                ),
-              ),
+              const Icon(Icons.camera_alt_outlined,
+                  color: Colors.white38, size: 56),
               const SizedBox(height: 20),
               Text(
-                permanentlyDenied
-                    ? 'Camera Permission Required'
-                    : 'Camera Access Needed',
+                msg,
                 style: const TextStyle(
-                  color:      Colors.white,
-                  fontSize:   18,
-                  fontWeight: FontWeight.w700,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                permanentlyDenied
-                    ? 'Camera permission was denied. Open Settings, enable Camera for this app, then return.'
-                    : 'Camera access is required to scan barcodes.',
-                style: const TextStyle(
-                    color: Colors.white60, fontSize: 13, height: 1.5),
+                    color: Colors.white70, fontSize: 14, height: 1.6),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 28),
-              if (permanentlyDenied) ...[
-                FilledButton.icon(
-                  onPressed: onSettings,
-                  icon:  const Icon(Icons.settings_rounded),
-                  label: const Text('Open Settings'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF2C6BF5),
-                    minimumSize:     const Size(200, 48),
-                  ),
+              FilledButton.icon(
+                onPressed: () async => openAppSettings(),
+                icon:  const Icon(Icons.settings_rounded),
+                label: const Text('Open Settings'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF2C6BF5),
+                  minimumSize:     const Size(200, 48),
                 ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: onRequest,
-                  child: const Text(
-                    'Already granted? Tap to retry',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                ),
-              ] else ...[
-                FilledButton.icon(
-                  onPressed: onRequest,
-                  icon:  const Icon(Icons.camera_alt_rounded),
-                  label: const Text('Grant Camera Permission'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF2C6BF5),
-                    minimumSize:     const Size(200, 48),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: onSettings,
-                  child: const Text(
-                    'Open Settings instead',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                ),
-              ],
+              ),
             ],
           ),
         ),
@@ -421,7 +299,7 @@ class _ProductResultSheet extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: onScanAgain,
               icon:  const Icon(Icons.qr_code_scanner_rounded),
               label: const Text('Scan Another'),
             ),
@@ -578,7 +456,7 @@ class _NotFoundResult extends StatelessWidget {
                 style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
             Text('No product with code "$barcode"',
-                style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
           ],
         ),
       ),

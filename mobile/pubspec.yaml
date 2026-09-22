@@ -36,8 +36,8 @@ dependencies:
   # Charts
   fl_chart: ^0.68.0
 
-  # Scanner (QR + barcode) — uses ZXing + Camera1, works on all Android ROMs
-  barcode_scan2: ^4.3.3
+  # Scanner (QR + barcode) — AVFoundation on iOS, MLKit on Android
+  mobile_scanner: ^5.2.3
 
 
   # Images

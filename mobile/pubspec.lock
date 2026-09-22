@@ -57,14 +57,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
-  barcode_scan2:
-    dependency: "direct main"
-    description:
-      name: barcode_scan2
-      sha256: dc58b90e9a6a7bb4f4a31bf8d0498f5ce53778c8e3784994e458d40ec134e38a
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.8.2"
   boolean_selector:
     dependency: transitive
     description:
@@ -848,6 +840,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  mobile_scanner:
+    dependency: "direct main"
+    description:
+      name: mobile_scanner
+      sha256: d234581c090526676fd8fab4ada92f35c6746e3fb4f05a399665d75a399fb760
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.2.3"
   nm:
     dependency: transitive
     description:
@@ -1040,14 +1040,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.2"
-  protobuf:
-    dependency: transitive
-    description:
-      name: protobuf
-      sha256: "13b6717366aa7ec3792dd62c19c7d33a785708224365f2db23c5ca01f1c1a0f2"
-      url: "https://pub.dev"
-    source: hosted
-    version: "6.1.0"
   pub_semver:
     dependency: transitive
     description:
