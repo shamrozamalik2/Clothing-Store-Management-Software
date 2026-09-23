@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>ProBusiness</string>
+	<string>SAS Garments</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan barcodes and QR codes for products</string>
 	<key>NSFaceIDUsageDescription</key>
