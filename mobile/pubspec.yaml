@@ -37,7 +37,7 @@ dependencies:
   fl_chart: ^0.68.0
 
   # Scanner (QR + barcode) — AVFoundation on iOS, MLKit on Android
-  mobile_scanner: ^5.2.3
+  mobile_scanner: ^6.0.0
 
 
   # Images
