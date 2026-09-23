@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:barcode_scan2/barcode_scan2.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../providers/cart_provider.dart';
 import '../../data/models/cart_item_model.dart';
@@ -118,15 +118,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   Future<void> _openBarcodeScanner() async {
     try {
-      final result = await BarcodeScanner.scan(
-        options: const ScanOptions(
-          strings: {'cancel': 'Cancel', 'flash_on': 'Flash on', 'flash_off': 'Flash off'},
-          autoEnableFlash: false,
-          useCamera: -1,
-        ),
+      final barcode = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => const _QuickBarcodeScanSheet()),
       );
-      if (result.type == ResultType.Barcode && result.rawContent.isNotEmpty) {
-        _applyBarcode(result.rawContent);
+      if (barcode != null && barcode.isNotEmpty) {
+        _applyBarcode(barcode);
       }
     } catch (_) {}
   }
@@ -1599,6 +1595,60 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Quick barcode scan — full-screen picker that pops with the scanned code.
+// ---------------------------------------------------------------------------
+
+class _QuickBarcodeScanSheet extends StatefulWidget {
+  const _QuickBarcodeScanSheet();
+
+  @override
+  State<_QuickBarcodeScanSheet> createState() => _QuickBarcodeScanSheetState();
+}
+
+class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet> {
+  final MobileScannerController _controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+  );
+  bool _handled = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_handled) return;
+    final code = capture.barcodes.firstOrNull?.rawValue;
+    if (code == null || code.isEmpty) return;
+    _handled = true;
+    Navigator.of(context).pop(code);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('Scan Barcode'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.flash_on_rounded),
+            onPressed: _controller.toggleTorch,
+          ),
+        ],
+      ),
+      body: MobileScanner(
+        controller: _controller,
+        onDetect:   _onDetect,
       ),
     );
   }

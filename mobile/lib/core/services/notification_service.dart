@@ -54,15 +54,26 @@ class NotificationService {
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized ||
         settings.authorizationStatus == AuthorizationStatus.provisional) {
-      // Retrieve the APNs token first on iOS (no-op on Android).
-      await _fcm.getAPNSToken();
+      // Token retrieval can fail (e.g. no APNs token available yet on iOS
+      // Simulator, or a slow/denied registration) — don't let that crash
+      // app startup.
+      try {
+        // Retrieve the APNs token first on iOS (no-op on Android).
+        await _fcm.getAPNSToken();
 
-      final token = await _fcm.getToken();
-      assert(() {
-        // ignore: avoid_print
-        print('[FCM] device token: $token');
-        return true;
-      }());
+        final token = await _fcm.getToken();
+        assert(() {
+          // ignore: avoid_print
+          print('[FCM] device token: $token');
+          return true;
+        }());
+      } catch (e) {
+        assert(() {
+          // ignore: avoid_print
+          print('[FCM] token retrieval failed: $e');
+          return true;
+        }());
+      }
 
       // Ensure foreground notifications are shown on iOS.
       await _fcm.setForegroundNotificationPresentationOptions(
