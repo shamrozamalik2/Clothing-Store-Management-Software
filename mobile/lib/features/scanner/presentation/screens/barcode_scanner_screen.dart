@@ -132,7 +132,11 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     if (!mounted) return;
 
     if (status.isGranted || status.isLimited) {
-      _ctrl = MobileScannerController(detectionSpeed: DetectionSpeed.noDuplicates);
+      _ctrl = MobileScannerController(
+        detectionSpeed:  DetectionSpeed.noDuplicates,
+        // 640×480 avoids CameraX high-resolution binding failures on some Android devices.
+        cameraResolution: const Size(640, 480),
+      );
       setState(() => _perm = _PermState.granted);
     } else if (status.isPermanentlyDenied || status.isRestricted) {
       setState(() => _perm = _PermState.permanentlyDenied);
