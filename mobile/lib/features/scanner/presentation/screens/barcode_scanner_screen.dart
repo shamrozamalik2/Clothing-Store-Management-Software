@@ -78,7 +78,8 @@ class BarcodeScannerScreen extends ConsumerStatefulWidget {
   ConsumerState<BarcodeScannerScreen> createState() => _BarcodeScannerScreenState();
 }
 
-class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
+class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
+    with WidgetsBindingObserver {
   MobileScannerController? _ctrl;
   bool _sheetOpen = false;
   _PermState _perm = _PermState.checking;
@@ -86,17 +87,37 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _requestPermission();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _ctrl?.stop();
     _ctrl?.dispose();
     super.dispose();
   }
 
+  // CameraX binds to the Android lifecycle; stop/resume here keeps it in sync.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final ctrl = _ctrl;
+    if (ctrl == null || _perm != _PermState.granted || _sheetOpen) return;
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      ctrl.stop();
+    } else if (state == AppLifecycleState.resumed) {
+      ctrl.start();
+    }
+  }
+
   Future<void> _requestPermission() async {
     if (!mounted) return;
+    // Clean up any previous controller before creating a new one.
+    await _ctrl?.stop();
+    _ctrl?.dispose();
+    _ctrl = null;
     setState(() => _perm = _PermState.checking);
 
     var status = await Permission.camera.status;
@@ -118,6 +139,16 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
     } else {
       setState(() => _perm = _PermState.denied);
     }
+  }
+
+  // Retry just the camera start without re-running the permission flow.
+  // A short pause lets CameraX fully release resources before trying again.
+  Future<void> _retryCamera() async {
+    if (!mounted || _ctrl == null) return;
+    try { await _ctrl!.stop(); } catch (_) {}
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    try { await _ctrl!.start(); } catch (_) {}
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -221,7 +252,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
               onDetect:     _onDetect,
               errorBuilder: (_, error, __) => _ScanError(
                 error:   error,
-                onRetry: _requestPermission,
+                onRetry: _retryCamera,
               ),
             ),
             Center(
