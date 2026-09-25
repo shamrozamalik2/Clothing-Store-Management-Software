@@ -259,24 +259,28 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
                 onRetry: _retryCamera,
               ),
             ),
-            Center(
-              child: Container(
-                width:  260,
-                height: 260,
-                decoration: BoxDecoration(
-                  border:       Border.all(color: const Color(0xFF2C6BF5), width: 2.5),
-                  borderRadius: BorderRadius.circular(18),
+            IgnorePointer(
+              child: Center(
+                child: Container(
+                  width:  260,
+                  height: 260,
+                  decoration: BoxDecoration(
+                    border:       Border.all(color: const Color(0xFF2C6BF5), width: 2.5),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                 ),
               ),
             ),
-            const Positioned(
-              bottom: 52,
-              left:   0,
-              right:  0,
-              child: Text(
-                'Aim at a barcode or QR code',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70, fontSize: 14),
+            const IgnorePointer(
+              child: Positioned(
+                bottom: 52,
+                left:   0,
+                right:  0,
+                child: Text(
+                  'Aim at a barcode or QR code',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
               ),
             ),
           ],
