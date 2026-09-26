@@ -137,7 +137,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     if (status.isGranted || status.isLimited) {
       _ctrl = MobileScannerController(
         detectionSpeed:   DetectionSpeed.noDuplicates,
-        cameraResolution: const Size(640, 480),
+        cameraResolution: const Size(1280, 720),
       );
       setState(() => _perm = _PermState.granted);
     } else if (status.isPermanentlyDenied || status.isRestricted) {
@@ -159,7 +159,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     if (!mounted) return;
     _ctrl = MobileScannerController(
       detectionSpeed:   DetectionSpeed.noDuplicates,
-      cameraResolution: const Size(640, 480),
+      cameraResolution: const Size(1280, 720),
     );
     setState(() => _retrying = false);
   }
@@ -264,6 +264,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
         final ctrl = _ctrl;
         if (ctrl == null) return const SizedBox.shrink();
         return Stack(
+          fit: StackFit.expand,
           children: [
             MobileScanner(
               controller:   ctrl,
@@ -287,14 +288,15 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
               ),
             ),
             const IgnorePointer(
-              child: Positioned(
-                bottom: 52,
-                left:   0,
-                right:  0,
-                child: Text(
-                  'Aim at a barcode or QR code',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 52),
+                  child: Text(
+                    'Aim at a barcode or QR code',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
                 ),
               ),
             ),

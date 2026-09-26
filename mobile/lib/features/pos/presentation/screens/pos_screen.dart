@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../providers/cart_provider.dart';
 import '../../data/models/cart_item_model.dart';
@@ -1623,7 +1624,7 @@ class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet>
     WidgetsBinding.instance.addObserver(this);
     _ctrl = MobileScannerController(
       detectionSpeed:   DetectionSpeed.noDuplicates,
-      cameraResolution: const Size(640, 480),
+      cameraResolution: const Size(1280, 720),
     );
   }
 
@@ -1659,7 +1660,7 @@ class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet>
     if (!mounted) return;
     _ctrl = MobileScannerController(
       detectionSpeed:   DetectionSpeed.noDuplicates,
-      cameraResolution: const Size(640, 480),
+      cameraResolution: const Size(1280, 720),
     );
     setState(() => _retrying = false);
   }
@@ -1700,7 +1701,8 @@ class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet>
           : MobileScanner(
               controller: ctrl,
               onDetect:   _onDetect,
-              errorBuilder: (_, __, ___) => _QuickScanError(
+              errorBuilder: (_, error, __) => _QuickScanError(
+                error:    error,
                 onRetry:  _retry,
                 retrying: _retrying,
               ),
@@ -1710,12 +1712,28 @@ class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet>
 }
 
 class _QuickScanError extends StatelessWidget {
-  const _QuickScanError({required this.onRetry, required this.retrying});
-  final VoidCallback onRetry;
-  final bool         retrying;
+  const _QuickScanError({
+    required this.error,
+    required this.onRetry,
+    required this.retrying,
+  });
+  final MobileScannerException error;
+  final VoidCallback            onRetry;
+  final bool                    retrying;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    final bool isPermission =
+        error.errorCode == MobileScannerErrorCode.permissionDenied;
+
+    final String title = isPermission
+        ? 'Camera Permission Required'
+        : 'Unable to start camera';
+    final String subtitle = isPermission
+        ? 'Open Settings and enable Camera for this app.'
+        : 'Please try again.';
+
+    return Container(
     color: Colors.black,
     child: Center(
       child: Column(
@@ -1724,22 +1742,25 @@ class _QuickScanError extends StatelessWidget {
           const Icon(Icons.camera_alt_outlined,
               color: Colors.white38, size: 56),
           const SizedBox(height: 16),
-          const Text('Unable to start camera',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+          Text(title,
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
               textAlign: TextAlign.center),
           const SizedBox(height: 8),
-          const Text('Please try again.',
-              style: TextStyle(color: Colors.white54, fontSize: 12)),
+          Text(subtitle,
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+              textAlign: TextAlign.center),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: retrying ? null : onRetry,
+            onPressed: retrying ? null : (isPermission ? () => openAppSettings() : onRetry),
             icon: retrying
                 ? const SizedBox(
                     width: 16, height: 16,
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.refresh_rounded),
-            label: Text(retrying ? 'Starting…' : 'Try Again'),
+                : Icon(isPermission ? Icons.settings_rounded : Icons.refresh_rounded),
+            label: Text(retrying
+                ? 'Starting…'
+                : isPermission ? 'Open Settings' : 'Try Again'),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF2C6BF5),
             ),
@@ -1748,4 +1769,5 @@ class _QuickScanError extends StatelessWidget {
       ),
     ),
   );
+  }
 }
