@@ -1622,10 +1622,23 @@ class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _ctrl = MobileScannerController(
-      detectionSpeed:   DetectionSpeed.noDuplicates,
-      cameraResolution: const Size(1280, 720),
-    );
+    // Defer camera start until after the first frame so the Flutter texture
+    // surface is fully ready. Creating the controller synchronously in initState
+    // (before the route animation settles) causes CameraX genericError because
+    // the surface it needs to bind to hasn't been committed yet.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startCamera());
+  }
+
+  Future<void> _startCamera() async {
+    if (!mounted) return;
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    setState(() {
+      _ctrl = MobileScannerController(
+        detectionSpeed:   DetectionSpeed.noDuplicates,
+        cameraResolution: const Size(640, 480),
+      );
+    });
   }
 
   @override
@@ -1660,7 +1673,7 @@ class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet>
     if (!mounted) return;
     _ctrl = MobileScannerController(
       detectionSpeed:   DetectionSpeed.noDuplicates,
-      cameraResolution: const Size(1280, 720),
+      cameraResolution: const Size(640, 480),
     );
     setState(() => _retrying = false);
   }

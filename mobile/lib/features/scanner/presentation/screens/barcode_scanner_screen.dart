@@ -137,7 +137,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     if (status.isGranted || status.isLimited) {
       _ctrl = MobileScannerController(
         detectionSpeed:   DetectionSpeed.noDuplicates,
-        cameraResolution: const Size(1280, 720),
+        cameraResolution: const Size(640, 480),
       );
       setState(() => _perm = _PermState.granted);
     } else if (status.isPermanentlyDenied || status.isRestricted) {
@@ -159,7 +159,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     if (!mounted) return;
     _ctrl = MobileScannerController(
       detectionSpeed:   DetectionSpeed.noDuplicates,
-      cameraResolution: const Size(1280, 720),
+      cameraResolution: const Size(640, 480),
     );
     setState(() => _retrying = false);
   }
