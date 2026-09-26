@@ -119,7 +119,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   Future<void> _openBarcodeScanner() async {
     try {
-      final barcode = await Navigator.of(context).push<String>(
+      // rootNavigator: true — push on the root navigator so the scanner
+      // covers the full screen (including bottom nav). Without this, the
+      // route is pushed on the nested tab navigator, which leaves the
+      // bottom bar active and prevents CameraX from binding its texture.
+      final barcode = await Navigator.of(context, rootNavigator: true).push<String>(
         MaterialPageRoute(builder: (_) => const _QuickBarcodeScanSheet()),
       );
       if (barcode != null && barcode.isNotEmpty) {
