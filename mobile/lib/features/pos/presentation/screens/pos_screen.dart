@@ -1611,16 +1611,57 @@ class _QuickBarcodeScanSheet extends StatefulWidget {
   State<_QuickBarcodeScanSheet> createState() => _QuickBarcodeScanSheetState();
 }
 
-class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet> {
-  final MobileScannerController _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
-  );
-  bool _handled = false;
+class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet>
+    with WidgetsBindingObserver {
+  MobileScannerController? _ctrl;
+  bool _handled  = false;
+  bool _retrying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _ctrl = MobileScannerController(
+      detectionSpeed:   DetectionSpeed.noDuplicates,
+      cameraResolution: const Size(640, 480),
+    );
+  }
 
   @override
   void dispose() {
-    _controller.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _ctrl?.stop();
+    _ctrl?.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final ctrl = _ctrl;
+    if (ctrl == null) return;
+    switch (state) {
+      case AppLifecycleState.paused:
+        ctrl.stop();
+      case AppLifecycleState.resumed:
+        if (!ctrl.value.isRunning) ctrl.start();
+      default:
+        break;
+    }
+  }
+
+  Future<void> _retry() async {
+    if (_retrying || !mounted) return;
+    setState(() => _retrying = true);
+    try { await _ctrl?.stop(); } catch (_) {}
+    _ctrl?.dispose();
+    _ctrl = null;
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+    _ctrl = MobileScannerController(
+      detectionSpeed:   DetectionSpeed.noDuplicates,
+      cameraResolution: const Size(640, 480),
+    );
+    setState(() => _retrying = false);
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -1633,6 +1674,7 @@ class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final ctrl = _ctrl;
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -1640,16 +1682,70 @@ class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet> {
         foregroundColor: Colors.white,
         title: const Text('Scan Barcode'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.flash_on_rounded),
-            onPressed: _controller.toggleTorch,
+          if (ctrl != null)
+            ValueListenableBuilder<MobileScannerState>(
+              valueListenable: ctrl,
+              builder: (_, state, __) => IconButton(
+                icon: Icon(state.torchState == TorchState.on
+                    ? Icons.flash_on_rounded
+                    : Icons.flash_off_rounded),
+                onPressed: ctrl.toggleTorch,
+              ),
+            ),
+        ],
+      ),
+      body: _retrying || ctrl == null
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF2C6BF5)))
+          : MobileScanner(
+              controller: ctrl,
+              onDetect:   _onDetect,
+              errorBuilder: (_, __, ___) => _QuickScanError(
+                onRetry:  _retry,
+                retrying: _retrying,
+              ),
+            ),
+    );
+  }
+}
+
+class _QuickScanError extends StatelessWidget {
+  const _QuickScanError({required this.onRetry, required this.retrying});
+  final VoidCallback onRetry;
+  final bool         retrying;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    color: Colors.black,
+    child: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.camera_alt_outlined,
+              color: Colors.white38, size: 56),
+          const SizedBox(height: 16),
+          const Text('Unable to start camera',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          const Text('Please try again.',
+              style: TextStyle(color: Colors.white54, fontSize: 12)),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: retrying ? null : onRetry,
+            icon: retrying
+                ? const SizedBox(
+                    width: 16, height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.refresh_rounded),
+            label: Text(retrying ? 'Starting…' : 'Try Again'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF2C6BF5),
+            ),
           ),
         ],
       ),
-      body: MobileScanner(
-        controller: _controller,
-        onDetect:   _onDetect,
-      ),
-    );
-  }
+    ),
+  );
 }

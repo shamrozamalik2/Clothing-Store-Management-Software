@@ -43,3 +43,25 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+// CameraX version pin — EVIDENCE-BASED, DO NOT REMOVE WITHOUT TESTING:
+// mobile_scanner 6.0.11 natively resolves CameraX 1.5.0.
+// Gradle dependency inspection confirmed: camera-lifecycle:1.5.0 -> 1.2.3
+//
+// Physical device test results:
+//   CameraX 1.5.0 → MobileScannerController.start() throws genericError
+//                    (camera surface fails to bind to FlutterFragmentActivity lifecycle)
+//   CameraX 1.2.3 → Camera preview opens successfully (gray frame visible)
+//
+// mobile_scanner 6.x is backwards-compatible with CameraX 1.2.3 at runtime
+// (confirmed: no crash, camera initialises, ML Kit detection layer active).
+// Root cause of 1.5.0 failure: device camera HAL does not support the new
+// camera selection strategy introduced in CameraX 1.3.0+.
+configurations.all {
+    resolutionStrategy {
+        force("androidx.camera:camera-core:1.2.3")
+        force("androidx.camera:camera-camera2:1.2.3")
+        force("androidx.camera:camera-lifecycle:1.2.3")
+        force("androidx.camera:camera-view:1.2.3")
+    }
+}

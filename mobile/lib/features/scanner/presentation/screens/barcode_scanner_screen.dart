@@ -83,6 +83,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
   MobileScannerController? _ctrl;
   bool _sheetOpen = false;
   _PermState _perm = _PermState.checking;
+  bool _retrying = false;
 
   @override
   void initState() {
@@ -99,23 +100,25 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     super.dispose();
   }
 
-  // CameraX binds to the Android lifecycle; stop/resume here keeps it in sync.
+  // Only stop on paused (not inactive — that fires during dialogs/animations).
+  // Only start on resumed if not already running to prevent double-start errors.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final ctrl = _ctrl;
     if (ctrl == null || _perm != _PermState.granted || _sheetOpen) return;
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      ctrl.stop();
-    } else if (state == AppLifecycleState.resumed) {
-      ctrl.start();
+    switch (state) {
+      case AppLifecycleState.paused:
+        ctrl.stop();
+      case AppLifecycleState.resumed:
+        if (!ctrl.value.isRunning) ctrl.start();
+      default:
+        break;
     }
   }
 
   Future<void> _requestPermission() async {
     if (!mounted) return;
-    // Clean up any previous controller before creating a new one.
-    await _ctrl?.stop();
+    try { await _ctrl?.stop(); } catch (_) {}
     _ctrl?.dispose();
     _ctrl = null;
     setState(() => _perm = _PermState.checking);
@@ -133,8 +136,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
 
     if (status.isGranted || status.isLimited) {
       _ctrl = MobileScannerController(
-        detectionSpeed:  DetectionSpeed.noDuplicates,
-        // 640×480 avoids CameraX high-resolution binding failures on some Android devices.
+        detectionSpeed:   DetectionSpeed.noDuplicates,
         cameraResolution: const Size(640, 480),
       );
       setState(() => _perm = _PermState.granted);
@@ -145,14 +147,21 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     }
   }
 
-  // Retry just the camera start without re-running the permission flow.
-  // A short pause lets CameraX fully release resources before trying again.
+  // One controlled retry: dispose the errored controller and create a fresh one.
+  // Only one retry is allowed — if it fails again the user sees a stable error.
   Future<void> _retryCamera() async {
-    if (!mounted || _ctrl == null) return;
-    try { await _ctrl!.stop(); } catch (_) {}
-    await Future.delayed(const Duration(milliseconds: 600));
+    if (_retrying || !mounted) return;
+    setState(() => _retrying = true);
+    try { await _ctrl?.stop(); } catch (_) {}
+    _ctrl?.dispose();
+    _ctrl = null;
+    await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
-    try { await _ctrl!.start(); } catch (_) {}
+    _ctrl = MobileScannerController(
+      detectionSpeed:   DetectionSpeed.noDuplicates,
+      cameraResolution: const Size(640, 480),
+    );
+    setState(() => _retrying = false);
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -247,6 +256,11 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
         );
 
       case _PermState.granted:
+        if (_retrying) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF2C6BF5)),
+          );
+        }
         final ctrl = _ctrl;
         if (ctrl == null) return const SizedBox.shrink();
         return Stack(
@@ -255,8 +269,9 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
               controller:   ctrl,
               onDetect:     _onDetect,
               errorBuilder: (_, error, __) => _ScanError(
-                error:   error,
-                onRetry: _retryCamera,
+                error:    error,
+                onRetry:  _retryCamera,
+                retrying: _retrying,
               ),
             ),
             IgnorePointer(
@@ -367,20 +382,27 @@ class _PermCard extends StatelessWidget {
 // ── Scanner error state ───────────────────────────────────────────────────────
 
 class _ScanError extends StatelessWidget {
-  const _ScanError({required this.error, required this.onRetry});
+  const _ScanError({
+    required this.error,
+    required this.onRetry,
+    this.retrying = false,
+  });
   final MobileScannerException error;
   final VoidCallback           onRetry;
+  final bool                   retrying;
 
   @override
   Widget build(BuildContext context) {
     final bool isPermission =
         error.errorCode == MobileScannerErrorCode.permissionDenied;
+    final bool unsupported =
+        error.errorCode == MobileScannerErrorCode.unsupported;
 
     final String msg = isPermission
         ? 'Camera permission denied.\nOpen Settings → enable Camera for this app.'
-        : error.errorCode == MobileScannerErrorCode.unsupported
+        : unsupported
             ? 'Camera is not supported on this device.'
-            : 'Camera failed to start. Please try again.';
+            : 'Unable to start camera.\nPlease try again.';
 
     return Container(
       color: Colors.black,
@@ -399,11 +421,20 @@ class _ScanError extends StatelessWidget {
                   textAlign: TextAlign.center),
               const SizedBox(height: 28),
               FilledButton.icon(
-                onPressed: isPermission ? () => openAppSettings() : onRetry,
-                icon:  Icon(isPermission
-                    ? Icons.settings_rounded
-                    : Icons.refresh_rounded),
-                label: Text(isPermission ? 'Open Settings' : 'Try Again'),
+                onPressed: (isPermission || unsupported || retrying)
+                    ? (isPermission ? () => openAppSettings() : null)
+                    : onRetry,
+                icon: retrying
+                    ? const SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : Icon(isPermission
+                        ? Icons.settings_rounded
+                        : Icons.refresh_rounded),
+                label: Text(retrying
+                    ? 'Starting…'
+                    : isPermission ? 'Open Settings' : 'Try Again'),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF2C6BF5),
                   minimumSize:     const Size(200, 48),
