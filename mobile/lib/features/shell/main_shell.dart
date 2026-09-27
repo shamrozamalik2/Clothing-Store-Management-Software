@@ -136,11 +136,20 @@ class _NavBtn extends StatelessWidget {
                       )
                     : null,
               ),
-              child: Icon(
-                selected ? item.activeIcon : item.inactiveIcon,
-                size:  22,
-                color: selected ? Colors.white : cs.onSurfaceVariant,
-              ),
+              child: selected
+                  ? ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end:   Alignment.bottomRight,
+                        colors: [Colors.white, Color(0xCCFFFFFF)],
+                      ).createShader(bounds),
+                      child: Icon(item.activeIcon, size: 22, color: Colors.white),
+                    )
+                  : Icon(
+                      item.inactiveIcon,
+                      size:  22,
+                      color: cs.onSurfaceVariant,
+                    ),
             ),
             const SizedBox(height: 3),
             AnimatedDefaultTextStyle(
