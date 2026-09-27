@@ -10,6 +10,7 @@ import '../providers/cart_provider.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../data/sources/pos_remote_source.dart';
 import '../widgets/product_grid.dart';
+import '../../../../core/providers/scanner_controller_provider.dart';
 import '../../../products/data/models/product_model.dart';
 import '../../../products/presentation/providers/products_provider.dart';
 import '../../../../core/api/api_client.dart';
@@ -1609,77 +1610,46 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
 // Quick barcode scan — full-screen picker that pops with the scanned code.
 // ---------------------------------------------------------------------------
 
-class _QuickBarcodeScanSheet extends StatefulWidget {
+class _QuickBarcodeScanSheet extends ConsumerStatefulWidget {
   const _QuickBarcodeScanSheet();
 
   @override
-  State<_QuickBarcodeScanSheet> createState() => _QuickBarcodeScanSheetState();
+  ConsumerState<_QuickBarcodeScanSheet> createState() => _QuickBarcodeScanSheetState();
 }
 
-class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet>
-    with WidgetsBindingObserver {
-  MobileScannerController? _ctrl;
+class _QuickBarcodeScanSheetState extends ConsumerState<_QuickBarcodeScanSheet> {
   bool _handled  = false;
   bool _retrying = false;
+
+  MobileScannerController get _ctrl => ref.read(mobileScannerControllerProvider);
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    // Defer camera start until after the first frame so the Flutter texture
-    // surface is fully ready. Creating the controller synchronously in initState
-    // (before the route animation settles) causes CameraX genericError because
-    // the surface it needs to bind to hasn't been committed yet.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startCamera());
-  }
-
-  Future<void> _startCamera() async {
-    if (!mounted) return;
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-    setState(() {
-      _ctrl = MobileScannerController(
-        detectionSpeed:   DetectionSpeed.noDuplicates,
-        cameraResolution: const Size(640, 480),
-      );
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // Always stop→start so MobileScanner.lastScanned is reset via releaseCamera().
+      // The singleton controller keeps lastScanned alive between sessions; without
+      // this the noDuplicates filter blocks re-detection of the same barcode.
+      if (_ctrl.value.isRunning) {
+        try { await _ctrl.stop(); } catch (_) {}
+      }
+      if (mounted) await _ctrl.start();
     });
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _ctrl?.stop();
-    _ctrl?.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    final ctrl = _ctrl;
-    if (ctrl == null) return;
-    switch (state) {
-      case AppLifecycleState.paused:
-        ctrl.stop();
-      case AppLifecycleState.resumed:
-        if (!ctrl.value.isRunning) ctrl.start();
-      default:
-        break;
-    }
   }
 
   Future<void> _retry() async {
     if (_retrying || !mounted) return;
     setState(() => _retrying = true);
-    try { await _ctrl?.stop(); } catch (_) {}
-    _ctrl?.dispose();
-    _ctrl = null;
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-    _ctrl = MobileScannerController(
-      detectionSpeed:   DetectionSpeed.noDuplicates,
-      cameraResolution: const Size(640, 480),
-    );
-    setState(() => _retrying = false);
+    if (!_ctrl.value.isRunning) {
+      try { await _ctrl.start(); } catch (_) {}
+    }
+    if (mounted) setState(() => _retrying = false);
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -1692,7 +1662,6 @@ class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet>
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = _ctrl;
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -1700,23 +1669,22 @@ class _QuickBarcodeScanSheetState extends State<_QuickBarcodeScanSheet>
         foregroundColor: Colors.white,
         title: const Text('Scan Barcode'),
         actions: [
-          if (ctrl != null)
-            ValueListenableBuilder<MobileScannerState>(
-              valueListenable: ctrl,
-              builder: (_, state, __) => IconButton(
-                icon: Icon(state.torchState == TorchState.on
-                    ? Icons.flash_on_rounded
-                    : Icons.flash_off_rounded),
-                onPressed: ctrl.toggleTorch,
-              ),
+          ValueListenableBuilder<MobileScannerState>(
+            valueListenable: _ctrl,
+            builder: (_, state, __) => IconButton(
+              icon: Icon(state.torchState == TorchState.on
+                  ? Icons.flash_on_rounded
+                  : Icons.flash_off_rounded),
+              onPressed: _ctrl.toggleTorch,
             ),
+          ),
         ],
       ),
-      body: _retrying || ctrl == null
+      body: _retrying
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF2C6BF5)))
           : MobileScanner(
-              controller: ctrl,
+              controller: _ctrl,
               onDetect:   _onDetect,
               errorBuilder: (_, error, __) => _QuickScanError(
                 error:    error,

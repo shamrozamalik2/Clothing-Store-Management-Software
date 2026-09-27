@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
+import '../../../../core/providers/scanner_controller_provider.dart';
 import '../../../../core/widgets/grad_widgets.dart';
 
 // ── Product lookup provider ───────────────────────────────────────────────────
@@ -78,49 +79,26 @@ class BarcodeScannerScreen extends ConsumerStatefulWidget {
   ConsumerState<BarcodeScannerScreen> createState() => _BarcodeScannerScreenState();
 }
 
-class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
-    with WidgetsBindingObserver {
-  MobileScannerController? _ctrl;
+class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
   bool _sheetOpen = false;
   _PermState _perm = _PermState.checking;
   bool _retrying = false;
 
+  MobileScannerController get _ctrl => ref.read(mobileScannerControllerProvider);
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _requestPermission();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _ctrl?.stop();
-    _ctrl?.dispose();
     super.dispose();
-  }
-
-  // Only stop on paused (not inactive — that fires during dialogs/animations).
-  // Only start on resumed if not already running to prevent double-start errors.
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    final ctrl = _ctrl;
-    if (ctrl == null || _perm != _PermState.granted || _sheetOpen) return;
-    switch (state) {
-      case AppLifecycleState.paused:
-        ctrl.stop();
-      case AppLifecycleState.resumed:
-        if (!ctrl.value.isRunning) ctrl.start();
-      default:
-        break;
-    }
   }
 
   Future<void> _requestPermission() async {
     if (!mounted) return;
-    try { await _ctrl?.stop(); } catch (_) {}
-    _ctrl?.dispose();
-    _ctrl = null;
     setState(() => _perm = _PermState.checking);
 
     var status = await Permission.camera.status;
@@ -135,11 +113,8 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     if (!mounted) return;
 
     if (status.isGranted || status.isLimited) {
-      _ctrl = MobileScannerController(
-        detectionSpeed:   DetectionSpeed.noDuplicates,
-        cameraResolution: const Size(640, 480),
-      );
       setState(() => _perm = _PermState.granted);
+      if (!_ctrl.value.isRunning) await _ctrl.start();
     } else if (status.isPermanentlyDenied || status.isRestricted) {
       setState(() => _perm = _PermState.permanentlyDenied);
     } else {
@@ -147,21 +122,13 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     }
   }
 
-  // One controlled retry: dispose the errored controller and create a fresh one.
-  // Only one retry is allowed — if it fails again the user sees a stable error.
   Future<void> _retryCamera() async {
     if (_retrying || !mounted) return;
     setState(() => _retrying = true);
-    try { await _ctrl?.stop(); } catch (_) {}
-    _ctrl?.dispose();
-    _ctrl = null;
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-    _ctrl = MobileScannerController(
-      detectionSpeed:   DetectionSpeed.noDuplicates,
-      cameraResolution: const Size(640, 480),
-    );
-    setState(() => _retrying = false);
+    if (!_ctrl.value.isRunning) {
+      try { await _ctrl.start(); } catch (_) {}
+    }
+    if (mounted) setState(() => _retrying = false);
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -172,7 +139,6 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
     if (code == null || code.isEmpty) return;
 
     _sheetOpen = true;
-    _ctrl?.stop();
     _showProductSheet(code);
   }
 
@@ -190,7 +156,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
       ),
     ).whenComplete(() {
       _sheetOpen = false;
-      if (mounted) _ctrl?.start();
+      if (mounted && !_ctrl.value.isRunning) _ctrl.start();
     });
   }
 
@@ -205,9 +171,9 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
         title: const Text('Barcode Scanner',
             style: TextStyle(color: Colors.white)),
         actions: [
-          if (_perm == _PermState.granted && _ctrl != null)
+          if (_perm == _PermState.granted)
             ValueListenableBuilder<MobileScannerState>(
-              valueListenable: _ctrl!,
+              valueListenable: _ctrl,
               builder: (_, state, __) => IconButton(
                 icon: Icon(
                   state.torchState == TorchState.on
@@ -215,7 +181,7 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
                       : Icons.flash_off_rounded,
                   color: Colors.white,
                 ),
-                onPressed: _ctrl!.toggleTorch,
+                onPressed: _ctrl.toggleTorch,
               ),
             ),
         ],
@@ -261,13 +227,11 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen>
             child: CircularProgressIndicator(color: Color(0xFF2C6BF5)),
           );
         }
-        final ctrl = _ctrl;
-        if (ctrl == null) return const SizedBox.shrink();
         return Stack(
           fit: StackFit.expand,
           children: [
             MobileScanner(
-              controller:   ctrl,
+              controller:   _ctrl,
               onDetect:     _onDetect,
               errorBuilder: (_, error, __) => _ScanError(
                 error:    error,
