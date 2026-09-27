@@ -883,8 +883,9 @@ class _SaleDetailSheetState extends ConsumerState<_SaleDetailSheet> {
                     ],
                   ),
             if (_detail != null)
-              Offstage(
-                offstage: true,
+              Positioned(
+                left: -9999,
+                top:  0,
                 child: RepaintBoundary(
                   key: _receiptKey,
                   child: _ReceiptCard(
