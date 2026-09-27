@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -100,6 +101,23 @@ class _BarcodeScannerScreenState extends ConsumerState<BarcodeScannerScreen> {
   Future<void> _requestPermission() async {
     if (!mounted) return;
     setState(() => _perm = _PermState.checking);
+
+    // On iOS, permission_handler can disagree with AVCaptureDevice's actual
+    // authorization status, reporting denied even when the camera is accessible.
+    // Use mobile_scanner's own permission flow on iOS; permission_handler on Android.
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      setState(() => _perm = _PermState.granted);
+      if (!_ctrl.value.isRunning) {
+        try { await _ctrl.start(); } catch (_) {}
+      }
+      if (mounted) {
+        final err = _ctrl.value.error;
+        if (err != null && err.errorCode == MobileScannerErrorCode.permissionDenied) {
+          setState(() => _perm = _PermState.permanentlyDenied);
+        }
+      }
+      return;
+    }
 
     var status = await Permission.camera.status;
 
