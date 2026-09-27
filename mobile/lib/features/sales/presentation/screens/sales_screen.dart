@@ -1,8 +1,13 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
@@ -141,14 +146,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                   ),
                 ],
               ),
-              actions: [
-                _AppBarAction(
-                  icon:    Icons.refresh_rounded,
-                  onTap:   () => ref.invalidate(salesProvider),
-                  tooltip: 'Refresh',
-                ),
-                const SizedBox(width: 8),
-              ],
             ),
 
             // ── Date filter chips ─────────────────────────────────────────
@@ -230,36 +227,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 }
 
-// ── AppBar action button ──────────────────────────────────────────────────────
-
-class _AppBarAction extends StatelessWidget {
-  const _AppBarAction({required this.icon, required this.onTap, this.tooltip});
-  final IconData     icon;
-  final VoidCallback onTap;
-  final String?      tooltip;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip ?? '',
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 36, height: 36,
-          decoration: BoxDecoration(
-            color:        const Color(0xFF2C6BF5).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-            border:       Border.all(
-              color: const Color(0xFF2C6BF5).withValues(alpha: 0.2),
-            ),
-          ),
-          child: Icon(icon, size: 18,
-              color: Theme.of(context).colorScheme.onSurface),
-        ),
-      ),
-    );
-  }
-}
 
 // ── Date filter chip ──────────────────────────────────────────────────────────
 
@@ -608,6 +575,8 @@ class _SaleDetailSheetState extends ConsumerState<_SaleDetailSheet> {
   SaleDetailModel? _detail;
   bool    _loading = true;
   String? _error;
+  bool    _sharing = false;
+  final GlobalKey _receiptKey = GlobalKey();
 
   @override
   void initState() {
@@ -638,32 +607,35 @@ class _SaleDetailSheetState extends ConsumerState<_SaleDetailSheet> {
     await ref.read(printerProvider.notifier).printSaleReceipt(_detail!, shop);
   }
 
-  void _shareWhatsApp() {
-    final sale = widget.sale;
-    final d    = _detail;
-    final lines = StringBuffer();
-    lines.writeln('*Receipt — ${sale.invoiceNo}*');
-    lines.writeln('Date: ${formatDateTime(sale.createdAt)}');
-    if (sale.customerName != null) lines.writeln('Customer: ${sale.customerName}');
-    lines.writeln('');
-    if (d != null) {
-      for (final item in d.items) {
-        lines.writeln('• ${item.productName}  ${item.quantity}x'
-            '${formatCurrency(item.unitPrice)} = ${formatCurrency(item.total)}');
-      }
-      lines.writeln('');
-    }
-    if (sale.discountAmount > 0) {
-      lines.writeln('Discount: -${formatCurrency(sale.discountAmount)}');
-    }
-    lines.writeln('*Total: ${formatCurrency(sale.totalAmount)}*');
-    lines.writeln('Payment: ${sale.paymentMethod.toUpperCase()}');
-    lines.writeln('');
-    lines.writeln('Thank you for shopping!');
+  Future<void> _shareWhatsApp() async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    try {
+      final boundary = _receiptKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) return;
 
-    final encoded = Uri.encodeComponent(lines.toString());
-    launchUrl(Uri.parse('https://wa.me/?text=$encoded'),
-        mode: LaunchMode.externalApplication);
+      final image     = await boundary.toImage(pixelRatio: 3.0);
+      final byteData  = await image.toByteData(format: ui.ImageByteFormat.png);
+      final bytes     = byteData!.buffer.asUint8List();
+
+      final dir  = await getTemporaryDirectory();
+      final file = File('${dir.path}/receipt_${widget.sale.invoiceNo}.png');
+      await file.writeAsBytes(bytes);
+
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(file.path, mimeType: 'image/png')],
+        text:  'Receipt ${widget.sale.invoiceNo}',
+      ));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not share receipt. Please try again.'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
   }
 
   Future<void> _showCollectSheet(BuildContext ctx) async {
@@ -697,7 +669,9 @@ class _SaleDetailSheetState extends ConsumerState<_SaleDetailSheet> {
       minChildSize:     0.4,
       builder: (_, sc) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        child: _loading
+        child: Stack(
+          children: [
+            _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
                 ? Center(
@@ -816,6 +790,7 @@ class _SaleDetailSheetState extends ConsumerState<_SaleDetailSheet> {
                                 const Color(0xFF25D366),
                                 const Color(0xFF128C7E),
                               ],
+                              loading: _sharing,
                               onTap:  () => _shareWhatsApp(),
                             ),
                           ),
@@ -907,6 +882,187 @@ class _SaleDetailSheetState extends ConsumerState<_SaleDetailSheet> {
                           bold: true),
                     ],
                   ),
+            if (_detail != null)
+              Offstage(
+                offstage: true,
+                child: RepaintBoundary(
+                  key: _receiptKey,
+                  child: _ReceiptCard(
+                    shopName: ref.watch(_shopNameProvider),
+                    sale:     sale,
+                    items:    _detail!.items,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shareable receipt card (captured off-screen as an image) ─────────────────
+
+class _ReceiptCard extends StatelessWidget {
+  const _ReceiptCard({
+    required this.shopName,
+    required this.sale,
+    required this.items,
+  });
+
+  final String shopName;
+  final SaleModel sale;
+  final List<SaleItemModel> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      child: Container(
+        width: 360,
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              shopName,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize:   19,
+                fontWeight: FontWeight.w800,
+                color:      Colors.black,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Sales Receipt',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 16),
+            _receiptRow('Invoice #', sale.invoiceNo),
+            _receiptRow('Date', formatDateTime(sale.createdAt)),
+            _receiptRow('Customer', sale.customerName ?? 'Walk-in Customer'),
+            _receiptRow('Payment', sale.paymentMethod.toUpperCase()),
+            const SizedBox(height: 10),
+            const _ReceiptDashedLine(),
+            const SizedBox(height: 10),
+            ...items.map((item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.productName,
+                              style: const TextStyle(
+                                  fontSize: 13, color: Colors.black),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${item.quantity} x ${formatCurrency(item.unitPrice)}',
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        formatCurrency(item.total),
+                        style: const TextStyle(
+                          fontSize:   13,
+                          fontWeight: FontWeight.w700,
+                          color:      Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+            const SizedBox(height: 6),
+            const _ReceiptDashedLine(),
+            const SizedBox(height: 10),
+            _receiptRow('Subtotal', formatCurrency(sale.subtotal)),
+            if (sale.discountAmount > 0)
+              _receiptRow('Discount', '- ${formatCurrency(sale.discountAmount)}'),
+            if (sale.taxAmount > 0)
+              _receiptRow('Tax', formatCurrency(sale.taxAmount)),
+            const SizedBox(height: 4),
+            const _ReceiptDashedLine(),
+            const SizedBox(height: 8),
+            _receiptRow('TOTAL', formatCurrency(sale.totalAmount), bold: true),
+            const SizedBox(height: 18),
+            Text(
+              'Thank you for shopping with us!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize:   12,
+                fontStyle:  FontStyle.italic,
+                color:      Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _receiptRow(String label, String value, {bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize:   bold ? 14 : 12,
+              fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
+              color:      bold ? Colors.black : Colors.grey.shade700,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize:   bold ? 14 : 12,
+              fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+              color:      Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReceiptDashedLine extends StatelessWidget {
+  const _ReceiptDashedLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 1,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const dashWidth = 5.0;
+          const dashSpace = 4.0;
+          final count =
+              (constraints.maxWidth / (dashWidth + dashSpace)).floor();
+          return Row(
+            children: List.generate(
+              count,
+              (_) => Container(
+                width:  dashWidth,
+                height: 1,
+                margin: const EdgeInsets.only(right: dashSpace),
+                color:  Colors.grey.shade400,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1148,16 +1304,18 @@ class _ActionBtn extends StatelessWidget {
     required this.label,
     required this.colors,
     required this.onTap,
+    this.loading = false,
   });
   final IconData        icon;
   final String          label;
   final List<Color>     colors;
   final VoidCallback    onTap;
+  final bool            loading;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: loading ? null : onTap,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: Container(
@@ -1172,7 +1330,14 @@ class _ActionBtn extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: colors[0], size: 20),
+              loading
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: colors[0]),
+                    )
+                  : Icon(icon, color: colors[0], size: 20),
               const SizedBox(height: 4),
               Text(
                 label,

@@ -128,7 +128,7 @@ const createProduct = async (req, res, next) => {
 
     const cid  = req.companyId;
     const body = req.body;
-    const image = req.file?.filename ? `${req.file.filename}` : null;
+    const image = req.file?.filename ? `/uploads/products/${req.file.filename}` : null;
 
     let sku = body.sku?.trim();
     if (!sku) sku = await generateSku(body.name, cid);
@@ -177,7 +177,7 @@ const updateProduct = async (req, res, next) => {
     if (!product) return error(res, 'Product not found.', 404);
 
     const body   = req.body;
-    const image  = req.file?.filename || product.image;
+    const image  = req.file?.filename ? `/uploads/products/${req.file.filename}` : product.image;
     const update = {};
 
     if (body.name !== undefined)            update.name            = body.name;

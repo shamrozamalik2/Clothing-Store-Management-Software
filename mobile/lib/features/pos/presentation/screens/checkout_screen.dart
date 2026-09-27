@@ -260,66 +260,177 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.check_circle_rounded,
-                color: Colors.green[600], size: 28),
-            const SizedBox(width: 8),
-            const Text('Sale Complete'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _InfoRow(
-                label: 'Invoice #', value: invoiceNumber),
-            if (cart.customerName != null)
-              _InfoRow(
-                  label: 'Customer', value: cart.customerName!),
-            _InfoRow(
-                label: 'Total',
-                value: formatCurrency(cart.total),
-                bold: true),
-            _InfoRow(
-                label: 'Payment', value: _paymentMethod.toUpperCase()),
-            if (_paymentMethod == 'cash') ...[
-              _InfoRow(
-                  label: 'Cash received',
-                  value: formatCurrency(_cashReceived)),
-              _InfoRow(
-                  label: 'Change',
-                  value: formatCurrency(_change),
-                  valueColor: Colors.green[700]),
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Success header ──────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.green[600],
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check_rounded,
+                          color: Colors.white, size: 32),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Sale Completed',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.green[800],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      invoiceNumber,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Receipt body ─────────────────────────────────────
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (cart.customerName != null) ...[
+                        _InfoRow(label: 'Customer', value: cart.customerName!),
+                        const SizedBox(height: 4),
+                      ],
+                      _DashedDivider(),
+                      const SizedBox(height: 8),
+                      ...cart.items.map((item) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: Text(
+                                    '${item.quantity}x ${item.name}',
+                                    style: const TextStyle(fontSize: 13),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  formatCurrency(
+                                      item.price * item.quantity - item.discount),
+                                  style: const TextStyle(
+                                      fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          )),
+                      const SizedBox(height: 8),
+                      _DashedDivider(),
+                      const SizedBox(height: 8),
+                      _InfoRow(
+                          label: 'Subtotal', value: formatCurrency(cart.subtotal)),
+                      if (cart.discountAmount > 0)
+                        _InfoRow(
+                            label: 'Discount',
+                            value: '- ${formatCurrency(cart.discountAmount)}',
+                            valueColor: Colors.orange[700]),
+                      if (cart.taxAmount > 0)
+                        _InfoRow(
+                            label: 'Tax', value: formatCurrency(cart.taxAmount)),
+                      const SizedBox(height: 4),
+                      _DashedDivider(),
+                      const SizedBox(height: 4),
+                      _InfoRow(
+                          label: 'Total',
+                          value: formatCurrency(cart.total),
+                          bold: true),
+                      const SizedBox(height: 8),
+                      _InfoRow(
+                          label: 'Payment', value: _paymentMethod.toUpperCase()),
+                      if (_paymentMethod == 'cash') ...[
+                        _InfoRow(
+                            label: 'Cash received',
+                            value: formatCurrency(_cashReceived)),
+                        _InfoRow(
+                            label: 'Change',
+                            value: formatCurrency(_change),
+                            valueColor: Colors.green[700]),
+                      ],
+                      const SizedBox(height: 12),
+                      Text(
+                        'Thank you for shopping with us!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Actions ──────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _printing
+                            ? null
+                            : () {
+                                // Close dialog first, then print so snackbars are visible
+                                Navigator.pop(ctx);
+                                _printReceipt(cart, invoiceNumber);
+                              },
+                        icon: _printing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.print_outlined),
+                        label: Text(_printing ? 'Printing…' : 'Print'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.shopping_cart_outlined),
+                        label: const Text('New Sale'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
-          ],
+          ),
         ),
-        actions: [
-          OutlinedButton.icon(
-            onPressed: _printing
-                ? null
-                : () {
-                    // Close dialog first, then print so snackbars are visible
-                    Navigator.pop(ctx);
-                    _printReceipt(cart, invoiceNumber);
-                  },
-            icon: _printing
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.print_outlined),
-            label: Text(_printing ? 'Printing…' : 'Print Receipt'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(ctx),
-            icon: const Icon(Icons.shopping_cart_outlined),
-            label: const Text('New Sale'),
-          ),
-        ],
       ),
     );
   }
@@ -878,6 +989,34 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DashedDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 1,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const dashWidth = 5.0;
+          const dashSpace = 4.0;
+          final count =
+              (constraints.maxWidth / (dashWidth + dashSpace)).floor();
+          return Row(
+            children: List.generate(
+              count,
+              (_) => Container(
+                width: dashWidth,
+                height: 1,
+                margin: const EdgeInsets.only(right: dashSpace),
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+          );
+        },
       ),
     );
   }

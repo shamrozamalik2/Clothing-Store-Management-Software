@@ -9,10 +9,10 @@ import '../../core/widgets/grad_widgets.dart';
 
 const _kBottomTabs = [
   _NavItem('/dashboard', Iconsax.home5,         Iconsax.home,         'Home'),
-  _NavItem('/sales',     Iconsax.receipt_item2, Iconsax.receipt_item, 'Sales'),
+  _NavItem('/sales',     Iconsax.receipt_item5, Iconsax.receipt_item, 'Sales'),
   _NavItem('/pos',       Iconsax.bag5,          Iconsax.bag,          'POS'),
-  _NavItem('/printer',   Iconsax.printer2,      Iconsax.printer,      'Printer'),
-  _NavItem('/settings',  Iconsax.setting_22,    Iconsax.setting_2,    'Settings'),
+  _NavItem('/printer',   Iconsax.printer5,      Iconsax.printer,      'Printer'),
+  _NavItem('/settings',  Iconsax.setting_25,    Iconsax.setting_2,    'Settings'),
 ];
 
 // ── Shell ─────────────────────────────────────────────────────────────────────

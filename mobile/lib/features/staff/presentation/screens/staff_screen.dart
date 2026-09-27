@@ -89,27 +89,6 @@ class _StaffScreenState extends ConsumerState<StaffScreen> {
                   ),
                 ],
               ),
-              actions: [
-                GestureDetector(
-                  onTap: () => ref.invalidate(staffProvider),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    width:  36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color:        kGradElectric[0].withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                      border:       Border.all(
-                          color: kGradElectric[0].withValues(alpha: 0.2)),
-                    ),
-                    child: Icon(
-                      Icons.refresh_rounded,
-                      color: kGradElectric[0],
-                      size:  20,
-                    ),
-                  ),
-                ),
-              ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(1),
                 child: Container(

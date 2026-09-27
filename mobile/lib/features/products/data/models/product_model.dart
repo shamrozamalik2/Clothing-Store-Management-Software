@@ -1,3 +1,5 @@
+import '../../../../core/utils/image_url.dart';
+
 class ProductModel {
   const ProductModel({
     required this.id,
@@ -53,7 +55,7 @@ class ProductModel {
     categoryName:  j['category_name']?.toString(),
     brandId:       j['brand_id']?.toString(),
     brandName:     j['brand_name']?.toString(),
-    imageUrl:      (j['image'] ?? j['image_url'])?.toString(),
+    imageUrl:      resolveImageUrl((j['image'] ?? j['image_url'])?.toString()),
     minStockLevel: _i(j['low_stock_alert'] ?? j['min_stock_level'] ?? 0),
     isActive:      j['is_active'] == true || j['is_active'] == 1,
   );

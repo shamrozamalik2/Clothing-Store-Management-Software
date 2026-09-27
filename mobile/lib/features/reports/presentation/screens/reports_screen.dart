@@ -864,41 +864,67 @@ class _PaymentPieChartState extends State<_PaymentPieChart> {
                 child: Column(
                   children: [
                     SizedBox(
-                      height: 200,
-                      child: PieChart(
-                        PieChartData(
-                          sectionsSpace:     3,
-                          centerSpaceRadius: 44,
-                          pieTouchData: PieTouchData(
-                            touchCallback: (event, resp) {
-                              if (event is FlTapUpEvent) {
-                                final idx =
-                                    resp?.touchedSection
-                                        ?.touchedSectionIndex ??
-                                    -1;
-                                setState(() => _touchedIndex = idx);
-                              }
-                            },
-                          ),
-                          sections: entries.asMap().entries.map((e) {
-                            final isTouched = e.key == _touchedIndex;
-                            final pct = total == 0
-                                ? 0.0
-                                : e.value.value / total * 100;
-                            return PieChartSectionData(
-                              value:      e.value.value,
-                              color:      _kChartColors[
-                                  e.key % _kChartColors.length],
-                              radius:     isTouched ? 90 : 80,
-                              title:      '${pct.toStringAsFixed(1)}%',
-                              titleStyle: TextStyle(
-                                fontSize:   isTouched ? 13 : 11,
-                                fontWeight: FontWeight.w600,
-                                color:      Colors.white,
+                      height: 220,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          PieChart(
+                            PieChartData(
+                              sectionsSpace:     entries.length > 1 ? 3 : 0,
+                              centerSpaceRadius: 52,
+                              pieTouchData: PieTouchData(
+                                touchCallback: (event, resp) {
+                                  if (event is FlTapUpEvent) {
+                                    final idx =
+                                        resp?.touchedSection
+                                            ?.touchedSectionIndex ??
+                                        -1;
+                                    setState(() => _touchedIndex = idx);
+                                  }
+                                },
                               ),
-                            );
-                          }).toList(),
-                        ),
+                              sections: entries.asMap().entries.map((e) {
+                                final isTouched = e.key == _touchedIndex;
+                                final pct = total == 0
+                                    ? 0.0
+                                    : e.value.value / total * 100;
+                                return PieChartSectionData(
+                                  value:      e.value.value,
+                                  color:      _kChartColors[
+                                      e.key % _kChartColors.length],
+                                  radius:     isTouched ? 48 : 42,
+                                  title:      '${pct.toStringAsFixed(0)}%',
+                                  titlePositionPercentageOffset: 0.62,
+                                  titleStyle: TextStyle(
+                                    fontSize:   isTouched ? 13 : 11,
+                                    fontWeight: FontWeight.w700,
+                                    color:      Colors.white,
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Total',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                formatCompact(total),
+                                style: const TextStyle(
+                                  fontSize:   16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),

@@ -992,8 +992,6 @@ class _TopProducts extends StatelessWidget {
     final tt   = Theme.of(context).textTheme;
     final list = stats.topProducts;
 
-    if (list.isEmpty) return const SizedBox.shrink();
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -1001,8 +999,30 @@ class _TopProducts extends StatelessWidget {
         children: [
           GradSectionLabel('Top Products'),
           const SizedBox(height: 4),
-          SizedBox(
-            height: 140,
+          if (list.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainer,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.bar_chart_rounded, size: 30, color: cs.onSurfaceVariant),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No product sales in the last 30 days',
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            )
+          else
+            SizedBox(
+              height: 140,
             child: ListView.separated(
               scrollDirection:  Axis.horizontal,
               itemCount:        list.length,

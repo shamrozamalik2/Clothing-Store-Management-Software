@@ -91,13 +91,6 @@ class _StockScreenState extends ConsumerState<StockScreen> {
                   ),
                 ],
               ),
-              actions: [
-                _AppBarAction(
-                  icon:  Icons.refresh_rounded,
-                  onTap: () => ref.invalidate(stockProvider),
-                ),
-                const SizedBox(width: 8),
-              ],
             ),
 
             stockAsync.when(
@@ -192,33 +185,6 @@ class _StockScreenState extends ConsumerState<StockScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── AppBar action button ──────────────────────────────────────────────────────
-
-class _AppBarAction extends StatelessWidget {
-  const _AppBarAction({required this.icon, required this.onTap});
-  final IconData     icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 36, height: 36,
-        decoration: BoxDecoration(
-          color:        kGradAmber[0].withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-          border:       Border.all(
-            color: kGradAmber[0].withValues(alpha: 0.2),
-          ),
-        ),
-        child: Icon(icon, size: 18,
-            color: Theme.of(context).colorScheme.onSurface),
       ),
     );
   }
