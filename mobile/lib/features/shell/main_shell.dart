@@ -146,11 +146,11 @@ class _NavBtn extends StatelessWidget {
                           // Offset colored "echo" layer — gives a visible
                           // two-tone/depth look regardless of glyph shape.
                           Transform.translate(
-                            offset: const Offset(1.6, 1.6),
-                            child: Icon(item.activeIcon, size: 22,
-                                color: const Color(0xFFFFD57A)),
+                            offset: const Offset(1.1, 1.1),
+                            child: Icon(item.activeIcon, size: 17,
+                                color: const Color(0xFF7DD3FC)),
                           ),
-                          Icon(item.activeIcon, size: 22, color: Colors.white),
+                          Icon(item.activeIcon, size: 17, color: Colors.white),
                         ],
                       ),
                     )
