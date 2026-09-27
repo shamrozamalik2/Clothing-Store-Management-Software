@@ -137,13 +137,22 @@ class _NavBtn extends StatelessWidget {
                     : null,
               ),
               child: selected
-                  ? ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end:   Alignment.bottomRight,
-                        colors: [Colors.white, Color(0xCCFFFFFF)],
-                      ).createShader(bounds),
-                      child: Icon(item.activeIcon, size: 22, color: Colors.white),
+                  ? SizedBox(
+                      width:  22,
+                      height: 22,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Offset colored "echo" layer — gives a visible
+                          // two-tone/depth look regardless of glyph shape.
+                          Transform.translate(
+                            offset: const Offset(1.6, 1.6),
+                            child: Icon(item.activeIcon, size: 22,
+                                color: const Color(0xFFFFD57A)),
+                          ),
+                          Icon(item.activeIcon, size: 22, color: Colors.white),
+                        ],
+                      ),
                     )
                   : Icon(
                       item.inactiveIcon,
