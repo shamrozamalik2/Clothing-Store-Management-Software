@@ -99,7 +99,13 @@ export default function SaleDetailPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="ghost" size="sm" icon={<PrinterIcon className="h-4 w-4" />}
-            onClick={() => printReceipt(sale, items, settingsRes?.data)}>
+            onClick={async () => {
+              try {
+                await printReceipt(sale, items, settingsRes?.data);
+              } catch (err) {
+                toast.error(err?.message || 'Receipt could not be printed. Please try again.');
+              }
+            }}>
             Receipt
           </Button>
           <Button variant="secondary" size="sm" icon={<PrinterIcon className="h-4 w-4" />}

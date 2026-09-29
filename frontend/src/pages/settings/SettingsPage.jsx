@@ -6,7 +6,8 @@ import {
   ArrowDownTrayIcon, ArrowUpTrayIcon, ShieldCheckIcon,
   ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon,
   ClockIcon, FolderOpenIcon, Cog6ToothIcon, DocumentTextIcon,
-  CubeIcon, CurrencyDollarIcon, SparklesIcon,
+  CubeIcon, CurrencyDollarIcon, SparklesIcon, PrinterIcon,
+  WifiIcon, ComputerDesktopIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -16,6 +17,7 @@ import Textarea from '@components/common/Textarea';
 import { settingsApi } from '@api/settings.api';
 import client from '@api/client';
 import { cn } from '@utils/cn';
+import { printerManager, CONNECTION, BT_SUPPORTED, HAS_ELECTRON_PRINTER_BRIDGE } from '@utils/printer/printerManager';
 
 const TABS = [
   { id: 'company',     label: 'Company',          icon: BuildingOfficeIcon },
@@ -1189,7 +1191,79 @@ function ReceiptTab() {
   const [returnPolicy, setReturnPolicy] = useState('');
   const [dirty,        setDirty]        = useState(false);
 
+  const [printerMode, setPrinterMode] = useState(printerManager.mode);
+  const [printerName, setPrinterName] = useState(printerManager.printerName);
+  const [connecting,  setConnecting]  = useState(false);
+  const [testing,     setTesting]     = useState(false);
+  const [scanning,    setScanning]    = useState(false);
+  const [devices,     setDevices]     = useState(null); // { usb: [], serial: [] } | null = not scanned yet
+
   const mark = (setter) => (val) => { setter(val); setDirty(true); };
+
+  const paperWidthMm = paperSize === '58mm' ? 58 : paperSize === '80mm' ? 80 : null;
+
+  async function handleConnectBluetooth() {
+    setConnecting(true);
+    try {
+      const name = await printerManager.connectBluetooth();
+      setPrinterMode(CONNECTION.BLUETOOTH);
+      setPrinterName(name);
+      toast.success(`Connected to ${name}`);
+    } catch (err) {
+      toast.error(err.message || 'Could not connect to printer.');
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function handleScanDesktopPrinters() {
+    setScanning(true);
+    try {
+      const found = await printerManager.listElectronPrinters();
+      setDevices(found);
+      if (!found.usb.length && !found.serial.length) {
+        toast.error('No printers found. For USB, install the printer in Windows first. For Bluetooth, pair it in Windows Settings first.');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Could not scan for printers.');
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function handleConnectDesktopTarget(target) {
+    setConnecting(true);
+    try {
+      const name = await printerManager.connectElectron(target);
+      setPrinterMode(CONNECTION.ELECTRON);
+      setPrinterName(name);
+      setDevices(null);
+      toast.success(`Connected to ${name}`);
+    } catch (err) {
+      toast.error(err.message || 'Could not connect to printer.');
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function handleUseSystemPrinter() {
+    await printerManager.disconnect();
+    printerManager.useBrowser();
+    setPrinterMode(CONNECTION.BROWSER);
+    setPrinterName(printerManager.printerName);
+  }
+
+  async function handleTestPrint() {
+    setTesting(true);
+    try {
+      await printerManager.testPrint({ paperWidthMm });
+      toast.success('Test print sent — check your printer.');
+    } catch (err) {
+      toast.error(err.message || 'Receipt could not be printed. Please try again.');
+    } finally {
+      setTesting(false);
+    }
+  }
 
   useEffect(() => {
     if (!data) return;
@@ -1264,6 +1338,106 @@ function ReceiptTab() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Printer connection */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center gap-3 pb-1 border-b border-surface-700">
+          <div className="h-8 w-8 rounded-lg bg-primary-500/10 flex items-center justify-center shrink-0">
+            <PrinterIcon className="h-4 w-4 text-primary-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-surface-200">Printer Connection</h2>
+            <p className="text-xs text-surface-400">How receipts are sent to your printer</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between p-3 rounded-xl border border-surface-600 bg-surface-800/50">
+          <div className="flex items-center gap-2.5">
+            {printerMode !== CONNECTION.BROWSER
+              ? <WifiIcon className="h-4 w-4 text-primary-400" />
+              : <ComputerDesktopIcon className="h-4 w-4 text-surface-400" />}
+            <div>
+              <p className="text-sm font-medium text-surface-200">
+                {printerMode !== CONNECTION.BROWSER ? (printerName || 'Printer') : 'System Printer'}
+              </p>
+              <p className="text-xs text-surface-500">
+                {printerMode === CONNECTION.BLUETOOTH && (printerManager.isConnected ? 'Connected via Bluetooth (BLE)' : 'Disconnected')}
+                {printerMode === CONNECTION.ELECTRON  && (printerManager.isConnected ? 'Connected via desktop printer bridge' : 'Disconnected')}
+                {printerMode === CONNECTION.BROWSER   && 'Uses your browser’s print dialog'}
+              </p>
+            </div>
+          </div>
+          {printerMode !== CONNECTION.BROWSER && (
+            <Button size="sm" variant="ghost" onClick={handleUseSystemPrinter}>Disconnect</Button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {HAS_ELECTRON_PRINTER_BRIDGE ? (
+            <Button size="sm" variant="secondary" loading={scanning} onClick={handleScanDesktopPrinters}>
+              Scan for USB / Bluetooth Printers
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" loading={connecting}
+              disabled={!BT_SUPPORTED}
+              onClick={handleConnectBluetooth}>
+              Connect Bluetooth Printer
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={handleTestPrint} loading={testing}>
+            Test Print
+          </Button>
+        </div>
+
+        {devices && (
+          <div className="rounded-xl border border-surface-600 divide-y divide-surface-700 overflow-hidden">
+            {devices.usb.length === 0 && devices.serial.length === 0 && (
+              <p className="p-3 text-xs text-surface-500">No printers found.</p>
+            )}
+            {devices.usb.map((d) => (
+              <button key={`usb-${d.id}`} type="button"
+                onClick={() => handleConnectDesktopTarget({ type: 'usb', id: d.id, name: d.name })}
+                className="w-full flex items-center justify-between p-3 text-left hover:bg-surface-800/60">
+                <div>
+                  <p className="text-sm text-surface-200">{d.name}</p>
+                  <p className="text-[11px] text-surface-500">USB / Windows printer</p>
+                </div>
+                <Button size="xs" variant="outline" loading={connecting}>Connect</Button>
+              </button>
+            ))}
+            {devices.serial.map((d) => (
+              <button key={`serial-${d.id}`} type="button"
+                onClick={() => handleConnectDesktopTarget({ type: 'serial', id: d.id, path: d.path, name: d.name })}
+                className="w-full flex items-center justify-between p-3 text-left hover:bg-surface-800/60">
+                <div>
+                  <p className="text-sm text-surface-200">{d.name}</p>
+                  <p className="text-[11px] text-surface-500">Bluetooth (paired — {d.path})</p>
+                </div>
+                <Button size="xs" variant="outline" loading={connecting}>Connect</Button>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!HAS_ELECTRON_PRINTER_BRIDGE && !BT_SUPPORTED && (
+          <p className="text-[11px] text-amber-400/80">
+            Web Bluetooth isn't available in this browser — use Google Chrome or Microsoft Edge to connect a
+            Bluetooth printer directly, or use System Printer with a printer installed in Windows.
+          </p>
+        )}
+        {!HAS_ELECTRON_PRINTER_BRIDGE && BT_SUPPORTED && (
+          <p className="text-[11px] text-surface-500">
+            Bluetooth printing here only supports Bluetooth Low Energy (BLE) printers. Bluetooth Classic and USB
+            printers should be installed as a system printer and used via System Printer.
+          </p>
+        )}
+        {HAS_ELECTRON_PRINTER_BRIDGE && (
+          <p className="text-[11px] text-surface-500">
+            USB printers must be installed in Windows first. Bluetooth Classic printers must be paired in Windows
+            Bluetooth Settings first — they’ll then appear here as a COM port.
+          </p>
+        )}
       </div>
 
       {/* Header elements */}

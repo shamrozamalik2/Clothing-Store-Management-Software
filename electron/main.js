@@ -6,6 +6,7 @@ const fs   = require('fs');
 
 const { getStatus, saveLicense, clearLicense } = require('./license');
 const { initUpdater } = require('./updater');
+const printerBridge   = require('./printer');
 
 const FRONTEND_DEV_PORT = 5173;
 const isDev             = !app.isPackaged;
@@ -116,6 +117,12 @@ ipcMain.handle('dialog:open-file',   async (_, opts) => dialog.showOpenDialog(ma
 ipcMain.handle('dialog:save-file',   async (_, opts) => dialog.showSaveDialog(mainWindow, opts));
 ipcMain.handle('dialog:message-box', async (_, opts) => dialog.showMessageBox(mainWindow, opts));
 ipcMain.handle('shell:open-path',    async (_, p)    => (await shell.openPath(p)) || null);
+
+ipcMain.handle('printer:list',       () => printerBridge.list());
+ipcMain.handle('printer:connect',    (_, target) => printerBridge.connect(target));
+ipcMain.handle('printer:write',      (_, bytes)  => printerBridge.write(bytes));
+ipcMain.handle('printer:disconnect', () => printerBridge.disconnect());
+ipcMain.handle('printer:status',     () => printerBridge.status());
 
 ipcMain.handle('license:get-status', () => getStatus(app.getPath('userData')));
 

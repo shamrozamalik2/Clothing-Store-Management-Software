@@ -1213,8 +1213,12 @@ function ReceiptModal({ receipt, onClose }) {
   const isPaid  = !receipt.due_amount || Number(receipt.due_amount) <= 0;
   const isCredit = receipt.payment_method === 'credit';
 
-  function handlePrint() {
-    printReceipt(receipt, items, settingsRes?.data ?? {});
+  async function handlePrint() {
+    try {
+      await printReceipt(receipt, items, settingsRes?.data ?? {});
+    } catch (err) {
+      toast.error(err?.message || 'Receipt could not be printed. Please try again.');
+    }
   }
 
   async function handleShareWhatsApp() {
