@@ -108,6 +108,11 @@ class _NavBtn extends StatelessWidget {
   final bool     selected;
   final VoidCallback onTap;
 
+  // Fixed-size icon/pill wrapper — identical for active and inactive states,
+  // so the pill background can never shift the icon's layout position.
+  static const double _boxWidth  = 48;
+  static const double _boxHeight = 32;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -119,46 +124,54 @@ class _NavBtn extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve:    Curves.easeInOut,
-              padding: EdgeInsets.symmetric(
-                horizontal: selected ? 14 : 10,
-                vertical:   4,
-              ),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: selected
-                    ? const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end:   Alignment.bottomRight,
-                        colors: kGradPrimary,
-                      )
-                    : null,
-              ),
-              child: selected
-                  ? SizedBox(
-                      width:  22,
-                      height: 22,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Offset colored "echo" layer — gives a visible
-                          // two-tone/depth look regardless of glyph shape.
-                          Transform.translate(
-                            offset: const Offset(1.1, 1.1),
-                            child: Icon(item.activeIcon, size: 17,
-                                color: const Color(0xFF7DD3FC)),
+            SizedBox(
+              width:  _boxWidth,
+              height: _boxHeight,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Active pill — absolutely fills the fixed box and only
+                  // fades in/out. It never participates in layout sizing,
+                  // so it cannot move the icon below.
+                  Positioned.fill(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 220),
+                      curve:    Curves.easeInOut,
+                      opacity:  selected ? 1 : 0,
+                      child: DecoratedBox(
+                        decoration: const BoxDecoration(
+                          borderRadius: BorderRadius.all(Radius.circular(24)),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end:   Alignment.bottomRight,
+                            colors: kGradPrimary,
                           ),
-                          Icon(item.activeIcon, size: 17, color: Colors.white),
-                        ],
+                        ),
                       ),
-                    )
-                  : Icon(
-                      item.inactiveIcon,
-                      size:  22,
-                      color: cs.onSurfaceVariant,
                     ),
+                  ),
+                  // Icon — always centered in the exact same fixed box.
+                  selected
+                      ? Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Offset colored "echo" layer — gives a visible
+                            // two-tone/depth look regardless of glyph shape.
+                            Transform.translate(
+                              offset: const Offset(1.1, 1.1),
+                              child: Icon(item.activeIcon, size: 17,
+                                  color: const Color(0xFF7DD3FC)),
+                            ),
+                            Icon(item.activeIcon, size: 17, color: Colors.white),
+                          ],
+                        )
+                      : Icon(
+                          item.inactiveIcon,
+                          size:  22,
+                          color: cs.onSurfaceVariant,
+                        ),
+                ],
+              ),
             ),
             const SizedBox(height: 3),
             AnimatedDefaultTextStyle(
