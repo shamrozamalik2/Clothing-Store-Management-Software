@@ -10,9 +10,13 @@ import '../../core/widgets/grad_widgets.dart';
 const _kBottomTabs = [
   _NavItem('/dashboard', Iconsax.home5,         Iconsax.home,         'Home'),
   _NavItem('/sales',     Iconsax.receipt_item5, Iconsax.receipt_item, 'Sales'),
-  _NavItem('/pos',       Iconsax.bag5,          Iconsax.bag,          'POS'),
+  // bag5 rendered off-center on-device; bag_25 is a different glyph
+  // that renders correctly centered.
+  _NavItem('/pos',       Iconsax.bag_25,        Iconsax.bag,          'POS'),
   _NavItem('/printer',   Iconsax.printer5,      Iconsax.printer,      'Printer'),
-  _NavItem('/settings',  Iconsax.setting_25,    Iconsax.setting_2,    'Settings'),
+  // setting_25 rendered off-center on-device; setting_35 is a different
+  // glyph (slider/equalizer style) that renders correctly centered.
+  _NavItem('/settings',  Iconsax.setting_35,    Iconsax.setting_2,    'Settings'),
 ];
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
