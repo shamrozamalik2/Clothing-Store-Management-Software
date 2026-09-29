@@ -10,13 +10,17 @@ import '../../core/widgets/grad_widgets.dart';
 const _kBottomTabs = [
   _NavItem('/dashboard', Iconsax.home5,         Iconsax.home,         'Home'),
   _NavItem('/sales',     Iconsax.receipt_item5, Iconsax.receipt_item, 'Sales'),
-  // bag5 rendered off-center on-device; bag_25 is a different glyph
-  // that renders correctly centered.
-  _NavItem('/pos',       Iconsax.bag_25,        Iconsax.bag,          'POS'),
+  // Every Iconsax "bag" glyph tried (bag5, bag_25) rendered off-center
+  // on-device despite a correctly centered advance box — a font/hinting
+  // issue in this specific package, not a layout bug. Using Flutter's
+  // own Material icon font instead, which has no such issue on any
+  // device, for both states so there's no cross-font mismatch.
+  _NavItem('/pos',       Icons.shopping_bag_rounded, Icons.shopping_bag_outlined, 'POS'),
   _NavItem('/printer',   Iconsax.printer5,      Iconsax.printer,      'Printer'),
-  // setting_25 rendered off-center on-device; setting_35 is a different
-  // glyph (slider/equalizer style) that renders correctly centered.
-  _NavItem('/settings',  Iconsax.setting_35,    Iconsax.setting_2,    'Settings'),
+  // Same issue with every Iconsax "settings" glyph tried (setting_22,
+  // setting_25, setting_35) — switched to Material icons for the same
+  // reason as POS above.
+  _NavItem('/settings',  Icons.settings_rounded, Icons.settings_outlined, 'Settings'),
 ];
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
