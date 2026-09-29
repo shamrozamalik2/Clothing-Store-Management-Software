@@ -10,9 +10,13 @@ import '../../core/widgets/grad_widgets.dart';
 const _kBottomTabs = [
   _NavItem('/dashboard', Iconsax.home5,         Iconsax.home,         'Home'),
   _NavItem('/sales',     Iconsax.receipt_item5, Iconsax.receipt_item, 'Sales'),
-  _NavItem('/pos',       Iconsax.bag5,          Iconsax.bag,          'POS'),
+  // bag5's ink sits visibly right-of-center on-device — nudge it back left.
+  _NavItem('/pos',       Iconsax.bag5,          Iconsax.bag,          'POS',
+      activeOffset: Offset(-2.5, 0)),
   _NavItem('/printer',   Iconsax.printer5,      Iconsax.printer,      'Printer'),
-  _NavItem('/settings',  Iconsax.setting_25,    Iconsax.setting_2,    'Settings'),
+  // setting_25's ink sits visibly left-of-center on-device — nudge it right.
+  _NavItem('/settings',  Iconsax.setting_25,    Iconsax.setting_2,    'Settings',
+      activeOffset: Offset(2.5, 0)),
 ];
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
@@ -152,18 +156,21 @@ class _NavBtn extends StatelessWidget {
                   ),
                   // Icon — always centered in the exact same fixed box.
                   selected
-                      ? Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Offset colored "echo" layer — gives a visible
-                            // two-tone/depth look regardless of glyph shape.
-                            Transform.translate(
-                              offset: const Offset(1.1, 1.1),
-                              child: Icon(item.activeIcon, size: 17,
-                                  color: const Color(0xFF7DD3FC)),
-                            ),
-                            Icon(item.activeIcon, size: 17, color: Colors.white),
-                          ],
+                      ? Transform.translate(
+                          offset: item.activeOffset,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Offset colored "echo" layer — gives a visible
+                              // two-tone/depth look regardless of glyph shape.
+                              Transform.translate(
+                                offset: const Offset(1.1, 1.1),
+                                child: Icon(item.activeIcon, size: 17,
+                                    color: const Color(0xFF7DD3FC)),
+                              ),
+                              Icon(item.activeIcon, size: 17, color: Colors.white),
+                            ],
+                          ),
                         )
                       : Icon(
                           item.inactiveIcon,
@@ -196,9 +203,18 @@ class _NavBtn extends StatelessWidget {
 // ── Data class ────────────────────────────────────────────────────────────────
 
 class _NavItem {
-  const _NavItem(this.path, this.activeIcon, this.inactiveIcon, this.label);
+  const _NavItem(
+    this.path,
+    this.activeIcon,
+    this.inactiveIcon,
+    this.label, {
+    this.activeOffset = Offset.zero,
+  });
   final String   path;
   final IconData activeIcon;
   final IconData inactiveIcon;
   final String   label;
+  // Per-icon optical correction for glyphs whose ink isn't centered in
+  // their advance box on-device, applied only to the active-state render.
+  final Offset   activeOffset;
 }
