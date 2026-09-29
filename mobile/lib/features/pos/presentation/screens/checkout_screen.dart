@@ -9,7 +9,13 @@ import '../../data/models/cart_item_model.dart';
 import '../../data/sources/pos_remote_source.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
-import '../../../../core/services/printer_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../printer/presentation/providers/printer_provider.dart';
+
+final _shopNameProvider = Provider<String>((ref) {
+  final user = ref.watch(currentUserProvider);
+  return user?.companyName.isNotEmpty == true ? user!.companyName : 'SAS Garments';
+});
 
 // ---------------------------------------------------------------------------
 // CheckoutScreen
@@ -139,9 +145,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   // ── Bluetooth printing ──────────────────────────────────────────────────────
 
-  Future<String?> _showPrinterPicker(
-      List<BluetoothPrinter> devices) async {
-    return showDialog<String>(
+  Future<BluetoothInfo?> _showPrinterPicker(
+      List<BluetoothInfo> devices) async {
+    return showDialog<BluetoothInfo>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Select Printer'),
@@ -156,9 +162,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 dense: true,
                 leading: const Icon(Icons.print_outlined),
                 title: Text(d.name),
-                subtitle: Text(d.address,
+                subtitle: Text(d.macAdress,
                     style: const TextStyle(fontSize: 11)),
-                onTap: () => Navigator.pop(ctx, d.address),
+                onTap: () => Navigator.pop(ctx, d),
               );
             },
           ),
@@ -177,25 +183,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (!mounted) return;
     setState(() => _printing = true);
     try {
-      // Check Bluetooth permission
-      final granted =
-          await PrintBluetoothThermal.isPermissionBluetoothGranted;
-      if (!granted && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'Bluetooth permission required. Enable in Settings.')),
-        );
-        return;
-      }
+      final notifier = ref.read(printerProvider.notifier);
 
-      // Resolve printer address
-      String? address =
-          await PrinterService.getDefaultPrinterAddress();
-      if (address == null) {
-        final devices = await PrinterService.getPairedDevices();
+      if (!ref.read(printerProvider).isConnected) {
+        await notifier.scanDevices();
         if (!mounted) return;
-        if (devices.isEmpty) {
+        final scanned = ref.read(printerProvider);
+        if (scanned.error != null) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(scanned.error!)));
+          return;
+        }
+        if (scanned.pairedDevices.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
                 content: Text(
@@ -203,52 +202,34 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           );
           return;
         }
-        final picked = await _showPrinterPicker(devices);
+        final picked = await _showPrinterPicker(scanned.pairedDevices);
         if (picked == null || !mounted) return;
-        address = picked;
-        // Remember choice for next time
-        await PrinterService.setDefaultPrinterAddress(address);
+        final connected = await notifier.connect(picked);
+        if (!connected) {
+          if (!mounted) return;
+          final err = ref.read(printerProvider).error ??
+              'Could not connect to printer.';
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(err)));
+          return;
+        }
       }
 
-      // Build receipt
-      final receiptData = ReceiptData(
-        companyName: 'SAS Garments',
-        companyAddress: '',
-        companyPhone: '',
-        invoiceNo: invoiceNumber,
-        cashierName: '',
-        paymentMethod: _paymentMethod,
-        date: DateTime.now(),
-        items: cart.items
-            .map((item) => ReceiptItem(
-                  name: item.name,
-                  qty: item.quantity,
-                  price: item.price,
-                  discount: item.discount,
-                ))
-            .toList(),
-        subtotal: cart.subtotal,
-        discount: cart.discountAmount,
-        tax: cart.taxAmount,
-        total: cart.total,
-        customerName: cart.customerName,
-        footerMessage: 'Thank you for your business!',
-      );
+      final shop = ref.read(_shopNameProvider);
+      final ok = await notifier.printCartReceipt(cart, invoiceNumber, shop);
+      if (!mounted) return;
 
-      await PrinterService.printReceipt(receiptData, address: address);
-
-      if (mounted) {
+      if (ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               backgroundColor: Colors.green,
               content: Text('Receipt printed successfully')),
         );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Print failed: $e')),
-        );
+      } else {
+        final err =
+            ref.read(printerProvider).error ?? 'Receipt could not be printed.';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(err)));
       }
     } finally {
       if (mounted) setState(() => _printing = false);

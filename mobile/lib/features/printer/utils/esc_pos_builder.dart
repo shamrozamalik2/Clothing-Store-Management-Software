@@ -1,7 +1,16 @@
 import 'dart:typed_data';
 
 /// Lightweight ESC/POS byte builder for 58mm/80mm thermal printers.
+///
+/// [width] is the printable column count for the connected printer's paper
+/// (32 for 58mm, 48 for 80mm) and is used as the default for [divider] and
+/// [row] so callers don't have to pass it on every single call — that's
+/// exactly what caused receipts to silently print at 58mm width even when
+/// an 80mm printer/paper size was selected.
 class EscPosBuilder {
+  EscPosBuilder({this.width = 32});
+
+  final int width;
   final List<int> _buf = [];
 
   // ── Control ──────────────────────────────────────────────────────────────────
@@ -38,11 +47,13 @@ class EscPosBuilder {
 
   EscPosBuilder ln(String s) => text(s).feed(1);
 
-  EscPosBuilder divider([int width = 32]) => ln('-' * width);
+  EscPosBuilder divider([int? overrideWidth]) => ln('-' * (overrideWidth ?? width));
 
-  /// Two-column row: left text + right text padded to `width` total chars.
-  EscPosBuilder row(String left, String right, {int width = 32}) {
-    final gap = width - left.length - right.length;
+  /// Two-column row: left text + right text padded to the builder's [width]
+  /// (or [overrideWidth]) total chars.
+  EscPosBuilder row(String left, String right, {int? overrideWidth}) {
+    final w = overrideWidth ?? width;
+    final gap = w - left.length - right.length;
     return text(left).text(gap > 0 ? ' ' * gap : ' ').ln(right);
   }
 

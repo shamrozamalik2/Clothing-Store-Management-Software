@@ -52,6 +52,19 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen> {
     ));
   }
 
+  Future<void> _reconnectSaved() async {
+    final ok = await ref.read(printerProvider.notifier).reconnectSaved();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? 'Reconnected' : 'Could not reconnect. Try scanning instead.'),
+      backgroundColor: ok ? Colors.green.shade700 : Colors.red.shade700,
+    ));
+  }
+
+  Future<void> _forgetSaved() async {
+    await ref.read(printerProvider.notifier).forgetSavedPrinter();
+  }
+
   Future<void> _testPrint() async {
     final shop = ref.read(_shopNameProvider);
     final ok   = await ref.read(printerProvider.notifier).printTest(shop);
@@ -167,7 +180,14 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ConnectionCard(printer: printer, onTest: _testPrint),
+                  _ConnectionCard(
+                    printer: printer,
+                    onTest:  _testPrint,
+                    onSetPaperWidth: (mm) =>
+                        ref.read(printerProvider.notifier).setPaperWidth(mm),
+                    onReconnectSaved: _reconnectSaved,
+                    onForgetSaved:    _forgetSaved,
+                  ),
                   const SizedBox(height: 16),
                   _DeviceList(
                     printer:      printer,
@@ -242,9 +262,18 @@ class _SectionHeader extends StatelessWidget {
 // ── Connection card ───────────────────────────────────────────────────────────
 
 class _ConnectionCard extends StatelessWidget {
-  const _ConnectionCard({required this.printer, required this.onTest});
+  const _ConnectionCard({
+    required this.printer,
+    required this.onTest,
+    required this.onSetPaperWidth,
+    required this.onReconnectSaved,
+    required this.onForgetSaved,
+  });
   final PrinterState printer;
   final VoidCallback onTest;
+  final void Function(int mm) onSetPaperWidth;
+  final VoidCallback onReconnectSaved;
+  final VoidCallback onForgetSaved;
 
   @override
   Widget build(BuildContext context) {
@@ -330,6 +359,70 @@ class _ConnectionCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (!connected && printer.hasSavedPrinter) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: cs.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.bookmark_outline_rounded, size: 16, color: cs.onSurfaceVariant),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Saved printer: ${printer.savedName ?? printer.savedAddress}',
+                              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: onReconnectSaved,
+                            child: const Text('Reconnect', style: TextStyle(fontSize: 12)),
+                          ),
+                          IconButton(
+                            onPressed: onForgetSaved,
+                            tooltip: 'Forget saved printer',
+                            icon: Icon(Icons.close_rounded, size: 16, color: cs.onSurfaceVariant),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (printer.isIOSBleOnly) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 16, color: Colors.amber),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'On iOS, only Bluetooth Low Energy (BLE) printers can be used. '
+                              'Bluetooth Classic printers that work on Android may not appear here.',
+                              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  _PaperWidthSelector(
+                    widthMm:  printer.paperWidthMm,
+                    onChange: onSetPaperWidth,
+                  ),
                   if (printer.lastStatus != null) ...[
                     const SizedBox(height: 6),
                     Text(
@@ -362,6 +455,56 @@ class _ConnectionCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Paper width selector ──────────────────────────────────────────────────────
+
+class _PaperWidthSelector extends StatelessWidget {
+  const _PaperWidthSelector({required this.widthMm, required this.onChange});
+  final int widthMm;
+  final void Function(int mm) onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Text('Paper Width',
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(width: 10),
+        for (final mm in [58, 80])
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => onChange(mm),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: widthMm == mm ? const LinearGradient(colors: kGradSky) : null,
+                  color: widthMm == mm ? null : cs.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: widthMm == mm
+                        ? Colors.transparent
+                        : cs.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Text(
+                  '${mm}mm',
+                  style: TextStyle(
+                    fontSize:   12,
+                    fontWeight: widthMm == mm ? FontWeight.w700 : FontWeight.w500,
+                    color:      widthMm == mm ? Colors.white : cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
