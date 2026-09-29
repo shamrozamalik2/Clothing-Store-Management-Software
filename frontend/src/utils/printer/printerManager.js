@@ -49,6 +49,7 @@ class PrinterManager {
     this._btChar        = null;
     this._name          = null;
     this._electronTarget = null; // { type: 'usb'|'serial', id, name }
+    this._printing       = false; // duplicate-print guard
   }
 
   // ── Status ───────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ class PrinterManager {
   get printerName()             { return this._name; }
   get bluetoothSupported()      { return BT_SUPPORTED; }
   get electronBridgeAvailable() { return HAS_ELECTRON_PRINTER_BRIDGE; }
+  get isPrinting()              { return this._printing; }
 
   get isConnected() {
     if (this._mode === CONNECTION.BLUETOOTH) return !!this._btDevice?.gatt?.connected;
@@ -167,21 +169,33 @@ class PrinterManager {
   // ── High-level operations ───────────────────────────────────────────────
 
   async testPrint({ paperWidthMm } = {}) {
-    if (this._mode === CONNECTION.BROWSER) {
-      printHtml(buildTestReceiptHtml({ printerName: this._name || 'System Printer', connType: 'System', paperWidthMm }));
-      return;
+    if (this._printing) throw new Error('A print job is already in progress.');
+    this._printing = true;
+    try {
+      if (this._mode === CONNECTION.BROWSER) {
+        printHtml(buildTestReceiptHtml({ printerName: this._name || 'System Printer', connType: 'System', paperWidthMm }));
+        return;
+      }
+      const bytes = buildTestEscPos({ printerName: this._name, connType: this._mode, paperWidthMm });
+      await this._sendBytes(bytes);
+    } finally {
+      this._printing = false;
     }
-    const bytes = buildTestEscPos({ printerName: this._name, connType: this._mode, paperWidthMm });
-    await this._sendBytes(bytes);
   }
 
   async printReceipt(receiptData) {
-    if (this._mode === CONNECTION.BROWSER) {
-      printHtml(buildReceiptHtml(receiptData));
-      return;
+    if (this._printing) throw new Error('A print job is already in progress.');
+    this._printing = true;
+    try {
+      if (this._mode === CONNECTION.BROWSER) {
+        printHtml(buildReceiptHtml(receiptData));
+        return;
+      }
+      const bytes = buildEscPosReceipt(receiptData);
+      await this._sendBytes(bytes);
+    } finally {
+      this._printing = false;
     }
-    const bytes = buildEscPosReceipt(receiptData);
-    await this._sendBytes(bytes);
   }
 }
 
