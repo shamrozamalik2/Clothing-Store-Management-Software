@@ -28,8 +28,8 @@ app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true); // Electron / mobile native
     if (env.CORS_ORIGINS.includes(origin)) return cb(null, true);
-    // Allow any localhost port for mobile/web dev testing
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
+    // Allow any localhost port for mobile/web dev testing — dev only, never in production
+    if (env.IS_DEV && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
     return cb(new Error(`CORS: origin '${origin}' not allowed`));
   },
   credentials:    true,
