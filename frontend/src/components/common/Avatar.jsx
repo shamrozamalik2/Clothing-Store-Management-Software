@@ -1,4 +1,5 @@
 import { cn } from '@utils/cn';
+import { API_ORIGIN } from '@api/client';
 
 const COLORS = [
   'bg-blue-600', 'bg-purple-600', 'bg-green-600', 'bg-rose-600',
@@ -28,7 +29,7 @@ export default function Avatar({ name = '', src, size = 'md', className }) {
   if (src) {
     return (
       <img
-        src={src}
+        src={`${API_ORIGIN}${src}`}
         alt={name}
         className={cn('rounded-full object-cover ring-1 ring-surface-600', sizes[size], className)}
       />

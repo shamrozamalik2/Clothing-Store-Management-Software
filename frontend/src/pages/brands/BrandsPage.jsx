@@ -16,6 +16,7 @@ import EmptyState from '@components/common/EmptyState';
 import ImportCsvModal from '@components/common/ImportCsvModal';
 import { usePermission } from '@hooks/usePermission';
 import { brandsApi } from '@api/brands.api';
+import { API_ORIGIN } from '@api/client';
 import BrandFormModal from './components/BrandFormModal';
 
 const LIMIT = 20;
@@ -366,7 +367,7 @@ export default function BrandsPage() {
                       <div className="flex items-center gap-3">
                         {brand.logo ? (
                           <img
-                            src={`http://localhost:3001${brand.logo}`}
+                            src={`${API_ORIGIN}${brand.logo}`}
                             alt={brand.name}
                             className="h-9 w-9 rounded-xl object-contain flex-shrink-0 bg-surface-700 p-1 ring-1 ring-surface-600"
                           />

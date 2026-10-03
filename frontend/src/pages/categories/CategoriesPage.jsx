@@ -17,6 +17,7 @@ import EmptyState from '@components/common/EmptyState';
 import ImportCsvModal from '@components/common/ImportCsvModal';
 import { usePermission } from '@hooks/usePermission';
 import { categoriesApi } from '@api/categories.api';
+import { API_ORIGIN } from '@api/client';
 import CategoryFormModal from './components/CategoryFormModal';
 
 const LIMIT = 20;
@@ -376,7 +377,7 @@ export default function CategoriesPage() {
                       <div className="flex items-center gap-3">
                         {cat.image ? (
                           <img
-                            src={`http://localhost:3001${cat.image}`}
+                            src={`${API_ORIGIN}${cat.image}`}
                             alt={cat.name}
                             className="h-9 w-9 rounded-xl object-cover flex-shrink-0 ring-1 ring-surface-600"
                           />

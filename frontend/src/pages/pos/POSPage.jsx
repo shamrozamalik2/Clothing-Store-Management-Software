@@ -17,6 +17,7 @@ import { customersApi }  from '@api/customers.api';
 import { salesApi }      from '@api/sales.api';
 import { holdsApi }      from '@api/holds.api';
 import { settingsApi }   from '@api/settings.api';
+import { API_ORIGIN }    from '@api/client';
 import { formatCurrency } from '@utils/format';
 import { printReceipt } from '@utils/printReceipt';
 import { cn } from '@utils/cn';
@@ -194,9 +195,15 @@ export default function POSPage() {
     onError: () => toast.error('No product found for this barcode.'),
   });
 
+  // One key per checkout attempt. Reused across retries/double-clicks of the
+  // same cart so the backend can collapse them into a single sale; cleared
+  // once that attempt actually succeeds so the next sale gets a fresh one.
+  const idempotencyKeyRef = useRef(null);
+
   const saleMutation = useMutation({
     mutationFn: (payload) => salesApi.create(payload),
     onSuccess: (res) => {
+      idempotencyKeyRef.current = null;
       toast.success('Sale completed!');
       qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['pos-products'] });
@@ -211,7 +218,9 @@ export default function POSPage() {
   });
 
   function completeSale(paymentInfo) {
+    if (!idempotencyKeyRef.current) idempotencyKeyRef.current = crypto.randomUUID();
     saleMutation.mutate({
+      idempotency_key: idempotencyKeyRef.current,
       customer_id:     customer?.id ?? null,
       discount_type:   discType,
       discount_amount: parseFloat(discValue) || 0,
@@ -308,7 +317,7 @@ export default function POSPage() {
                           oos ? 'opacity-40 cursor-not-allowed' : 'hover:bg-surface-700/50 active:bg-surface-700'
                         )}>
                         {p.image ? (
-                          <img src={`http://localhost:3001${p.image}`} alt={p.name}
+                          <img src={`${API_ORIGIN}${p.image}`} alt={p.name}
                             className="h-10 w-10 rounded-xl object-cover shrink-0 bg-surface-700" />
                         ) : (
                           <div className="h-10 w-10 rounded-xl bg-surface-700/70 flex items-center justify-center shrink-0">
@@ -381,7 +390,7 @@ export default function POSPage() {
               <button key={p.id} onClick={() => handleProductClick(p)}
                 className="flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-xl bg-surface-800/70 hover:bg-surface-700/80 border border-surface-700/40 hover:border-primary-500/30 transition-all shrink-0 group">
                 {p.image ? (
-                  <img src={`http://localhost:3001${p.image}`} alt={p.name}
+                  <img src={`${API_ORIGIN}${p.image}`} alt={p.name}
                     className="h-5 w-5 rounded-lg object-cover" />
                 ) : (
                   <div className="h-5 w-5 rounded-lg bg-surface-700 flex items-center justify-center">
@@ -640,7 +649,7 @@ function ProductCard({ product, onAdd }) {
       <div className="relative w-full overflow-hidden bg-surface-800/60" style={{ aspectRatio: '1 / 1' }}>
         {product.image ? (
           <img
-            src={`http://localhost:3001${product.image}`}
+            src={`${API_ORIGIN}${product.image}`}
             alt={product.name}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />

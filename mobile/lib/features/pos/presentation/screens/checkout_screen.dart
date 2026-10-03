@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../providers/cart_provider.dart';
+import '../providers/checkout_idempotency.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../data/sources/pos_remote_source.dart';
 import '../../../../core/utils/currency_formatter.dart';
-import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../printer/presentation/providers/printer_provider.dart';
 
@@ -46,6 +47,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   // State
   bool _submitting = false;
   bool _printing   = false;
+
+  final _idempotency = CheckoutIdempotency();
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -102,6 +105,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final cart = _resolveCart();
 
     final payload = <String, dynamic>{
+      'idempotency_key': _idempotency.keyFor(),
       if (cart.customerId != null) 'customer_id': cart.customerId,
       'payment_method': _paymentMethod,
       'paid_amount': cart.total,
@@ -127,10 +131,16 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
       await _showSuccessDialog(cart, invoiceNumber?.toString() ?? '—');
 
+      // Sale confirmed — this attempt is done, so the next one gets a fresh key.
+      _idempotency.clear();
+
       // Clear cart and navigate back to POS.
       ref.read(cartProvider.notifier).clearCart();
       if (mounted) context.go('/pos');
     } catch (e) {
+      // Do NOT clear _idempotency here — if the user retries (e.g. after a
+      // network error), the retry must reuse this same key so the backend can
+      // tell it's the same checkout attempt, not a new sale.
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

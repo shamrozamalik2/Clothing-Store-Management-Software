@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { PhotoIcon, XMarkIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import { cn } from '@utils/cn';
+import { API_ORIGIN } from '@api/client';
 
 export default function ImageUpload({
   value,          // current image URL (existing)
@@ -34,7 +35,11 @@ export default function ImageUpload({
     if (inputRef.current) inputRef.current.value = '';
   }
 
-  const displayed = preview || value;
+  // `preview` is a local data: URL from FileReader (newly picked file — always
+  // absolute, needs no prefix). `value` is the existing image's path as stored
+  // by the backend, e.g. "/uploads/products/xyz.jpg" — relative to the API's
+  // origin, not the frontend's, so it needs API_ORIGIN prefixed here.
+  const displayed = preview || (value ? `${API_ORIGIN}${value}` : null);
 
   return (
     <div className={cn('flex flex-col gap-1', className)}>

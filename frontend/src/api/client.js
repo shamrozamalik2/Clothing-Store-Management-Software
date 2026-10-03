@@ -13,10 +13,11 @@ function redirectTo(path) {
 }
 
 
-// Priority: Electron preload URL → VITE env var → same-origin /api
-const BASE_URL = window.electronAPI?.backendUrl
-  ? `${window.electronAPI.backendUrl}/api`
-  : (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api');
+// Priority: Electron preload URL → VITE env var → same origin.
+// Exported as API_ORIGIN so other modules (e.g. <img> src for uploaded files)
+// can build absolute URLs without duplicating this resolution logic.
+export const API_ORIGIN = window.electronAPI?.backendUrl || import.meta.env.VITE_API_URL || '';
+const BASE_URL = `${API_ORIGIN}/api`;
 
 const client = axios.create({
   baseURL:         BASE_URL,

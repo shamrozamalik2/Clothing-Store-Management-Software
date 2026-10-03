@@ -19,6 +19,7 @@ import { usePermission } from '@hooks/usePermission';
 import { categoriesApi } from '@api/categories.api';
 import { brandsApi } from '@api/brands.api';
 import { productsApi } from '@api/products.api';
+import { API_ORIGIN } from '@api/client';
 import { formatCurrency, formatNumber } from '@utils/format';
 import { cn } from '@utils/cn';
 import ImportCsvModal from '@components/common/ImportCsvModal';
@@ -426,7 +427,7 @@ export default function ProductsPage() {
                 onClick={() => can('products', 'edit') && navigate(`/products/${p.id}/edit`)}>
                 <div className="relative aspect-square overflow-hidden" style={{ background: 'rgb(var(--s-800))' }}>
                   {p.image
-                    ? <img src={`http://localhost:3001${p.image}`} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ? <img src={`${API_ORIGIN}${p.image}`} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     : <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-surface-800 to-surface-900"><CubeIcon className="h-10 w-10 text-surface-600" /></div>
                   }
                   <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -524,7 +525,7 @@ export default function ProductsPage() {
                         <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center"
                           style={{ background: 'rgb(var(--s-700))' }}>
                           {p.image
-                            ? <img src={`http://localhost:3001${p.image}`} alt={p.name} className="h-10 w-10 object-cover" />
+                            ? <img src={`${API_ORIGIN}${p.image}`} alt={p.name} className="h-10 w-10 object-cover" />
                             : <CubeIcon className="h-5 w-5 text-surface-500" />
                           }
                         </div>
