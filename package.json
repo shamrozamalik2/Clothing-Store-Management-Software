@@ -14,7 +14,8 @@
     "dev:server": "cross-env NODE_ENV=development nodemon backend/src/server.js",
     "start:server": "node backend/src/server.js",
     "migrate": "node backend/src/database/migrate.js",
-    "build:web": "npm --prefix frontend run build:web"
+    "build:web": "npm --prefix frontend run build:web",
+    "test": "node --test backend/test/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -43,6 +44,7 @@
     "cross-env": "^7.0.3",
     "electron": "^31.1.0",
     "electron-builder": "^24.13.3",
+    "mongodb-memory-server": "^11.3.0",
     "nodemon": "^3.1.0",
     "wait-on": "^7.2.0"
   },

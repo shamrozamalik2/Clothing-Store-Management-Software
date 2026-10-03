@@ -40,12 +40,22 @@ const saleSchema = new Schema(
     notes:           { type: String },
     created_by:      { type: Types.ObjectId, ref: 'User', default: null },
     items:           { type: [saleItemSchema], default: [] },
+    // Client-generated key for one checkout attempt. A retried/double-submitted
+    // request carrying the same key is treated as a replay of an already-completed
+    // sale rather than a new one — see sales.controller.js#create.
+    idempotency_key: { type: String, default: null },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );
 
 saleSchema.index({ company_id: 1 });
 saleSchema.index({ company_id: 1, reference: 1 }, { unique: true });
+// Partial: only applies when idempotency_key is an actual string, so sales
+// without one (older clients, or any future caller that omits it) never collide.
+saleSchema.index(
+  { company_id: 1, idempotency_key: 1 },
+  { unique: true, partialFilterExpression: { idempotency_key: { $type: 'string' } } }
+);
 saleSchema.index({ company_id: 1, sale_date: -1 });
 saleSchema.index({ company_id: 1, customer_id: 1 });
 saleSchema.index({ company_id: 1, status: 1, sale_date: -1 });

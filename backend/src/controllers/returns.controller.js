@@ -168,18 +168,44 @@ const create = async (req, res, next) => {
           created_by:     req.user.id,
         }], { session });
 
-        // 4. Update sale status
+        // 4. A return/exchange changes what's actually owed on the original sale.
+        // If part of it was still unpaid, the returned value pays that down first —
+        // only the portion beyond what was due is a real cash/card refund (already
+        // captured above via refund_amount/refund_method). A net-negative value
+        // (an exchange taking more than it returns) adds to what's owed, the same
+        // way an underpaid sale establishes due_amount at creation.
+        let newDueAmount = Math.max(0, parseFloat(sale.due_amount) || 0);
+        let balanceDelta = 0;
+        if (refundAmount > 0) {
+          const dueReduction = Math.min(refundAmount, newDueAmount);
+          newDueAmount -= dueReduction;
+          balanceDelta = -dueReduction;
+        } else if (refundAmount < 0) {
+          const shortfall = -refundAmount;
+          newDueAmount += shortfall;
+          balanceDelta = shortfall;
+        }
+
+        // 5. Update sale status + due_amount together
+        const saleUpdate = { due_amount: newDueAmount, updated_at: new Date() };
         if (type === 'exchange') {
-          await Sale.updateOne({ _id: sale_id, company_id: cid }, { status: 'exchanged', updated_at: new Date() }, { session });
+          saleUpdate.status = 'exchanged';
         } else {
           // Check if fully returned
           const fullyReturned = sale.items.every(si => {
             const returned = resolvedReturn.find(ri => ri.sale_item_id.toString() === si._id.toString());
             return returned && returned.quantity >= si.quantity - 0.0001;
           });
-          if (fullyReturned) {
-            await Sale.updateOne({ _id: sale_id, company_id: cid }, { status: 'refunded', updated_at: new Date() }, { session });
-          }
+          if (fullyReturned) saleUpdate.status = 'refunded';
+        }
+        await Sale.updateOne({ _id: sale_id, company_id: cid }, { $set: saleUpdate }, { session });
+
+        if (balanceDelta !== 0 && sale.customer_id) {
+          await Customer.updateOne(
+            { _id: sale.customer_id, company_id: cid },
+            { $inc: { current_balance: balanceDelta }, $set: { updated_at: new Date() } },
+            { session }
+          );
         }
 
         returnDoc = newReturn;

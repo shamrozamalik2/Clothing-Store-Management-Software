@@ -131,6 +131,17 @@ const createPurchase = async (req, res, next) => {
           items:           lineItems,
         }], { session });
 
+        // A credit purchase (due_amount > 0) is money this company now owes
+        // the supplier — mirrors how a credit sale increases Customer.current_balance.
+        const due = Math.max(0, total - paid);
+        if (body.supplier_id && due > 0) {
+          await Supplier.updateOne(
+            { _id: body.supplier_id, company_id: cid },
+            { $inc: { current_balance: due }, $set: { updated_at: new Date() } },
+            { session }
+          );
+        }
+
         // Update stock if received
         if (status === 'received') {
           for (const li of lineItems) {
@@ -196,6 +207,25 @@ const updateStatus = async (req, res, next) => {
               );
             }
           }
+        } else if (wasReceived && !nowReceived) {
+          // Un-receiving (or cancelling after having received) must reverse
+          // exactly what the receive step added above — otherwise stock stays
+          // permanently inflated by a purchase that's no longer marked received.
+          for (const li of purchase.items) {
+            if (li.variant_id) {
+              await Product.updateOne(
+                { _id: li.product_id, company_id: cid, 'variants._id': li.variant_id },
+                { $inc: { 'variants.$.stock_quantity': -li.quantity } },
+                { session }
+              );
+            } else {
+              await Product.updateOne(
+                { _id: li.product_id, company_id: cid },
+                { $inc: { stock_quantity: -li.quantity } },
+                { session }
+              );
+            }
+          }
         }
 
         await Purchase.updateOne({ _id: purchase._id }, { status, updated_at: new Date() }, { session });
@@ -244,6 +274,14 @@ const addPayment = async (req, res, next) => {
           { $inc: { paid_amount: pay }, $set: { due_amount: remaining, updated_at: new Date() } },
           { session }
         );
+
+        if (purchase.supplier_id) {
+          await Supplier.updateOne(
+            { _id: purchase.supplier_id, company_id: cid },
+            { $inc: { current_balance: -pay }, $set: { updated_at: new Date() } },
+            { session }
+          );
+        }
       });
     } finally {
       session.endSession();

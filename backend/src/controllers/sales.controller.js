@@ -26,6 +26,20 @@ async function generateReference(companyId, session) {
   return `${prefix}${String(seq).padStart(4, '0')}`;
 }
 
+async function buildSaleResponse(sale) {
+  const [cust, usr] = await Promise.all([
+    sale.customer_id ? Customer.findById(sale.customer_id, { name: 1, phone: 1 }).lean() : null,
+    sale.created_by  ? User.findById(sale.created_by, { name: 1 }).lean() : null,
+  ]);
+  return {
+    ...sale,
+    id:             sale._id.toString(),
+    customer_name:  cust?.name  || null,
+    customer_phone: cust?.phone || null,
+    cashier_name:   usr?.name   || null,
+  };
+}
+
 function populateSale(sale, customerMap, userMap) {
   const cust = sale.customer_id ? customerMap[sale.customer_id.toString()] : null;
   const usr  = sale.created_by  ? userMap[sale.created_by.toString()]     : null;
@@ -124,10 +138,18 @@ const create = async (req, res, next) => {
       card_amount     = 0,
       notes,
       items = [],
+      idempotency_key = null,
     } = req.body;
 
     const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
     if (!parsedItems?.length) return error(res, 'At least one item is required.', 422);
+
+    // Idempotency: a retried/double-submitted request carrying the same key as
+    // an already-completed sale returns that sale instead of creating another.
+    if (idempotency_key) {
+      const existing = await Sale.findOne({ company_id: cid, idempotency_key }).lean();
+      if (existing) return created(res, await buildSaleResponse(existing), 'Sale completed successfully.');
+    }
 
     // Credit limit check
     if (customer_id && payment_method === 'credit') {
@@ -235,6 +257,7 @@ const create = async (req, res, next) => {
           due_amount:      due,
           payment_method,
           notes:           notes?.trim() || null,
+          idempotency_key,
           items: lineItems.map(li => ({
             product_id:   li.productId,
             variant_id:   li.variantId,
@@ -261,6 +284,12 @@ const create = async (req, res, next) => {
       });
     } catch (txErr) {
       session.endSession();
+      // Concurrent duplicate: another request with the same key won the race
+      // and created the sale first — return that one instead of erroring.
+      if (idempotency_key && txErr.code === 11000) {
+        const existing = await Sale.findOne({ company_id: cid, idempotency_key }).lean();
+        if (existing) return created(res, await buildSaleResponse(existing), 'Sale completed successfully.');
+      }
       return error(res, txErr.message, 422);
     }
     session.endSession();
@@ -303,19 +332,33 @@ const voidSale = async (req, res, next) => {
     try {
       await session.withTransaction(async () => {
         for (const item of sale.items) {
+          // Net restorable quantity = what this line originally sold, minus
+          // whatever a prior return has already restored for it — a return
+          // restores stock itself at the time it's processed, independently
+          // of void, so voiding afterward must not restore the same units twice.
+          const alreadyReturnedAgg = await Return.aggregate([
+            { $match: { company_id: cid } },
+            { $unwind: '$items' },
+            { $match: { 'items.sale_item_id': item._id } },
+            { $group: { _id: null, already: { $sum: '$items.quantity' } } },
+          ]).session(session);
+          const alreadyReturned = parseFloat(alreadyReturnedAgg[0]?.already || 0);
+          const restoreQty = Math.max(0, parseFloat(item.quantity) - alreadyReturned);
+          if (restoreQty <= 0) continue;
+
           const product = await Product.findById(item.product_id, { track_inventory: 1 }).lean();
           if (!product?.track_inventory) continue;
 
           if (item.variant_id) {
             await Product.updateOne(
               { _id: item.product_id, company_id: cid, 'variants._id': item.variant_id },
-              { $inc: { 'variants.$.stock_quantity': item.quantity } },
+              { $inc: { 'variants.$.stock_quantity': restoreQty } },
               { session }
             );
           } else {
             await Product.updateOne(
               { _id: item.product_id, company_id: cid },
-              { $inc: { stock_quantity: item.quantity } },
+              { $inc: { stock_quantity: restoreQty } },
               { session }
             );
           }

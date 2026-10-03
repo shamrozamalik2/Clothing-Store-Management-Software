@@ -14,6 +14,16 @@ const { success, created, error }   = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { logAudit }                  = require('../utils/audit');
 
+async function generateAdjReference(companyId, session) {
+  const date   = new Date();
+  const ymd    = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+  const prefix = `ADJ-${ymd}-`;
+  const last = await StockAdj.findOne({ company_id: companyId, reference: { $regex: `^${prefix}` } }, { reference: 1 })
+    .sort({ _id: -1 }).session(session).lean();
+  const seq = last ? parseInt(last.reference.split('-').pop(), 10) + 1 : 1;
+  return `${prefix}${String(seq).padStart(4, '0')}`;
+}
+
 // ─── list ─────────────────────────────────────────────────────────────────────
 
 const list = async (req, res, next) => {
@@ -190,7 +200,6 @@ const updateProduct = async (req, res, next) => {
     if (body.sale_price  !== undefined)     update.sale_price      = parseFloat(body.sale_price);
     if (body.wholesale_price !== undefined) update.wholesale_price = parseFloat(body.wholesale_price);
     if (body.tax_rate    !== undefined)     update.tax_rate        = parseFloat(body.tax_rate);
-    if (body.stock_quantity  !== undefined) update.stock_quantity  = parseFloat(body.stock_quantity);
     if (body.low_stock_alert !== undefined) update.low_stock_alert = parseInt(body.low_stock_alert, 10);
     if (body.track_inventory !== undefined) update.track_inventory = body.track_inventory !== 'false' && body.track_inventory !== false;
     if (body.allow_negative  !== undefined) update.allow_negative  = body.allow_negative === 'true' || body.allow_negative === true;
@@ -199,7 +208,47 @@ const updateProduct = async (req, res, next) => {
     if (body.is_finished_good !== undefined) update.is_finished_good = body.is_finished_good === 'true' || body.is_finished_good === true;
     if (req.file?.filename) update.image = image;
 
-    await Product.findByIdAndUpdate(req.params.id, { ...update, updated_at: new Date() });
+    // A direct stock_quantity edit here bypasses every other stock-changing
+    // path's audit trail (sales, returns, purchases, and the dedicated Stock
+    // Adjust feature all record a StockAdjustment of what changed and why).
+    // When the value actually changes, route it through the same record,
+    // atomically with the rest of the update, clamped at 0 like every other
+    // stock-adjusting path already does.
+    const requestedStock = body.stock_quantity !== undefined ? parseFloat(body.stock_quantity) : undefined;
+    const stockChanged   = requestedStock !== undefined && !Number.isNaN(requestedStock) && requestedStock !== product.stock_quantity;
+
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        if (stockChanged) {
+          const quantityAfter = Math.max(0, requestedStock);
+          update.stock_quantity = quantityAfter;
+
+          const reference = await generateAdjReference(cid, session);
+          await StockAdj.create([{
+            company_id: cid,
+            reference,
+            type:       'adjustment',
+            reason:     'Direct product edit',
+            created_by: req.user.id,
+            items: [{
+              product_id:        product._id,
+              variant_id:        null,
+              product_name:      product.name,
+              sku:               product.sku,
+              quantity_before:   product.stock_quantity,
+              quantity_adjusted: quantityAfter - product.stock_quantity,
+              quantity_after:    quantityAfter,
+              unit_cost:         product.cost_price || 0,
+            }],
+          }], { session });
+        }
+        await Product.findByIdAndUpdate(req.params.id, { ...update, updated_at: new Date() }, { session });
+      });
+    } finally {
+      session.endSession();
+    }
+
     const updated = await Product.findById(req.params.id).lean();
     await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'products', req.params.id);
     return success(res, { ...updated, id: updated._id.toString() }, 'Product updated.');
@@ -278,22 +327,62 @@ const updateVariant = async (req, res, next) => {
     const { id: productId, variantId } = req.params;
     const { size, color, cost_price, sale_price, stock_quantity, barcode, is_active } = req.body;
 
+    const product = await Product.findOne({ _id: productId, company_id: cid }).lean();
+    if (!product) return error(res, 'Product not found.', 404);
+    const existingVariant = product.variants?.find(v => v._id.toString() === variantId);
+    if (!existingVariant) return error(res, 'Variant not found.', 404);
+
     const update = {};
     if (size           !== undefined) update['variants.$.size']           = size;
     if (color          !== undefined) update['variants.$.color']          = color;
     if (barcode        !== undefined) update['variants.$.barcode']        = barcode;
     if (cost_price     !== undefined) update['variants.$.cost_price']     = parseFloat(cost_price);
     if (sale_price     !== undefined) update['variants.$.sale_price']     = parseFloat(sale_price);
-    if (stock_quantity !== undefined) update['variants.$.stock_quantity'] = parseFloat(stock_quantity);
     if (is_active      !== undefined) update['variants.$.is_active']      = is_active !== 'false' && is_active !== false;
 
-    await Product.updateOne(
-      { _id: productId, company_id: cid, 'variants._id': variantId },
-      { $set: { ...update, updated_at: new Date() } }
-    );
-    const product = await Product.findOne({ _id: productId, company_id: cid }, { variants: 1 }).lean();
-    const variant = product?.variants?.find(v => v._id.toString() === variantId);
-    if (!variant) return error(res, 'Variant not found.', 404);
+    // Same audit-trail requirement as the base product: a direct stock edit
+    // must go through a StockAdjustment record, atomically, clamped at 0.
+    const requestedStock = stock_quantity !== undefined ? parseFloat(stock_quantity) : undefined;
+    const stockChanged   = requestedStock !== undefined && !Number.isNaN(requestedStock) && requestedStock !== existingVariant.stock_quantity;
+
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        if (stockChanged) {
+          const quantityAfter = Math.max(0, requestedStock);
+          update['variants.$.stock_quantity'] = quantityAfter;
+
+          const reference = await generateAdjReference(cid, session);
+          await StockAdj.create([{
+            company_id: cid,
+            reference,
+            type:       'adjustment',
+            reason:     'Direct product edit',
+            created_by: req.user.id,
+            items: [{
+              product_id:        product._id,
+              variant_id:        existingVariant._id,
+              product_name:      product.name,
+              sku:               existingVariant.sku,
+              quantity_before:   existingVariant.stock_quantity,
+              quantity_adjusted: quantityAfter - existingVariant.stock_quantity,
+              quantity_after:    quantityAfter,
+              unit_cost:         existingVariant.cost_price || 0,
+            }],
+          }], { session });
+        }
+        await Product.updateOne(
+          { _id: productId, company_id: cid, 'variants._id': variantId },
+          { $set: { ...update, updated_at: new Date() } },
+          { session }
+        );
+      });
+    } finally {
+      session.endSession();
+    }
+
+    const updated = await Product.findOne({ _id: productId, company_id: cid }, { variants: 1 }).lean();
+    const variant = updated?.variants?.find(v => v._id.toString() === variantId);
     return success(res, { ...variant, id: variant._id.toString() }, 'Variant updated.');
   } catch (err) { next(err); }
 };
