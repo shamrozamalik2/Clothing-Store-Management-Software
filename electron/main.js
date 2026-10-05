@@ -9,6 +9,7 @@ const { initUpdater } = require('./updater');
 const printerBridge   = require('./printer');
 
 const FRONTEND_DEV_PORT = 5173;
+const APP_URL = 'https://app.probusinesscloud.com';
 const isDev             = !app.isPackaged;
 
 let mainWindow = null;
@@ -58,9 +59,7 @@ function createWindow() {
     },
   });
 
-  const url = isDev
-    ? `http://localhost:${FRONTEND_DEV_PORT}`
-    : `file://${path.join(__dirname, '../frontend/dist/index.html')}`;
+  const url = isDev ? `http://localhost:${FRONTEND_DEV_PORT}` : APP_URL;
 
   mainWindow.loadURL(url);
   log(`[Window] Loading ${url}`);
@@ -162,6 +161,7 @@ app.on('web-contents-created', (_, contents) => {
     const parsed = new URL(navUrl);
     if (parsed.protocol === 'file:') return; // local frontend ok
     if (isDev && navUrl.startsWith(`http://localhost:${FRONTEND_DEV_PORT}`)) return;
+    if (!isDev && navUrl.startsWith(APP_URL)) return;
     event.preventDefault();
     log(`[Security] Blocked navigation to ${navUrl}`);
   });
