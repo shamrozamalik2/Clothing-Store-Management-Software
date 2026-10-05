@@ -22,7 +22,7 @@ import { gsap, useGSAP, prefersReducedMotion } from './components/gsapSetup';
    Everything in that sheet is scoped to `.pbc`, so it cannot reach the
    authenticated app shell rendered by the same bundle. */
 import './site.css';
-
+ 
 /* The site's shared easing curve. */
 const EASE = [0.22, 1, 0.36, 1];
 
