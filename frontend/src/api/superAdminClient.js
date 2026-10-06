@@ -59,6 +59,12 @@ export const saImpersonate      = (id)     => sa.post(`/companies/${id}/imperson
 export const saUpdatePlan     = (id, d) => sa.put(`/companies/${id}/plan`, d);
 export const saUpdateFeatures = (id, d) => sa.put(`/companies/${id}/features`, d);
 
+export const saListBusinessCategories     = ()         => sa.get('/business-categories');
+export const saCreateBusinessCategory     = (d)        => sa.post('/business-categories', d);
+export const saUpdateBusinessCategory     = (key, d)   => sa.put(`/business-categories/${key}`, d);
+export const saSetBusinessCategoryStatus  = (key, on)  => sa.patch(`/business-categories/${key}/status`, { is_active: on });
+export const saAssignBusinessCategory     = (id, key)  => sa.put(`/companies/${id}/business-category`, { business_category: key });
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const saListUsers          = (params) => sa.get('/users', { params });
 export const saUpdateUser         = (id, d)  => sa.patch(`/users/${id}`, d);

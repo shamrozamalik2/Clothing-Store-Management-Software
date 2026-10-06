@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const { body }   = require('express-validator');
 const ctrl       = require('../controllers/admin.controller');
+const categoryCtrl = require('../controllers/business-categories.controller');
 const { requireSuperAdmin } = require('../middleware/superadmin.middleware');
 
 const router = Router();
@@ -39,6 +40,13 @@ router.delete('/companies/:id',              ctrl.deleteCompany);
 router.post('/companies/:id/suspend',        ctrl.suspendCompany);
 router.post('/companies/:id/reinstate',      ctrl.reinstateCompany);
 router.post('/companies/:id/impersonate',    ctrl.impersonateCompany);
+
+// ── Business categories ───────────────────────────────────────────────────────
+router.get('/business-categories',                 categoryCtrl.listBusinessCategories);
+router.post('/business-categories',                categoryCtrl.createBusinessCategory);
+router.put('/business-categories/:key',            categoryCtrl.updateBusinessCategory);
+router.patch('/business-categories/:key/status',   categoryCtrl.setBusinessCategoryStatus);
+router.put('/companies/:id/business-category',     categoryCtrl.assignCompanyBusinessCategory);
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get('/users',                   ctrl.listUsers);

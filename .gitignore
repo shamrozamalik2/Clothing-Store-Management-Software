@@ -13,6 +13,7 @@ backups/*
 .env
 .env.local
 .env.*.local
+.env.production
 logs/
 *.log
 .DS_Store

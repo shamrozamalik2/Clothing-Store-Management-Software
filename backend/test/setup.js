@@ -10,6 +10,7 @@
 // Must be set before any src/ module is required anywhere in the test suite.
 process.env.JWT_SECRET     ||= 'test-jwt-secret';
 process.env.REFRESH_SECRET ||= 'test-refresh-secret';
+process.env.SUPER_ADMIN_JWT_SECRET ||= 'test-super-admin-secret';
 
 const mongoose = require('mongoose');
 const { MongoMemoryReplSet } = require('mongodb-memory-server');

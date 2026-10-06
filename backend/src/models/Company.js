@@ -22,6 +22,7 @@ const companySchema = new Schema(
     suspended_at:        { type: Date },
     suspended_reason:    { type: String },
     features:            { type: Schema.Types.Mixed, default: {} },
+    business_category:   { type: String, default: 'CLOTHING', uppercase: true, trim: true },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );

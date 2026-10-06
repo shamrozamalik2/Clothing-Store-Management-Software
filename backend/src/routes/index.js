@@ -42,6 +42,7 @@ router.use('/customers',         require('./customers.routes'));
 router.use('/sales',             require('./sales.routes'));
 router.use('/reports',           require('./reports.routes'));
 router.use('/settings',          require('./settings.routes'));
+router.use('/features',          require('./features.routes'));
 
 // ── Super-admin portal (separate auth, no company_id scoping) ─────────────────
 router.use('/admin',             require('./admin.routes'));

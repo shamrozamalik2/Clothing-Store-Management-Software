@@ -3,6 +3,7 @@
 const router = require('express').Router();
 const { list, listCategories, create, update, remove, importExpensesCsv, importExpenseCategoriesCsv } = require('../controllers/expenses.controller');
 const { authenticate, requirePermission } = require('../middleware/auth.middleware');
+const { requireFeature } = require('../middleware/feature.middleware');
 const { body }        = require('express-validator');
 const csvUpload       = require('../utils/csv-uploader');
 
@@ -13,6 +14,7 @@ const validateExpense = [
 ];
 
 router.use(authenticate);
+router.use(requireFeature('EXPENSES'));
 
 router.get('/',            requirePermission('expenses', 'view'),   list);
 router.get('/categories',  requirePermission('expenses', 'view'),   listCategories);

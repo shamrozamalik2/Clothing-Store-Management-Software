@@ -2,10 +2,12 @@
 
 const { Router } = require('express');
 const { authenticate, requirePermission } = require('../middleware/auth.middleware');
+const { requireFeature } = require('../middleware/feature.middleware');
 const ctrl = require('../controllers/employees.controller');
 
 const router = Router();
 router.use(authenticate);
+router.use(requireFeature('HR'));
 
 router.get('/',                          requirePermission('hr', 'view'),   ctrl.list);
 router.get('/salaries',                  requirePermission('hr', 'view'),   ctrl.listSalaries);

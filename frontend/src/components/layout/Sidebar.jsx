@@ -31,6 +31,7 @@ import { selectCurrentUser } from '@store/slices/authSlice';
 import { settingsApi } from '@api/settings.api';
 import { cn } from '@utils/cn';
 import Logo from '@components/ui/Logo';
+import { useFeatures } from '@hooks/useFeatures';
 
 /* ─── Navigation structure ─────────────────────────────────────────────── */
 const NAV_GROUPS = [
@@ -97,11 +98,21 @@ function PBCMark({ size = 32 }) {
 }
 
 /* ─── Sidebar ────────────────────────────────────────────────────────────── */
+const FEATURE_BY_PATH = {
+  '/products': 'PRODUCTS', '/categories': 'PRODUCTS', '/brands': 'PRODUCTS',
+  '/inventory/adjust': 'INVENTORY', '/barcodes': 'BARCODE',
+  '/pos': 'POS', '/sales': 'SALES', '/returns': 'RETURNS', '/purchases': 'PURCHASES',
+  '/expenses': 'EXPENSES', '/customers': 'CUSTOMERS', '/suppliers': 'SUPPLIERS',
+  '/reports': 'REPORTS', '/manufacturing': 'MANUFACTURING', '/hr': 'HR',
+  '/ledger': 'LEDGER', '/audit': 'AUDIT',
+};
+
 export default function Sidebar() {
   const dispatch    = useDispatch();
   const collapsed   = useSelector(selectSidebarCollapsed);
   const currentUser = useSelector(selectCurrentUser);
   const permissions = currentUser?.permissions || {};
+  const { isOn } = useFeatures();
   const isDark      = useSelector(selectTheme) === 'dark';
 
   const { data: settingsRes } = useQuery({
@@ -174,7 +185,7 @@ export default function Sidebar() {
       {/* ── Navigation ── */}
       <nav className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden py-3 no-scrollbar">
         {NAV_GROUPS.map((group, gi) => {
-          const visibleItems = group.items.filter(item => hasAccess(item.permission));
+          const visibleItems = group.items.filter(item => hasAccess(item.permission) && isOn(FEATURE_BY_PATH[item.path]));
           if (visibleItems.length === 0) return null;
 
           return (

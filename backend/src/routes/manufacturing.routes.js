@@ -2,10 +2,12 @@
 
 const { Router } = require('express');
 const { authenticate, requirePermission } = require('../middleware/auth.middleware');
+const { requireFeature } = require('../middleware/feature.middleware');
 const ctrl = require('../controllers/manufacturing.controller');
 
 const router = Router();
 router.use(authenticate);
+router.use(requireFeature('MANUFACTURING'));
 
 router.get('/bom',            requirePermission('manufacturing', 'view'),   ctrl.listBOM);
 router.get('/bom/:id',        requirePermission('manufacturing', 'view'),   ctrl.getBOM);

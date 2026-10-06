@@ -10,6 +10,7 @@ const Sale       = require('../models/Sale');
 const Product    = require('../models/Product');
 const SuperAdmin = require('../models/SuperAdmin');
 const logger     = require('../config/logger');
+const { invalidateCompany } = require('../services/features.service');
 
 const SUPER_ADMIN_SECRET = process.env.SUPER_ADMIN_JWT_SECRET || process.env.JWT_SECRET;
 const JWT_EXPIRES_IN     = '4h';
@@ -61,7 +62,7 @@ exports.listCompanies = async (req, res, next) => {
 
     const [total, companies] = await Promise.all([
       Company.countDocuments(filter),
-      Company.find(filter, { name: 1, slug: 1, email: 1, phone: 1, plan: 1, subscription_status: 1, max_users: 1, is_active: 1, trial_ends_at: 1, suspended_at: 1, billing_email: 1, notes: 1, created_at: 1 }).sort({ created_at: -1 }).skip(off).limit(lim).lean(),
+      Company.find(filter, { name: 1, slug: 1, email: 1, phone: 1, plan: 1, subscription_status: 1, max_users: 1, is_active: 1, trial_ends_at: 1, suspended_at: 1, billing_email: 1, notes: 1, business_category: 1, created_at: 1 }).sort({ created_at: -1 }).skip(off).limit(lim).lean(),
     ]);
 
     const companyIds = companies.map(c => c._id);
@@ -167,6 +168,7 @@ exports.updateFeatures = async (req, res, next) => {
     if (!features || typeof features !== 'object') return res.status(422).json({ success: false, message: 'features object is required.' });
 
     const updated = await Company.findByIdAndUpdate(req.params.id, { features, updated_at: new Date() }, { new: true }).lean();
+    invalidateCompany(req.params.id);
     if (!updated) return res.status(404).json({ success: false, message: 'Company not found.' });
     return res.json({ success: true, data: { id: updated._id.toString(), name: updated.name, features: updated.features }, message: 'Features updated.' });
   } catch (err) { next(err); }

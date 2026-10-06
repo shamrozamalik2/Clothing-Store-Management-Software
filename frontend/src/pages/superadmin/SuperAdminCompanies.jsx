@@ -12,6 +12,7 @@ import {
   saListCompanies, saCreateCompany, saSuspendCompany,
   saReinstateCompany, saUpdateCompany, saDeleteCompany, saImpersonate,
   saUpdatePlan, saUpdateFeatures,
+  saListBusinessCategories, saAssignBusinessCategory,
 } from '@api/superAdminClient';
 
 const STATUS = {
@@ -27,6 +28,14 @@ function Badge({ status }) {
       {status}
     </span>
   );
+}
+
+// Customers sign in on the app host, not the admin host this screen runs on.
+function clientLoginUrl() {
+  const host = window.location.hostname === 'admin.probusinesscloud.com'
+    ? 'app.probusinesscloud.com'
+    : window.location.host;
+  return `${window.location.protocol}//${host}/login`;
 }
 
 function Field({ label, children, required }) {
@@ -156,7 +165,7 @@ function CreateModal({ onClose, onCreated }) {
     setBusy(true); setError('');
     try {
       await saCreateCompany(form);
-      const loginUrl = window.location.origin + window.location.pathname + '#/login';
+      const loginUrl = clientLoginUrl();
       setCreds({
         company_name: form.name,
         slug:         form.slug || autoSlug(form.name),
@@ -258,16 +267,28 @@ function EditModal({ company, onClose, onSaved }) {
     plan:                company.plan || 'standard',
     subscription_status: company.subscription_status,
     max_users:           company.max_users || 5,
+    business_category:   company.business_category || 'CLOTHING',
   });
+  const [categories, setCategories] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy]   = useState(false);
   const set = f => e => setForm(v => ({ ...v, [f]: e.target.value }));
+
+  useEffect(() => {
+    saListBusinessCategories()
+      .then(res => setCategories(res.data.data.categories.filter(c => c.is_active || c.key === form.business_category)))
+      .catch(() => setCategories([]));
+  }, []);
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true); setError('');
     try {
-      await saUpdateCompany(company.id, form);
+      const { business_category, ...companyFields } = form;
+      await saUpdateCompany(company.id, companyFields);
+      if (business_category !== (company.business_category || 'CLOTHING')) {
+        await saAssignBusinessCategory(company.id, business_category);
+      }
       onSaved();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update.');
@@ -311,9 +332,17 @@ function EditModal({ company, onClose, onSaved }) {
               </select>
             </Field>
           </div>
-          <Field label="Max Users">
-            <input type="number" min={1} max={500} value={form.max_users} onChange={set('max_users')} className={INPUT} />
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Max Users">
+              <input type="number" min={1} max={500} value={form.max_users} onChange={set('max_users')} className={INPUT} />
+            </Field>
+            <Field label="Business Category">
+              <select value={form.business_category} onChange={set('business_category')} className={INPUT}>
+                {!categories.some(c => c.key === form.business_category) && <option value={form.business_category}>{form.business_category}</option>}
+                {categories.map(c => <option key={c.key} value={c.key}>{c.name}{c.is_active ? '' : ' (inactive)'}</option>)}
+              </select>
+            </Field>
+          </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
             <button type="submit" disabled={busy}
@@ -348,7 +377,7 @@ function PlanModal({ company, onClose, onSaved }) {
   const [error, setError]   = useState('');
 
   const toggleFeature = (key) =>
-    setFeatures(f => ({ ...f, [key]: !f[key] }));
+    setFeatures(f => ({ ...f, [key]: f[key] === false }));
 
   async function save(e) {
     e.preventDefault();
@@ -401,8 +430,8 @@ function PlanModal({ company, onClose, onSaved }) {
                 <label key={key} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-800 cursor-pointer">
                   <span className="text-sm text-slate-300">{label}</span>
                   <div onClick={() => toggleFeature(key)}
-                    className={`relative h-5 w-9 rounded-full cursor-pointer transition-colors duration-200 ${features[key] ? 'bg-purple-500' : 'bg-slate-600'}`}>
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${features[key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    className={`relative h-5 w-9 rounded-full cursor-pointer transition-colors duration-200 ${features[key] !== false ? 'bg-purple-500' : 'bg-slate-600'}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${features[key] !== false ? 'translate-x-4' : 'translate-x-0.5'}`} />
                   </div>
                 </label>
               ))}

@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import {
   HomeIcon, BuildingOffice2Icon, UsersIcon,
   ShieldCheckIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon,
-  Bars3Icon, ChevronLeftIcon,
+  Bars3Icon, ChevronLeftIcon, TagIcon,
 } from '@heroicons/react/24/outline';
 
 export function useSuperAdmin() {
@@ -21,6 +21,7 @@ export function SuperAdminGuard({ children }) {
 const NAV = [
   { id: 'dashboard', label: 'Dashboard',  href: '#/admin/dashboard', Icon: HomeIcon },
   { id: 'companies', label: 'Companies',  href: '#/admin/companies', Icon: BuildingOffice2Icon },
+  { id: 'business-categories', label: 'Business Categories', href: '#/admin/business-categories', Icon: TagIcon },
   { id: 'users',     label: 'Users',      href: '#/admin/users',     Icon: UsersIcon },
 ];
 
