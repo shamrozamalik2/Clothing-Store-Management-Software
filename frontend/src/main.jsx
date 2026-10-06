@@ -12,6 +12,16 @@ import './index.css';
 // Apply saved theme before React renders to avoid flash of wrong theme
 document.documentElement.className = localStorage.getItem('sas_theme') || 'light';
 
+// A tab opened before a deploy still points at chunks the new build removed.
+// Reload once to pick up the new build; the timestamp guard prevents a loop.
+window.addEventListener('vite:preloadError', (event) => {
+  const last = Number(sessionStorage.getItem('chunk_reload_at') || 0);
+  if (Date.now() - last < 10000) return;
+  event.preventDefault();
+  sessionStorage.setItem('chunk_reload_at', String(Date.now()));
+  window.location.reload();
+});
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
