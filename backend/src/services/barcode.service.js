@@ -33,7 +33,8 @@ function gtinCheckValid(digits) {
 
 function normalizeBarcode(raw) {
   if (raw === undefined || raw === null) return null;
-  const code = String(raw).trim();
+  // Barcodes never contain spaces. Typed codes often have them for readability, so drop all whitespace.
+  const code = String(raw).replace(/\s+/g, '');
   return code === '' ? null : code;
 }
 

@@ -577,7 +577,7 @@ const expiryAlerts = async (req, res, next) => {
 const getByBarcode = async (req, res, next) => {
   try {
     const cid  = req.companyId;
-    const code = req.params.code;
+    const code = String(req.params.code).replace(/\s+/g, '');
     let product = await Product.findOne({ company_id: cid, barcode: code }).populate('category_id', 'name').populate('brand_id', 'name').lean();
     let variant = null;
     if (!product) {

@@ -172,7 +172,7 @@ export default function BarcodePage() {
 
   // ── Scan lookup: found → open product; not found → create product with this barcode ──
   const runScan = async (raw) => {
-    const code = raw.trim();
+    const code = raw.replace(/\s+/g, '');
     if (!code) return;
     setScanBusy(true);
     try {

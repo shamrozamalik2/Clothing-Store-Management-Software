@@ -64,6 +64,7 @@ describe('barcodes', () => {
     it('trims input, and treats blank input as clearing the barcode', async () => {
       const co = await externalOn('trim-co');
       assert.equal(await barcodes.prepareExternalBarcode(co._id, `  ${VALID_GTIN}  `), VALID_GTIN);
+      assert.equal(await barcodes.prepareExternalBarcode(co._id, '5 449000 000996'), VALID_GTIN, 'spaces inside a typed code are dropped');
       assert.equal(await barcodes.prepareExternalBarcode(co._id, '   '), null);
       assert.equal(await barcodes.prepareExternalBarcode(co._id, undefined), null);
     });
