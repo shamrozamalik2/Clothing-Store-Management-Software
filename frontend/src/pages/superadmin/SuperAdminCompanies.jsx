@@ -11,7 +11,7 @@ import SuperAdminLayout, { SuperAdminGuard } from './SuperAdminLayout';
 import {
   saListCompanies, saCreateCompany, saSuspendCompany,
   saReinstateCompany, saUpdateCompany, saDeleteCompany, saImpersonate,
-  saUpdatePlan, saUpdateFeatures,
+  saUpdatePlan, saUpdateFeatures, saGetCompanyFeatures,
   saListBusinessCategories, saAssignBusinessCategory,
 } from '@api/superAdminClient';
 
@@ -356,35 +356,44 @@ function EditModal({ company, onClose, onSaved }) {
   );
 }
 
-const FEATURE_DEFS = [
-  { key: 'manufacturing',    label: 'Manufacturing / BOM' },
-  { key: 'hr',               label: 'HR & Payroll' },
-  { key: 'ledger',           label: 'Ledger / AR-AP' },
-  { key: 'audit',            label: 'Audit Trail' },
-  { key: 'mobile_app',       label: 'Mobile App Access' },
-  { key: 'multi_branch',     label: 'Multi-Branch' },
-  { key: 'reports_advanced', label: 'Advanced Reports' },
-];
-
 function PlanModal({ company, onClose, onSaved }) {
   const [plan, setPlan]     = useState(company.plan || 'standard');
   const [maxUsers, setMaxUsers] = useState(company.max_users || 5);
   const [trialEnds, setTrialEnds] = useState(
     company.trial_ends_at ? company.trial_ends_at.slice(0, 10) : ''
   );
-  const [features, setFeatures] = useState({ ...(company.features || {}) });
+  // rows: every feature with its category default and effective result. overrides: only what this company sets.
+  const [rows, setRows]         = useState(null);
+  const [category, setCategory] = useState('');
+  const [overrides, setOverrides] = useState({});
   const [busy,  setBusy]    = useState(false);
   const [error, setError]   = useState('');
 
-  const toggleFeature = (key) =>
-    setFeatures(f => ({ ...f, [key]: f[key] === false }));
+  useEffect(() => {
+    saGetCompanyFeatures(company.id)
+      .then(res => {
+        const data = res.data.data;
+        setRows(data.rows);
+        setCategory(data.business_category);
+        setOverrides(Object.fromEntries(data.rows.filter(r => r.override !== null).map(r => [r.key, r.override])));
+      })
+      .catch(() => setError('Could not load the feature list.'));
+  }, [company.id]);
+
+  // 'default' removes the override, so the category decides again.
+  const setOverride = (key, value) => setOverrides(o => {
+    const next = { ...o };
+    if (value === 'default') delete next[key];
+    else next[key] = value === 'true';
+    return next;
+  });
 
   async function save(e) {
     e.preventDefault();
     setBusy(true); setError('');
     try {
       await saUpdatePlan(company.id, { plan, max_users: maxUsers, trial_ends_at: trialEnds || null });
-      await saUpdateFeatures(company.id, features);
+      await saUpdateFeatures(company.id, overrides);
       onSaved();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update plan.');
@@ -393,7 +402,7 @@ function PlanModal({ company, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <div>
             <h3 className="text-white font-semibold">Plan & Features</h3>
@@ -424,18 +433,41 @@ function PlanModal({ company, onClose, onSaved }) {
           </Field>
 
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Feature Flags</p>
-            <div className="space-y-2">
-              {FEATURE_DEFS.map(({ key, label }) => (
-                <label key={key} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-800 cursor-pointer">
-                  <span className="text-sm text-slate-300">{label}</span>
-                  <div onClick={() => toggleFeature(key)}
-                    className={`relative h-5 w-9 rounded-full cursor-pointer transition-colors duration-200 ${features[key] !== false ? 'bg-purple-500' : 'bg-slate-600'}`}>
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${features[key] !== false ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                  </div>
-                </label>
-              ))}
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Features</p>
+              <button type="button" onClick={() => setOverrides({})}
+                className="text-xs text-purple-400 hover:text-purple-300">Use category defaults for all</button>
             </div>
+            {!rows ? (
+              <p className="text-sm text-slate-500">Loading…</p>
+            ) : (
+              <div className="space-y-1 max-h-[55vh] overflow-y-auto pr-1">
+                <p className="text-xs text-slate-500 mb-2">
+                  Business category: {category}. Each feature follows the category unless you set it here.
+                </p>
+                {rows.map(r => {
+                  const override = overrides[r.key];
+                  const on = typeof override === 'boolean' ? override : r.category;
+                  return (
+                    <div key={r.key} className="flex items-center justify-between gap-3 py-1.5 px-3 rounded-lg hover:bg-slate-800">
+                      <div className="min-w-0">
+                        <p className="text-sm text-slate-300 truncate">{r.label}</p>
+                        <p className="text-xs text-slate-500">Category: {r.category ? 'on' : 'off'}</p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className={`text-xs font-semibold ${on ? 'text-green-400' : 'text-slate-500'}`}>{on ? 'On' : 'Off'}</span>
+                        <select value={typeof override === 'boolean' ? String(override) : 'default'}
+                          onChange={e => setOverride(r.key, e.target.value)} className={INPUT}>
+                          <option value="default">Category default</option>
+                          <option value="true">On</option>
+                          <option value="false">Off</option>
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-1">

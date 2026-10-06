@@ -35,6 +35,7 @@ router.post('/companies', [
 ], ctrl.createCompany);
 router.patch('/companies/:id',               ctrl.updateCompany);
 router.put('/companies/:id/plan',            ctrl.updatePlan);
+router.get('/companies/:id/features',        ctrl.getFeatures);
 router.put('/companies/:id/features',        ctrl.updateFeatures);
 router.delete('/companies/:id',              ctrl.deleteCompany);
 router.post('/companies/:id/suspend',        ctrl.suspendCompany);

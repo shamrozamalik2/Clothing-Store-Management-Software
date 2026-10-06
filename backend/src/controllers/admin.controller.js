@@ -10,6 +10,9 @@ const Sale       = require('../models/Sale');
 const Product    = require('../models/Product');
 const SuperAdmin = require('../models/SuperAdmin');
 const logger     = require('../config/logger');
+const BusinessCategory = require('../models/BusinessCategory');
+const featureSvc = require('../services/features.service');
+const { FEATURES, FEATURE_KEYS, LEGACY_TO_KEY } = require('../config/features');
 const { invalidateCompany } = require('../services/features.service');
 
 const SUPER_ADMIN_SECRET = process.env.SUPER_ADMIN_JWT_SECRET || process.env.JWT_SECRET;
@@ -162,12 +165,56 @@ exports.updatePlan = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Overrides are stored under registry keys. Older rows may use legacy names such as "hr".
+function normalizeOverrides(features) {
+  const out = {};
+  for (const [name, value] of Object.entries(features || {})) {
+    if (typeof value !== 'boolean') continue;
+    const key = LEGACY_TO_KEY[name] || name;
+    if (FEATURE_KEYS.has(key)) out[key] = value;
+  }
+  return out;
+}
+
+// Each feature with its category default, any company override, and the result that applies.
+exports.getFeatures = async (req, res, next) => {
+  try {
+    const company = await Company.findById(req.params.id, { business_category: 1, features: 1 }).lean();
+    if (!company) return res.status(404).json({ success: false, message: 'Company not found.' });
+
+    const category    = await BusinessCategory.findOne({ key: company.business_category }, { features: 1 }).lean();
+    const categoryMap = category?.features || {};
+    const overrides   = normalizeOverrides(company.features);
+    const effective   = await featureSvc.computeEffective(company._id);
+
+    const rows = FEATURES.map(f => ({
+      key:       f.key,
+      label:     f.label,
+      group:     f.group,
+      category:  typeof categoryMap[f.key] === 'boolean' ? categoryMap[f.key] : true,
+      override:  typeof overrides[f.key] === 'boolean' ? overrides[f.key] : null,
+      effective: effective?.features[f.key] === true,
+    }));
+    return res.json({ success: true, data: { business_category: company.business_category, rows } });
+  } catch (err) { next(err); }
+};
+
+// Replaces the company's overrides. Only known features with on/off values are accepted,
+// and anything left out goes back to the category default.
 exports.updateFeatures = async (req, res, next) => {
   try {
     const features = req.body.features;
-    if (!features || typeof features !== 'object') return res.status(422).json({ success: false, message: 'features object is required.' });
+    if (!features || typeof features !== 'object' || Array.isArray(features)) {
+      return res.status(422).json({ success: false, message: 'features object is required.' });
+    }
+    const unknown = Object.keys(features).find(k => !FEATURE_KEYS.has(LEGACY_TO_KEY[k] || k));
+    if (unknown) return res.status(422).json({ success: false, message: `Unknown feature "${unknown}".` });
+    if (Object.values(features).some(v => typeof v !== 'boolean')) {
+      return res.status(422).json({ success: false, message: 'Each feature must be on or off.' });
+    }
 
-    const updated = await Company.findByIdAndUpdate(req.params.id, { features, updated_at: new Date() }, { new: true }).lean();
+    const clean = normalizeOverrides(features);
+    const updated = await Company.findByIdAndUpdate(req.params.id, { features: clean, updated_at: new Date() }, { new: true }).lean();
     invalidateCompany(req.params.id);
     if (!updated) return res.status(404).json({ success: false, message: 'Company not found.' });
     return res.json({ success: true, data: { id: updated._id.toString(), name: updated.name, features: updated.features }, message: 'Features updated.' });

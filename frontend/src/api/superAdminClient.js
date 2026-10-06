@@ -58,6 +58,7 @@ export const saImpersonate      = (id)     => sa.post(`/companies/${id}/imperson
 // ── Plan & Features ───────────────────────────────────────────────────────────
 export const saUpdatePlan     = (id, d) => sa.put(`/companies/${id}/plan`, d);
 export const saUpdateFeatures = (id, d) => sa.put(`/companies/${id}/features`, d);
+export const saGetCompanyFeatures = (id) => sa.get(`/companies/${id}/features`);
 
 export const saListBusinessCategories     = ()         => sa.get('/business-categories');
 export const saCreateBusinessCategory     = (d)        => sa.post('/business-categories', d);

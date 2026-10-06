@@ -7,7 +7,9 @@ export function useFeatures() {
   const { data } = useQuery({
     queryKey: ['features'],
     queryFn: () => client.get('/features').then(r => r.data.data),
-    staleTime: 5 * 60 * 1000,
+    // Short cache, and a refresh when the tab comes back, so admin changes show up without a reload.
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
   return {
     business_category: data?.business_category,
