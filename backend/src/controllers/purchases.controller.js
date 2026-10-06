@@ -10,6 +10,8 @@ const { success, created, error }   = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { AUDIT_ACTIONS } = require('../config/constants');
 const { logAudit }      = require('../utils/audit');
+const stockBatch        = require('../services/stockBatch.service');
+const featureSvc        = require('../services/features.service');
 
 async function generateReference(companyId, session) {
   const now    = new Date();
@@ -86,6 +88,12 @@ const createPurchase = async (req, res, next) => {
     const parsedItems = typeof body.items === 'string' ? JSON.parse(body.items) : (body.items || []);
     if (!parsedItems.length) return error(res, 'At least one item is required.', 422);
 
+    // Expiry dates are only recorded when the business has the EXPIRY module.
+    const expiryOn = await featureSvc.isFeatureEnabled(cid, 'EXPIRY');
+    if (!expiryOn && parsedItems.some(i => i.expiry_date)) {
+      return error(res, 'Expiry dates are not enabled for your business.', 403);
+    }
+
     let purchaseDoc;
     const session = await mongoose.startSession();
     try {
@@ -105,12 +113,37 @@ const createPurchase = async (req, res, next) => {
           subtotal  += qty * cost;
           taxTotal  += tax;
           discTotal += disc;
-          lineItems.push({ product_id: product._id, variant_id: item.variant_id || null, product_name: product.name, sku: product.sku, quantity: qty, unit_cost: cost, discount: disc, tax_amount: tax, total: tot });
+
+          let lot = {};
+          if (product.track_batches) {
+            lot = stockBatch.normalizeLot({ batch_no: item.batch_no, expiry_date: item.expiry_date, mfg_date: item.mfg_date });
+            if (expiryOn && !lot.expiry_date) throw new Error(`Expiry date is required for "${product.name}".`);
+          } else if (item.batch_no || item.expiry_date || item.mfg_date) {
+            throw new Error(`"${product.name}" does not track batches. Turn on batch tracking for it first.`);
+          }
+
+          lineItems.push({
+            product_id: product._id, variant_id: item.variant_id || null, product_name: product.name, sku: product.sku,
+            quantity: qty, unit_cost: cost, discount: disc, tax_amount: tax, total: tot,
+            ...lot,
+            tracksBatches: !!product.track_batches && !item.variant_id,
+          });
         }
 
         const total  = subtotal - discTotal + taxTotal;
         const paid   = parseFloat(body.paid_amount) || 0;
         const status = body.status || 'ordered';
+
+        // A purchase received on creation puts each batch-tracked line into its lot now,
+        // so the line can remember which lot it went into.
+        if (status === 'received') {
+          for (const li of lineItems) {
+            if (li.tracksBatches) {
+              const lot = await stockBatch.receiveLot(session, cid, li.product_id, li, li.quantity);
+              li.batch_id = lot.batch_id;
+            }
+          }
+        }
 
         const [newPurchase] = await Purchase.create([{
           company_id:      cid,
@@ -205,6 +238,15 @@ const updateStatus = async (req, res, next) => {
                 { $inc: { stock_quantity: li.quantity }, $set: { cost_price: li.unit_cost } },
                 { session }
               );
+              const tracked = await Product.findOne({ _id: li.product_id, company_id: cid }, { track_batches: 1, name: 1 }).session(session).lean();
+              if (tracked?.track_batches) {
+                const lot = await stockBatch.receiveLot(session, cid, li.product_id, li, li.quantity);
+                await Purchase.updateOne(
+                  { _id: purchase._id, company_id: cid },
+                  { $set: { 'items.$[it].batch_id': lot.batch_id } },
+                  { session, arrayFilters: [{ 'it._id': li._id }] }
+                );
+              }
             }
           }
         } else if (wasReceived && !nowReceived) {
@@ -224,6 +266,13 @@ const updateStatus = async (req, res, next) => {
                 { $inc: { stock_quantity: -li.quantity } },
                 { session }
               );
+              const tracked = await Product.findOne({ _id: li.product_id, company_id: cid }, { track_batches: 1, name: 1 }).session(session).lean();
+              if (tracked?.track_batches) {
+                // Take the units back out of the lot they were received into. If that lot
+                // has already been sold, refuse rather than leave the lots out of step.
+                if (li.batch_id) await stockBatch.consumeFromLot(session, cid, li.batch_id, li.quantity, tracked.name);
+                else await stockBatch.allocateFEFO(session, cid, li.product_id, li.quantity, { productName: tracked.name, allowExpired: true });
+              }
             }
           }
         }

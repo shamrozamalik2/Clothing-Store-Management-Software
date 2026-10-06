@@ -11,6 +11,7 @@ const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { AUDIT_ACTIONS } = require('../config/constants');
 const { logAudit }      = require('../utils/audit');
 const { notifySale }    = require('../utils/fcm');
+const stockBatch        = require('../services/stockBatch.service');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -180,6 +181,7 @@ const create = async (req, res, next) => {
           if (!product) throw new Error(`Product ${productId} not found or inactive.`);
 
           let price, cost, taxAmt, itemDisc, lineTot, productName, sku, resolvedVariantId;
+          let batchAllocations = [];
 
           if (variantId) {
             const variant = product.variants?.find(v => v._id.toString() === variantId.toString());
@@ -224,8 +226,12 @@ const create = async (req, res, next) => {
                 { session }
               );
             }
+            // Batch-tracked products take from the earliest-expiring lots first (FEFO).
+            if (product.track_batches) {
+              batchAllocations = await stockBatch.allocateFEFO(session, cid, productId, qty, { productName: product.name });
+            }
           }
-          lineItems.push({ productId, variantId: resolvedVariantId, qty, price, cost, taxAmt, itemDisc, lineTot, productName, sku });
+          lineItems.push({ productId, variantId: resolvedVariantId, qty, price, cost, taxAmt, itemDisc, lineTot, productName, sku, batchAllocations });
         }
 
         const discAmt  = discount_type === 'percent'
@@ -269,6 +275,7 @@ const create = async (req, res, next) => {
             discount:     li.itemDisc,
             tax_amount:   li.taxAmt,
             total:        li.lineTot,
+            batch_allocations: li.batchAllocations,
           })),
         }], { session });
 
@@ -331,6 +338,7 @@ const voidSale = async (req, res, next) => {
     const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
+        const restoredPairs = [];
         for (const item of sale.items) {
           // Net restorable quantity = what this line originally sold, minus
           // whatever a prior return has already restored for it — a return
@@ -346,7 +354,7 @@ const voidSale = async (req, res, next) => {
           const restoreQty = Math.max(0, parseFloat(item.quantity) - alreadyReturned);
           if (restoreQty <= 0) continue;
 
-          const product = await Product.findById(item.product_id, { track_inventory: 1 }).lean();
+          const product = await Product.findById(item.product_id, { track_inventory: 1, track_batches: 1, name: 1 }).lean();
           if (!product?.track_inventory) continue;
 
           if (item.variant_id) {
@@ -361,8 +369,15 @@ const voidSale = async (req, res, next) => {
               { $inc: { stock_quantity: restoreQty } },
               { session }
             );
+            if (product.track_batches) {
+              const restores = await stockBatch.restoreToAllocations(session, cid, item.product_id, item.batch_allocations, restoreQty);
+              for (const r of restores) {
+                if (!r.unallocated) restoredPairs.push({ itemId: item._id, batchId: r.batch_id, quantity: r.quantity });
+              }
+            }
           }
         }
+        await stockBatch.recordRestored(session, cid, sale._id, restoredPairs);
 
         if (sale.customer_id && parseFloat(sale.due_amount) > 0) {
           await Customer.updateOne(

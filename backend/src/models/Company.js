@@ -23,6 +23,7 @@ const companySchema = new Schema(
     suspended_reason:    { type: String },
     features:            { type: Schema.Types.Mixed, default: {} },
     business_category:   { type: String, default: 'CLOTHING', uppercase: true, trim: true },
+    internal_barcode_seq: { type: Number, default: 0 },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );

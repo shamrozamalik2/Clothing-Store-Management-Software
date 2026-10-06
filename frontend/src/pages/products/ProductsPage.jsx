@@ -24,6 +24,7 @@ import { formatCurrency, formatNumber } from '@utils/format';
 import { cn } from '@utils/cn';
 import ImportCsvModal from '@components/common/ImportCsvModal';
 import BulkPriceModal from './BulkPriceModal';
+import ExpiryAlertsCard from './components/ExpiryAlertsCard';
 import QuickEditModal from './QuickEditModal';
 import { toastWithUndo } from '@utils/undoToast.jsx';
 
@@ -167,6 +168,8 @@ export default function ProductsPage() {
 
   return (
     <div className="flex flex-col gap-5">
+
+      <ExpiryAlertsCard />
 
       {/* ── Hero header ────────────────────────────────────────────────────── */}
       <div className="relative rounded-2xl overflow-hidden px-6 py-5"

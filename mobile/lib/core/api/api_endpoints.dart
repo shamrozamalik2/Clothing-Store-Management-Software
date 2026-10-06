@@ -12,6 +12,9 @@ class ApiEndpoints {
   static const String products       = '/products';
   static String product(String id)   => '/products/$id';
 
+  // Company feature map (missing means on, as on the backend)
+  static const String features       = '/features';
+
   // Categories
   static const String categories     = '/categories';
 

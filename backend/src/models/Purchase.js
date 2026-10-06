@@ -15,6 +15,11 @@ const purchaseItemSchema = new Schema(
     discount:     { type: Number, default: 0 },
     tax_amount:   { type: Number, default: 0 },
     total:        { type: Number, required: true },
+    // Lot details for batch-tracked products. batch_id is set when the line is received.
+    batch_no:     { type: String, default: null },
+    expiry_date:  { type: Date, default: null },
+    mfg_date:     { type: Date, default: null },
+    batch_id:     { type: Types.ObjectId, ref: 'StockBatch', default: null },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: false }, _id: true }
 );

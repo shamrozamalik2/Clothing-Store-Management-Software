@@ -8,6 +8,7 @@ const Customer = require('../models/Customer');
 const User     = require('../models/User');
 const { success, error } = require('../utils/response');
 const { logAudit }       = require('../utils/audit');
+const stockBatch         = require('../services/stockBatch.service');
 
 async function generateReference(companyId, session) {
   const d   = new Date();
@@ -52,6 +53,7 @@ const create = async (req, res, next) => {
 
         let returnTotal = 0;
         const resolvedReturn = [];
+        const restoredPairs  = [];
 
         for (const ri of return_items) {
           const qty = parseFloat(ri.quantity);
@@ -76,7 +78,7 @@ const create = async (req, res, next) => {
           }
 
           // Restore stock
-          const product = await Product.findOne({ _id: saleItem.product_id, company_id: cid }, { track_inventory: 1 }).session(session).lean();
+          const product = await Product.findOne({ _id: saleItem.product_id, company_id: cid }, { track_inventory: 1, track_batches: 1, name: 1 }).session(session).lean();
           if (product?.track_inventory) {
             if (saleItem.variant_id) {
               await Product.updateOne(
@@ -90,6 +92,13 @@ const create = async (req, res, next) => {
                 { $inc: { stock_quantity: qty } },
                 { session }
               );
+              // Put the units back into the lots they came from.
+              if (product.track_batches) {
+                const restores = await stockBatch.restoreToAllocations(session, cid, saleItem.product_id, saleItem.batch_allocations, qty);
+                for (const r of restores) {
+                  if (!r.unallocated) restoredPairs.push({ itemId: saleItem._id, batchId: r.batch_id, quantity: r.quantity });
+                }
+              }
             }
           }
 
@@ -141,6 +150,10 @@ const create = async (req, res, next) => {
             } else {
               if (product.track_inventory) {
                 await Product.updateOne({ _id: product._id, company_id: cid }, { $inc: { stock_quantity: -qty } }, { session });
+                if (product.track_batches) {
+                  // Exchange lines are not returnable later, so no allocation needs to be kept.
+                  await stockBatch.allocateFEFO(session, cid, product._id, qty, { productName: product.name });
+                }
               }
               const total = qty * price;
               exchangeTotal += total;
@@ -199,6 +212,7 @@ const create = async (req, res, next) => {
           if (fullyReturned) saleUpdate.status = 'refunded';
         }
         await Sale.updateOne({ _id: sale_id, company_id: cid }, { $set: saleUpdate }, { session });
+        await stockBatch.recordRestored(session, cid, sale._id, restoredPairs);
 
         if (balanceDelta !== 0 && sale.customer_id) {
           await Customer.updateOne(

@@ -3,6 +3,7 @@ import client from './client';
 export const productsApi = {
   list:          (params) => client.get('/products', { params }),
   stats:         ()       => client.get('/products/stats'),
+  expiryAlerts:  ()       => client.get('/products/expiry-alerts'),
   lowStock:      ()       => client.get('/products/low-stock'),
   getOne:        (id)     => client.get(`/products/${id}`),
   getByBarcode:  (code)   => client.get(`/products/barcode/${encodeURIComponent(code)}`),
@@ -16,5 +17,7 @@ export const productsApi = {
   updateVariant:  (id, vid, d)  => client.put(`/products/${id}/variants/${vid}`, d),
   deleteVariant:  (id, vid)     => client.delete(`/products/${id}/variants/${vid}`),
   updateBarcode: (id, barcode) => client.patch(`/products/${id}/barcode`, { barcode }),
+  generateInternalBarcode:        (id)      => client.post(`/products/${id}/barcode/internal`),
+  generateVariantInternalBarcode: (id, vid) => client.post(`/products/${id}/variants/${vid}/barcode/internal`),
   importCsv: (file) => { const fd = new FormData(); fd.append('file', file); return client.post('/products/import', fd, { headers: { 'Content-Type': undefined } }); },
 };

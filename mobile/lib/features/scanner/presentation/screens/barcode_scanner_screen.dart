@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,29 +7,31 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
+import '../../../../core/providers/company_features_provider.dart';
 import '../../../../core/providers/scanner_controller_provider.dart';
 import '../../../../core/widgets/grad_widgets.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../products/data/models/product_model.dart';
+import '../../../products/presentation/screens/product_create_screen.dart';
 
 // ── Product lookup provider ───────────────────────────────────────────────────
 
 final _scannedProductProvider =
     FutureProvider.autoDispose.family<List<_ScannedProduct>, String>((ref, code) async {
+     
+
   if (code.isEmpty) return [];
-  final res = await ref.watch(apiClientProvider).get(
-    ApiEndpoints.products,
-    queryParameters: {'search': code, 'limit': 5},
-  );
-  final body = res.data as Map<String, dynamic>? ?? {};
-  final dataField = body['data'];
-  final List<dynamic> items;
-  if (dataField is List) {
-    items = dataField;
-  } else if (dataField is Map<String, dynamic>) {
-    items = (dataField['items'] as List?) ?? (dataField['data'] as List?) ?? [];
-  } else {
-    items = [];
+  // Exact barcode match, the same lookup the web uses. A substring search could show the wrong product.
+  try {
+    final res = await ref.watch(apiClientProvider).get(
+      '${ApiEndpoints.products}/barcode/${Uri.encodeComponent(code)}',
+    );
+    final body = res.data as Map<String, dynamic>;
+    return [_ScannedProduct.fromJson(body['data'] as Map<String, dynamic>)];
+  } on DioException catch (e) {
+    if (e.response?.statusCode == 404) return [];
+    rethrow;
   }
-  return items.map((j) => _ScannedProduct.fromJson(j as Map<String, dynamic>)).toList();
 });
 
 // ── Simple product view model ─────────────────────────────────────────────────
@@ -641,14 +644,18 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-class _NotFoundResult extends StatelessWidget {
+class _NotFoundResult extends ConsumerWidget {
   const _NotFoundResult({required this.barcode});
   final String barcode;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final barcodeAllowed = featureOn(ref.watch(companyFeaturesProvider), 'EXTERNAL_BARCODE');
+    final user           = ref.watch(currentUserProvider);
+    final canCreate      = user != null && (user.isAdmin || user.can('products', 'create'));
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child:   Center(
@@ -662,10 +669,28 @@ class _NotFoundResult extends StatelessWidget {
             const SizedBox(height: 4),
             Text('No product with code "$barcode"',
                 style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            if (canCreate) ...[
+              const SizedBox(height: 20),
+              GradButton(
+                label:     'Create Product',
+                icon:      Icons.add_box_outlined,
+                onPressed: () => _createProduct(context, ref, barcodeAllowed),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _createProduct(BuildContext context, WidgetRef ref, bool barcodeAllowed) async {
+    final created = await Navigator.of(context).push<ProductModel>(
+      MaterialPageRoute(
+        builder: (_) => ProductCreateScreen(barcode: barcode, barcodeAllowed: barcodeAllowed),
+      ),
+    );
+    // Run the lookup again so the sheet shows the product that was just saved.
+    if (created != null && context.mounted) ref.invalidate(_scannedProductProvider(barcode));
   }
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeftIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -11,6 +11,7 @@ import Textarea from '@components/common/Textarea';
 import Select from '@components/common/Select';
 import ImageUpload from '@components/common/ImageUpload';
 import Toggle from '@components/common/Toggle';
+import { useFeatures } from '@hooks/useFeatures';
 import { categoriesApi } from '@api/categories.api';
 import { brandsApi } from '@api/brands.api';
 import { productsApi } from '@api/products.api';
@@ -22,7 +23,12 @@ export default function ProductFormPage() {
   const navigate  = useNavigate();
   const qc        = useQueryClient();
   const { id }    = useParams();
+  const [searchParams] = useSearchParams();
   const isEditing = !!id;
+
+  // Scan-to-create: the Barcode page opens /products/new?barcode=… and returns there after saving.
+  const scannedBarcode = isEditing ? '' : (searchParams.get('barcode') ?? '');
+  const returnToScan   = searchParams.get('from') === 'scan';
 
   const [imageFile, setImageFile]       = useState(null);
   const [isActive, setIsActive]         = useState(true);
@@ -31,10 +37,12 @@ export default function ProductFormPage() {
   const [variants, setVariants]         = useState([]);
   const [skuManual, setSkuManual]       = useState(false);
   const [hasTransactions, setHasTx]    = useState(false);
+  const [isBatchTracked, setIsBatchTracked] = useState(false);
+  const { isOn } = useFeatures();
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
-      name: '', sku: '', barcode: '', description: '',
+      name: '', sku: '', barcode: scannedBarcode, description: '',
       category_id: '', brand_id: '', unit: 'piece',
       cost_price: '', sale_price: '', wholesale_price: '',
       stock_quantity: 0, low_stock_alert: 10,
@@ -88,6 +96,7 @@ export default function ProductFormPage() {
     setIsFinishedGood(!!p.is_finished_good);
     setSkuManual(true);
     setHasTx(!!p.has_transactions);
+    setIsBatchTracked(!!p.track_batches);
   }, [productData]);
 
   // Load variants for edit
@@ -110,6 +119,7 @@ export default function ProductFormPage() {
       fd.set('is_active', isActive ? '1' : '0');
       fd.set('is_raw_material', isRawMaterial ? '1' : '0');
       fd.set('is_finished_good', isFinishedGood ? '1' : '0');
+      if (isEditing) fd.set('track_batches', isBatchTracked ? '1' : '0');
       if (variants.length > 0) fd.set('variants', JSON.stringify(variants));
       if (imageFile) fd.append('image', imageFile);
       return isEditing ? productsApi.update(id, fd) : productsApi.create(fd);
@@ -118,7 +128,7 @@ export default function ProductFormPage() {
       toast.success(res.message);
       qc.invalidateQueries({ queryKey: ['products'] });
       if (isEditing) qc.invalidateQueries({ queryKey: ['product', id] });
-      navigate('/products');
+      navigate(returnToScan ? '/barcodes' : '/products');
     },
     onError: (err) => toast.error(err.message),
   });
@@ -265,6 +275,20 @@ export default function ProductFormPage() {
                   onChange={(v) => setValue('track_inventory', v ? '1' : '0')}
                 />
               </div>
+              {isEditing && isOn('BATCH_TRACKING') && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-surface-200">
+                      Track Batches{isOn('EXPIRY') ? ' & Expiry' : ''}
+                    </p>
+                    <p className="text-xs text-surface-500">
+                      Keep stock in lots with their own batch number{isOn('EXPIRY') ? ' and expiry date' : ''}. Sales use the earliest expiry first.
+                      Turning this on makes the current stock one lot.
+                    </p>
+                  </div>
+                  <Toggle checked={isBatchTracked} onChange={setIsBatchTracked} />
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 {isEditing ? (
                   <div>

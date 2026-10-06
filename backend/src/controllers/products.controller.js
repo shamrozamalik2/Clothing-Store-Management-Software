@@ -13,6 +13,11 @@ const { AUDIT_ACTIONS }             = require('../config/constants');
 const { success, created, error }   = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { logAudit }                  = require('../utils/audit');
+const { prepareExternalBarcode, normalizeBarcode, assignInternalBarcode, sendBarcodeError } = require('../services/barcode.service');
+const featureSvc  = require('../services/features.service');
+const stockBatch  = require('../services/stockBatch.service');
+const StockBatch  = require('../models/StockBatch');
+const Setting     = require('../models/Setting');
 
 async function generateAdjReference(companyId, session) {
   const date   = new Date();
@@ -147,13 +152,16 @@ const createProduct = async (req, res, next) => {
     const existing = await Product.findOne({ company_id: cid, sku }).lean();
     if (existing) return error(res, `SKU "${sku}" already exists.`, 409);
 
+    const barcode = await prepareExternalBarcode(cid, body.barcode);
+
     const product = await Product.create({
       company_id:      cid,
       category_id:     body.category_id || null,
       brand_id:        body.brand_id    || null,
       name:            body.name,
       sku,
-      barcode:         body.barcode || null,
+      barcode,
+      barcode_type:    barcode ? 'external' : null,
       description:     body.description || null,
       image,
       unit:            body.unit || 'pcs',
@@ -172,7 +180,7 @@ const createProduct = async (req, res, next) => {
 
     await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'products', product._id.toString(), null, { sku, name: body.name });
     return created(res, { ...product.toJSON() }, 'Product created.');
-  } catch (err) { next(err); }
+  } catch (err) { if (!sendBarcodeError(res, err)) next(err); }
 };
 
 // ─── update ───────────────────────────────────────────────────────────────────
@@ -193,7 +201,13 @@ const updateProduct = async (req, res, next) => {
     if (body.name !== undefined)            update.name            = body.name;
     if (body.category_id !== undefined)     update.category_id     = body.category_id || null;
     if (body.brand_id    !== undefined)     update.brand_id        = body.brand_id    || null;
-    if (body.barcode     !== undefined)     update.barcode         = body.barcode     || null;
+    if (body.barcode     !== undefined) {
+      const incoming = normalizeBarcode(body.barcode);
+      if (incoming !== (product.barcode || null)) {
+        update.barcode      = await prepareExternalBarcode(cid, incoming, { excludeProductId: product._id });
+        update.barcode_type = update.barcode ? 'external' : null;
+      }
+    }
     if (body.description !== undefined)     update.description     = body.description || null;
     if (body.unit        !== undefined)     update.unit            = body.unit;
     if (body.cost_price  !== undefined)     update.cost_price      = parseFloat(body.cost_price);
@@ -207,6 +221,36 @@ const updateProduct = async (req, res, next) => {
     if (body.is_raw_material  !== undefined) update.is_raw_material  = body.is_raw_material === 'true'  || body.is_raw_material === true;
     if (body.is_finished_good !== undefined) update.is_finished_good = body.is_finished_good === 'true' || body.is_finished_good === true;
     if (req.file?.filename) update.image = image;
+
+    // Batch and expiry tracking. Turning it on needs the BATCH_TRACKING module; turning it
+    // off needs every lot emptied first, so no stock is left outside the lots.
+    const wantsBatches = body.track_batches !== undefined
+      ? (body.track_batches === true || body.track_batches === 'true' || body.track_batches === '1')
+      : undefined;
+    // A batch-tracked product must keep inventory tracking on and negative stock off.
+    if (product.track_batches && wantsBatches !== false) {
+      if (update.track_inventory === false || update.allow_negative === true) {
+        return error(res, 'Batch-tracked products need inventory tracking on and negative stock off.', 422);
+      }
+    }
+    if (wantsBatches !== undefined && wantsBatches !== !!product.track_batches) {
+      if (wantsBatches) {
+        if (!(await featureSvc.isFeatureEnabled(cid, 'BATCH_TRACKING'))) {
+          return error(res, 'Batch tracking is not available for your business.', 403);
+        }
+        const trackInv = update.track_inventory ?? product.track_inventory;
+        const negative = update.allow_negative ?? product.allow_negative;
+        if (!trackInv || negative) {
+          return error(res, 'Batch tracking needs inventory tracking on and negative stock off.', 422);
+        }
+        if (product.variants?.length) {
+          return error(res, 'Batch tracking is not available for products with variants.', 422);
+        }
+      } else if (await stockBatch.hasLotStock(cid, product._id)) {
+        return error(res, 'Clear the stock held in batches before turning off batch tracking.', 422);
+      }
+      update.track_batches = wantsBatches;
+    }
 
     // A direct stock_quantity edit here bypasses every other stock-changing
     // path's audit trail (sales, returns, purchases, and the dedicated Stock
@@ -243,6 +287,13 @@ const updateProduct = async (req, res, next) => {
             }],
           }], { session });
         }
+        // Batch-tracked products: keep the lots in step with the stock figure.
+        if (update.track_batches === true) {
+          const finalStock = stockChanged ? Math.max(0, requestedStock) : product.stock_quantity;
+          if (finalStock > 0) await stockBatch.receiveLot(session, cid, product._id, {}, finalStock);
+        } else if (product.track_batches && update.track_batches !== false && stockChanged) {
+          await stockBatch.applyStockDelta(session, cid, product, Math.max(0, requestedStock) - product.stock_quantity);
+        }
         await Product.findByIdAndUpdate(req.params.id, { ...update, updated_at: new Date() }, { session });
       });
     } finally {
@@ -252,7 +303,7 @@ const updateProduct = async (req, res, next) => {
     const updated = await Product.findById(req.params.id).lean();
     await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'products', req.params.id);
     return success(res, { ...updated, id: updated._id.toString() }, 'Product updated.');
-  } catch (err) { next(err); }
+  } catch (err) { if (!sendBarcodeError(res, err)) next(err); }
 };
 
 // ─── delete ───────────────────────────────────────────────────────────────────
@@ -274,6 +325,7 @@ const deleteProduct = async (req, res, next) => {
     }
 
     await Product.findByIdAndDelete(req.params.id);
+    await StockBatch.deleteMany({ company_id: cid, product_id: product._id });
     await logAudit(cid, req.user.id, AUDIT_ACTIONS.DELETE, 'products', req.params.id);
     return success(res, null, 'Product deleted.');
   } catch (err) { next(err); }
@@ -296,8 +348,12 @@ const addVariant = async (req, res, next) => {
     const product = await Product.findOne({ _id: req.params.id, company_id: cid }).lean();
     if (!product) return error(res, 'Product not found.', 404);
 
+    if (product.track_batches) return error(res, 'Variants cannot be added to a batch-tracked product.', 422);
+
     const { sku, size, color, cost_price, sale_price, stock_quantity, barcode } = req.body;
     if (!sku) return error(res, 'SKU is required.', 422);
+
+    const variantBarcode = await prepareExternalBarcode(cid, barcode);
 
     const dupSku = await Product.findOne({ company_id: cid, 'variants.sku': sku }).lean();
     if (dupSku) return error(res, `Variant SKU "${sku}" already exists.`, 409);
@@ -305,7 +361,8 @@ const addVariant = async (req, res, next) => {
     const variant = {
       company_id:     cid,
       sku,
-      barcode:        barcode || null,
+      barcode:        variantBarcode,
+      barcode_type:   variantBarcode ? 'external' : null,
       size:           size    || null,
       color:          color   || null,
       cost_price:     parseFloat(cost_price) || 0,
@@ -318,7 +375,7 @@ const addVariant = async (req, res, next) => {
     const updated = await Product.findById(req.params.id, { variants: 1 }).lean();
     const added   = updated.variants[updated.variants.length - 1];
     return created(res, { ...added, id: added._id.toString() }, 'Variant added.');
-  } catch (err) { next(err); }
+  } catch (err) { if (!sendBarcodeError(res, err)) next(err); }
 };
 
 const updateVariant = async (req, res, next) => {
@@ -335,7 +392,14 @@ const updateVariant = async (req, res, next) => {
     const update = {};
     if (size           !== undefined) update['variants.$.size']           = size;
     if (color          !== undefined) update['variants.$.color']          = color;
-    if (barcode        !== undefined) update['variants.$.barcode']        = barcode;
+    if (barcode        !== undefined) {
+      const incoming = normalizeBarcode(barcode);
+      if (incoming !== (existingVariant.barcode || null)) {
+        const code = await prepareExternalBarcode(cid, incoming, { excludeVariantId: existingVariant._id });
+        update['variants.$.barcode']      = code;
+        update['variants.$.barcode_type'] = code ? 'external' : null;
+      }
+    }
     if (cost_price     !== undefined) update['variants.$.cost_price']     = parseFloat(cost_price);
     if (sale_price     !== undefined) update['variants.$.sale_price']     = parseFloat(sale_price);
     if (is_active      !== undefined) update['variants.$.is_active']      = is_active !== 'false' && is_active !== false;
@@ -384,7 +448,7 @@ const updateVariant = async (req, res, next) => {
     const updated = await Product.findOne({ _id: productId, company_id: cid }, { variants: 1 }).lean();
     const variant = updated?.variants?.find(v => v._id.toString() === variantId);
     return success(res, { ...variant, id: variant._id.toString() }, 'Variant updated.');
-  } catch (err) { next(err); }
+  } catch (err) { if (!sendBarcodeError(res, err)) next(err); }
 };
 
 // ─── stats ────────────────────────────────────────────────────────────────────
@@ -436,6 +500,45 @@ const lowStock = async (req, res, next) => {
 
 // ─── getByBarcode ─────────────────────────────────────────────────────────────
 
+// ─── expiryAlerts ─────────────────────────────────────────────────────────────
+
+// Lots that are expired, expire today, or expire within the company's warning window.
+const expiryAlerts = async (req, res, next) => {
+  try {
+    const cid = req.companyId;
+    const setting = await Setting.findOne({ company_id: cid, key: 'expiry_warning_days' }, { value: 1 }).lean();
+    const parsed  = parseInt(setting?.value, 10);
+    const days    = Number.isFinite(parsed) && parsed >= 0 ? parsed : 30;
+
+    const rows = await StockBatch.find({
+      company_id:  cid,
+      quantity:    { $gt: 0 },
+      expiry_date: { $ne: null, $lt: stockBatch.warningHorizon(new Date(), days) },
+    }).lean();
+
+    const productIds = [...new Set(rows.map(r => String(r.product_id)))];
+    const products   = await Product.find({ company_id: cid, _id: { $in: productIds } }, { name: 1, sku: 1 }).lean();
+    const byId       = new Map(products.map(p => [String(p._id), p]));
+
+    const grouped = stockBatch.classifyLots(rows, days);
+    const shape = (r) => ({
+      batch_id:     String(r._id),
+      product_id:   String(r.product_id),
+      product_name: byId.get(String(r.product_id))?.name || '',
+      sku:          byId.get(String(r.product_id))?.sku  || '',
+      batch_no:     r.batch_no,
+      expiry_date:  r.expiry_date,
+      quantity:     r.quantity,
+    });
+    return success(res, {
+      warning_days:  days,
+      expired:       grouped.expired.map(shape),
+      expires_today: grouped.expires_today.map(shape),
+      expires_soon:  grouped.expires_soon.map(shape),
+    });
+  } catch (err) { next(err); }
+};
+
 const getByBarcode = async (req, res, next) => {
   try {
     const cid  = req.companyId;
@@ -456,16 +559,39 @@ const getByBarcode = async (req, res, next) => {
 const updateBarcode = async (req, res, next) => {
   try {
     const cid     = req.companyId;
-    const { barcode } = req.body;
-    const product = await Product.findOne({ _id: req.params.id, company_id: cid }).lean();
+    const incoming = normalizeBarcode(req.body.barcode);
+    const product  = await Product.findOne({ _id: req.params.id, company_id: cid }).lean();
     if (!product) return error(res, 'Product not found.', 404);
-    if (barcode) {
-      const dup = await Product.findOne({ company_id: cid, barcode, _id: { $ne: product._id } }).lean();
-      if (dup) return error(res, 'Barcode already in use.', 409);
+    if (incoming !== (product.barcode || null)) {
+      const code = await prepareExternalBarcode(cid, incoming, { excludeProductId: product._id });
+      await Product.updateOne(
+        { _id: product._id, company_id: cid },
+        { $set: { barcode: code, barcode_type: code ? 'external' : null, updated_at: new Date() } }
+      );
     }
-    await Product.findByIdAndUpdate(req.params.id, { barcode: barcode || null, updated_at: new Date() });
     return success(res, null, 'Barcode updated.');
-  } catch (err) { next(err); }
+  } catch (err) { if (!sendBarcodeError(res, err)) next(err); }
+};
+
+// ─── generateInternalBarcode ──────────────────────────────────────────────────
+
+const generateInternalBarcode = async (req, res, next) => {
+  try {
+    const cid  = req.companyId;
+    const code = await assignInternalBarcode(cid, { productId: req.params.id });
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'products', req.params.id, null, { barcode: code, barcode_type: 'internal' });
+    return success(res, { barcode: code, barcode_type: 'internal' }, 'Internal barcode generated.');
+  } catch (err) { if (!sendBarcodeError(res, err)) next(err); }
+};
+
+const generateVariantInternalBarcode = async (req, res, next) => {
+  try {
+    const cid  = req.companyId;
+    const { id: productId, variantId } = req.params;
+    const code = await assignInternalBarcode(cid, { productId, variantId });
+    await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'products', productId, null, { variant_id: variantId, barcode: code, barcode_type: 'internal' });
+    return success(res, { barcode: code, barcode_type: 'internal' }, 'Internal barcode generated.');
+  } catch (err) { if (!sendBarcodeError(res, err)) next(err); }
 };
 
 // ─── deleteVariant ────────────────────────────────────────────────────────────
@@ -521,6 +647,7 @@ module.exports = {
   update: updateProduct,
   remove: deleteProduct,
   stats, lowStock, getByBarcode, updateBarcode,
+  generateInternalBarcode, generateVariantInternalBarcode, expiryAlerts,
   listVariants,
   upsertVariant: addVariant,
   updateVariant,

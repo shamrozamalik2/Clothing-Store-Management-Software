@@ -3,6 +3,19 @@
 const { Schema, model, Types } = require('mongoose');
 const basePlugin = require('./_plugin');
 
+// Which lots a batch-tracked line was taken from. `restored` is how much has gone
+// back into that lot through returns or a void, so the same units are never restored twice.
+const batchAllocationSchema = new Schema(
+  {
+    batch_id:    { type: Types.ObjectId, ref: 'StockBatch', required: true },
+    batch_no:    { type: String, default: null },
+    expiry_date: { type: Date, default: null },
+    quantity:    { type: Number, required: true },
+    restored:    { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 // Embedded sale item
 const saleItemSchema = new Schema(
   {
@@ -16,6 +29,7 @@ const saleItemSchema = new Schema(
     discount:     { type: Number, default: 0 },
     tax_amount:   { type: Number, default: 0 },
     total:        { type: Number, required: true },
+    batch_allocations: { type: [batchAllocationSchema], default: [] },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: false }, _id: true }
 );

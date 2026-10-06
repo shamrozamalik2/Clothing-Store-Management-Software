@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { Fragment, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
@@ -13,6 +13,7 @@ import { suppliersApi } from '@api/suppliers.api';
 import { productsApi } from '@api/products.api';
 import { purchasesApi } from '@api/purchases.api';
 import { formatCurrency } from '@utils/format';
+import { useFeatures } from '@hooks/useFeatures';
 
 export default function PurchaseFormPage() {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ export default function PurchaseFormPage() {
 
   // Line items
   const [items, setItems] = useState([]);
+  const { isOn } = useFeatures();
 
   // Product search
   const [productSearch, setProductSearch] = useState('');
@@ -70,6 +72,10 @@ export default function PurchaseFormPage() {
         variant_id:   null,
         product_name: product.name,
         product_sku:  product.sku,
+        track_batches: !!product.track_batches,
+        batch_no:     '',
+        expiry_date:  '',
+        mfg_date:     '',
         quantity:     1,
         unit_cost:    parseFloat(product.cost_price) || 0,
         subtotal:     parseFloat(product.cost_price) || 0,
@@ -119,6 +125,11 @@ export default function PurchaseFormPage() {
         quantity:   parseFloat(i.quantity),
         unit_cost:  parseFloat(i.unit_cost),
         subtotal:   parseFloat(i.subtotal),
+        ...(i.track_batches ? {
+          batch_no:    i.batch_no || null,
+          expiry_date: i.expiry_date || null,
+          mfg_date:    i.mfg_date || null,
+        } : {}),
       })),
     });
   }
@@ -197,7 +208,8 @@ export default function PurchaseFormPage() {
                     </thead>
                     <tbody className="divide-y divide-surface-700/50">
                       {items.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-surface-800/20">
+                        <Fragment key={idx}>
+                        <tr className="hover:bg-surface-800/20">
                           <td className="px-3 py-2">
                             <p className="font-medium text-surface-100">{item.product_name}</p>
                             <p className="text-xs text-surface-500 font-mono">{item.product_sku}</p>
@@ -228,6 +240,35 @@ export default function PurchaseFormPage() {
                             </button>
                           </td>
                         </tr>
+                        {item.track_batches && (
+                          <tr className="bg-surface-800/30">
+                            <td colSpan={5} className="px-3 pb-3 pt-0">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <input
+                                  type="text" placeholder="Batch no."
+                                  value={item.batch_no}
+                                  onChange={e => updateItem(idx, 'batch_no', e.target.value)}
+                                  className="w-full px-2 py-1 rounded bg-surface-700 border border-surface-600 text-surface-100 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                />
+                                {isOn('EXPIRY') && (
+                                  <input
+                                    type="date" aria-label="Expiry date"
+                                    value={item.expiry_date}
+                                    onChange={e => updateItem(idx, 'expiry_date', e.target.value)}
+                                    className="w-full px-2 py-1 rounded bg-surface-700 border border-surface-600 text-surface-100 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                  />
+                                )}
+                                <input
+                                  type="date" aria-label="Manufacturing date"
+                                  value={item.mfg_date}
+                                  onChange={e => updateItem(idx, 'mfg_date', e.target.value)}
+                                  className="w-full px-2 py-1 rounded bg-surface-700 border border-surface-600 text-surface-100 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>

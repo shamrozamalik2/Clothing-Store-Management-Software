@@ -9,6 +9,7 @@ const { success, created, error }       = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { logAudit } = require('../utils/audit');
 const { AUDIT_ACTIONS } = require('../config/constants');
+const stockBatch = require('../services/stockBatch.service');
 
 async function genBatchRef(companyId, session) {
   const d      = new Date();
@@ -189,7 +190,7 @@ exports.createBatch = async (req, res, next) => {
     if (!product_id || qty <= 0) return error(res, 'product_id and quantity_produced are required.', 422);
 
     const boms = await BOM.find({ company_id: cid, product_id })
-      .populate('raw_material_id', 'name cost_price stock_quantity track_inventory')
+      .populate('raw_material_id', 'name cost_price stock_quantity track_inventory track_batches')
       .lean();
 
     if (!boms.length) return error(res, 'No BOM defined for this product. Add raw materials first.', 422);
@@ -218,6 +219,8 @@ exports.createBatch = async (req, res, next) => {
           productionCost += cost;
 
           await Product.updateOne({ _id: rm._id, company_id: cid }, { $inc: { stock_quantity: -needed }, $set: { updated_at: new Date() } }, { session });
+          // Expired material is never used in production.
+          await stockBatch.applyStockDelta(session, cid, rm, -needed, { allowExpired: false });
           materials.push({ product_id: rm._id, product_name: rm.name, quantity_used: needed, unit_cost: parseFloat(rm.cost_price || 0), total_cost: cost });
         }
 
@@ -238,6 +241,8 @@ exports.createBatch = async (req, res, next) => {
 
         // Add finished goods, update cost price
         await Product.updateOne({ _id: product_id, company_id: cid }, { $inc: { stock_quantity: qty }, $set: { cost_price: unitCost, updated_at: new Date() } }, { session });
+        const finished = await Product.findOne({ _id: product_id, company_id: cid }, { track_batches: 1, name: 1 }).session(session).lean();
+        await stockBatch.applyStockDelta(session, cid, finished, qty);
 
         batchDoc = newBatch;
       });

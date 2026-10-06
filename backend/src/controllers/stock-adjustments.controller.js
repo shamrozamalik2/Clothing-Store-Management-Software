@@ -8,6 +8,7 @@ const { success, created, error } = require('../utils/response');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { AUDIT_ACTIONS } = require('../config/constants');
 const { logAudit }      = require('../utils/audit');
+const stockBatch        = require('../services/stockBatch.service');
 
 async function generateReference(companyId, session) {
   const date = new Date();
@@ -136,6 +137,8 @@ const create = async (req, res, next) => {
               { $set: { stock_quantity: newQty, updated_at: new Date() } },
               { session }
             );
+            // Batch-tracked products: move the lots by the same amount. Write-offs may take expired stock.
+            await stockBatch.applyStockDelta(session, cid, product, newQty - currentStock, { allowExpired: true });
           }
         }
 

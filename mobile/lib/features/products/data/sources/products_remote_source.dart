@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_endpoints.dart';
 import '../../../../core/models/api_response.dart';
@@ -15,11 +17,16 @@ class ProductsRemoteSource {
     String? categoryId,
     bool?   lowStock,
   }) async {
+    // The list endpoint has no barcode filter, so an exact barcode goes to the barcode endpoint.
+    if (barcode != null) {
+      final product = await findByBarcode(barcode);
+      final items   = product == null ? <ProductModel>[] : [product];
+      return PaginatedResponse(items: items, total: items.length, page: 1, limit: 1);
+    }
     final res = await _api.get(ApiEndpoints.products, queryParameters: {
       'page':  page,
       'limit': limit,
       if (search     != null) 'search':      search,
-      if (barcode    != null) 'barcode':     barcode,
       if (categoryId != null) 'category_id': categoryId,
       if (lowStock   == true) 'low_stock':   'true',
     });
@@ -29,12 +36,23 @@ class ProductsRemoteSource {
     );
   }
 
-  Future<ProductModel> getByBarcode(String barcode) async {
-    final res  = await _api.get(ApiEndpoints.products, queryParameters: {'barcode': barcode, 'limit': 1});
-    final data = res.data as Map<String, dynamic>;
-    final list = (data['data'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    if (list.isEmpty) throw Exception('Product not found');
-    return ProductModel.fromJson(list.first);
+  /// Exact barcode lookup. Returns null when no product or variant uses the code.
+  Future<ProductModel?> findByBarcode(String barcode) async {
+    try {
+      final res  = await _api.get('${ApiEndpoints.products}/barcode/${Uri.encodeComponent(barcode)}');
+      final body = res.data as Map<String, dynamic>;
+      return ProductModel.fromJson(body['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// Creates a product. [data] uses the same field names as the web product form.
+  Future<ProductModel> createProduct(Map<String, dynamic> data) async {
+    final res  = await _api.post(ApiEndpoints.products, data: data);
+    final body = res.data as Map<String, dynamic>;
+    return ProductModel.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   Future<List<Map<String, dynamic>>> getCategories() async {

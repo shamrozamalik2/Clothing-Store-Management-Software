@@ -99,7 +99,10 @@ client.interceptors.response.use(
       err.response?.data?.message ||
       err.message ||
       'An unexpected error occurred.';
-    return Promise.reject(new Error(message));
+    const error = new Error(message);
+    error.status = status;
+    error.code = code;
+    return Promise.reject(error);
   }
 );
 

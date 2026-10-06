@@ -20,7 +20,9 @@ import {
   ExclamationTriangleIcon,
   InformationCircleIcon,
 } from '@heroicons/react/24/outline';
+import { useNavigate }        from 'react-router-dom';
 import { usePermission }      from '@hooks/usePermission';
+import { useFeatures }        from '@hooks/useFeatures';
 import { productsApi }        from '@api/products.api';
 import { formatCurrency }     from '@utils/format';
 import { printerService, BT_SUPPORTED, PLATFORM } from '@utils/printerService';
@@ -30,10 +32,6 @@ import Badge   from '@components/common/Badge';
 import SearchInput from '@components/common/SearchInput';
 
 // ── Barcode generation ───────────────────────────────────────────────────────
-
-function generateNumeric12() {
-  return Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join('');
-}
 
 function renderBarcode(svgEl, value, opts = {}) {
   if (!svgEl || !value) return false;
@@ -79,6 +77,15 @@ const CONN_TYPES = [
 export default function BarcodePage() {
   const { can, isAdmin } = usePermission();
   const qc               = useQueryClient();
+  const navigate         = useNavigate();
+  const { isOn }         = useFeatures();
+  const canCreate        = can('products', 'create');
+
+  // ── Scan to find or create ──
+  const [scanCode, setScanCode]     = useState('');
+  const [scanResult, setScanResult] = useState(null); // { status: 'found' | 'missing' | 'error', ... }
+  const [scanBusy, setScanBusy]     = useState(false);
+  const scanRef = useRef(null);
 
   const canView   = can('products', 'view');
   const canUpdate = can('products', 'update');
@@ -163,29 +170,49 @@ export default function BarcodePage() {
     setBarcodeValue(p.barcode || '');
   }, []);
 
-  // ── Generate barcode ──
+  // ── Scan lookup: found → open product; not found → create product with this barcode ──
+  const runScan = async (raw) => {
+    const code = raw.trim();
+    if (!code) return;
+    setScanBusy(true);
+    try {
+      const res = await productsApi.getByBarcode(code);
+      setScanResult({ status: 'found', code, product: res.data, variant: res.data.matched_variant });
+    } catch (err) {
+      setScanResult(err.status === 404
+        ? { status: 'missing', code }
+        : { status: 'error', code, message: err.message });
+    } finally {
+      setScanBusy(false);
+      setScanCode('');
+      scanRef.current?.focus();
+    }
+  };
+
+  // Manufacturer barcodes are only prefilled when the business can use them; otherwise
+  // the product is created without one and an internal barcode is generated afterwards.
+  const createFromScan = (code) => {
+    const qs = new URLSearchParams({ from: 'scan' });
+    if (isOn('EXTERNAL_BARCODE')) qs.set('barcode', code);
+    navigate(`/products/new?${qs}`);
+  };
+
+  // ── Generate internal barcode (server issues the PBC- number and saves it to the product) ──
   const handleGenerate = async () => {
+    if (!selectedProduct) return toast.error('Select a product first.');
     setChecking(true);
-    let code = '';
-    let attempts = 0;
-    while (attempts < 10) {
-      code = generateNumeric12();
-      try {
-        await productsApi.getByBarcode(code);
-        // If we reach here, barcode is taken — try again
-        attempts++;
-      } catch {
-        // 404 = not found = code is available
-        break;
-      }
+    try {
+      const res = await productsApi.generateInternalBarcode(selectedProduct.id);
+      const code = res.data.barcode;
+      setBarcodeValue(code);
+      setProduct(p => ({ ...p, barcode: code, barcode_type: 'internal' }));
+      qc.invalidateQueries({ queryKey: ['products'] });
+      toast.success(`Internal barcode ${code} assigned.`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setChecking(false);
     }
-    setChecking(false);
-    if (attempts >= 10) {
-      toast.error('Could not generate a unique barcode. Please try again.');
-      return;
-    }
-    setBarcodeValue(code);
-    toast.success('New barcode generated.');
   };
 
   // ── Save barcode ──
@@ -341,6 +368,76 @@ export default function BarcodePage() {
         {/* ── LEFT: Barcode management ── */}
         <div className="lg:col-span-2 flex flex-col gap-5">
 
+          {/* Scan to find or create */}
+          <div className="card p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700/60 pb-3 flex items-center gap-2">
+              <QrCodeIcon className="h-4 w-4" />
+              Scan to Find or Create
+            </h2>
+
+            <Input
+              ref={scanRef}
+              autoFocus
+              value={scanCode}
+              onChange={e => setScanCode(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); runScan(scanCode); } }}
+              placeholder={scanBusy ? 'Looking up…' : 'Scan a barcode, or type it and press Enter'}
+              disabled={scanBusy}
+            />
+
+            {scanResult?.status === 'found' && (() => {
+              const p = scanResult.product;
+              const v = scanResult.variant;
+              const stock = v ? v.stock_quantity : p.stock_quantity;
+              const price = v ? v.sale_price : p.sale_price;
+              const variantLabel = v ? [v.size, v.color].filter(Boolean).join(' / ') : '';
+              return (
+                <div className="rounded-lg border border-surface-700 p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-surface-100">{p.name}{variantLabel && ` · ${variantLabel}`}</p>
+                      <p className="text-xs text-surface-400 mt-0.5">
+                        SKU {v?.sku || p.sku} · Stock {stock} · {formatCurrency(price)}
+                      </p>
+                    </div>
+                    <Badge variant="success" dot>Found</Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => navigate(`/products/${p.id}/edit`)}>Open Product</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setScanResult(null)}>Scan Next</Button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {scanResult?.status === 'missing' && (
+              <div className="rounded-lg border border-amber-500/40 p-4 space-y-3">
+                <p className="text-sm text-surface-200">
+                  No product uses barcode <span className="font-mono">{scanResult.code}</span> yet.
+                </p>
+                {!isOn('EXTERNAL_BARCODE') && (
+                  <p className="text-xs text-surface-400">
+                    Manufacturer barcodes are not enabled for your business. Create the product, then generate an internal barcode for it.
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {canCreate ? (
+                    <Button size="sm" onClick={() => createFromScan(scanResult.code)}>
+                      {isOn('EXTERNAL_BARCODE') ? 'Create Product with This Barcode' : 'Create Product'}
+                    </Button>
+                  ) : (
+                    <p className="text-xs text-surface-400">You don't have permission to create products. Ask a manager to add it.</p>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => setScanResult(null)}>Scan Next</Button>
+                </div>
+              </div>
+            )}
+
+            {scanResult?.status === 'error' && (
+              <p className="text-sm text-red-400">{scanResult.message}</p>
+            )}
+          </div>
+
           {/* Product search card */}
           <div className="card p-5 space-y-4">
             <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700/60 pb-3 flex items-center gap-2">
@@ -426,7 +523,7 @@ export default function BarcodePage() {
                 onClick={handleGenerate}
                 loading={checking}
                 leftIcon={<SparklesIcon className="h-4 w-4" />}
-                title="Generate unique 12-digit barcode"
+                title="Assign the next PBC internal barcode to the selected product"
               >
                 Generate
               </Button>
