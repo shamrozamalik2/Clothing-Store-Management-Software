@@ -38,6 +38,7 @@ export default function ProductFormPage() {
   const [skuManual, setSkuManual]       = useState(false);
   const [hasTransactions, setHasTx]    = useState(false);
   const [isBatchTracked, setIsBatchTracked] = useState(false);
+  const [variantsLoaded, setVariantsLoaded] = useState(false);
   const { isOn } = useFeatures();
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
@@ -107,7 +108,10 @@ export default function ProductFormPage() {
   });
 
   useEffect(() => {
-    if (variantData?.data) setVariants(variantData.data);
+    if (variantData?.data) {
+      setVariants(variantData.data);
+      setVariantsLoaded(true);
+    }
   }, [variantData]);
 
   const mutation = useMutation({
@@ -122,7 +126,8 @@ export default function ProductFormPage() {
       fd.set('is_raw_material', isRawMaterial ? '1' : '0');
       fd.set('is_finished_good', isFinishedGood ? '1' : '0');
       fd.set('track_batches', isBatchTracked ? '1' : '0');
-      if (variants.length > 0) fd.set('variants', JSON.stringify(variants));
+      // On edit, send the list once loaded, even when empty, so removing every variant saves.
+      if (isEditing ? variantsLoaded : variants.length > 0) fd.set('variants', JSON.stringify(variants));
       if (imageFile) fd.append('image', imageFile);
       return isEditing ? productsApi.update(id, fd) : productsApi.create(fd);
     },
@@ -330,7 +335,7 @@ export default function ProductFormPage() {
             {/* Variants: sizes and colours, for businesses that use variants */}
             {isOn('VARIANTS') && (
               <div className="card p-5">
-                <VariantsSection variants={variants} onChange={setVariants} />
+                <VariantsSection variants={variants} onChange={setVariants} productSku={watch('sku')} />
               </div>
             )}
           </div>

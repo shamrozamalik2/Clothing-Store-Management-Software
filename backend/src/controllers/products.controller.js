@@ -15,9 +15,22 @@ const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { logAudit }                  = require('../utils/audit');
 const { prepareExternalBarcode, normalizeBarcode, assignInternalBarcode, sendBarcodeError } = require('../services/barcode.service');
 const featureSvc  = require('../services/features.service');
+const variantsSvc = require('../services/variants.service');
 const stockBatch  = require('../services/stockBatch.service');
 const StockBatch  = require('../models/StockBatch');
 const Setting     = require('../models/Setting');
+
+// A product with variants holds stock in its variants. Its own stock figure isn't used then.
+const derivedStock = (p) => (p.variants?.length
+  ? p.variants.reduce((sum, v) => sum + (Number(v.stock_quantity) || 0), 0)
+  : Number(p.stock_quantity) || 0);
+const DERIVED_STOCK_EXPR = {
+  $cond: [
+    { $gt: [{ $size: { $ifNull: ['$variants', []] } }, 0] },
+    { $sum: '$variants.stock_quantity' },
+    '$stock_quantity',
+  ],
+};
 
 async function generateAdjReference(companyId, session) {
   const date   = new Date();
@@ -51,6 +64,7 @@ const list = async (req, res, next) => {
     const sortDir   = order === 'desc' ? -1 : 1;
 
     let pipeline = [
+      { $addFields: { stock_quantity: DERIVED_STOCK_EXPR } },
       { $match: filter },
       { $lookup: { from: 'categories', localField: 'category_id', foreignField: '_id', as: '_cat' } },
       { $lookup: { from: 'brands',     localField: 'brand_id',    foreignField: '_id', as: '_br'  } },
@@ -118,6 +132,7 @@ const getOne = async (req, res, next) => {
       StockAdj.findOne({ company_id: req.companyId, 'items.product_id': product._id }, { _id: 1 }).lean(),
     ]);
 
+    const stockQty = derivedStock(product);
     return success(res, {
       ...product,
       id:               product._id.toString(),
@@ -127,8 +142,9 @@ const getOne = async (req, res, next) => {
       brand_id:         product.brand_id?._id?.toString()    || null,
       has_transactions: !!(hasSale || hasPurchase || hasAdj),
       total_sold:       totalSold,
-      stock_status:     product.stock_quantity <= 0 ? 'out_of_stock'
-                      : product.stock_quantity <= product.low_stock_alert ? 'low_stock'
+      stock_quantity:   stockQty,
+      stock_status:     stockQty <= 0 ? 'out_of_stock'
+                      : stockQty <= product.low_stock_alert ? 'low_stock'
                       : 'in_stock',
     });
   } catch (err) { next(err); }
@@ -177,6 +193,11 @@ const createProduct = async (req, res, next) => {
       return error(res, 'Turn on batch tracking to record a batch or expiry date.', 422);
     }
 
+    const variantPlan = await variantsSvc.planVariants({ companyId: cid, productSku: sku, input: body.variants });
+    if (trackBatches && variantPlan.variants.length) {
+      return error(res, 'Batch tracking is not available for products with variants.', 422);
+    }
+
     const session = await mongoose.startSession();
     let product;
     try {
@@ -196,10 +217,11 @@ const createProduct = async (req, res, next) => {
           sale_price:      parseFloat(body.sale_price) || 0,
           wholesale_price: parseFloat(body.wholesale_price) || 0,
           tax_rate:        parseFloat(body.tax_rate) || 0,
-          stock_quantity:  stockQty,
+          stock_quantity:  variantPlan.variants.length ? 0 : stockQty,
           low_stock_alert: parseInt(body.low_stock_alert, 10) || 5,
           track_inventory: trackInv,
           track_batches:   trackBatches,
+          variants:        variantPlan.variants,
           allow_negative:  negative,
           is_active:       body.is_active !== 'false' && body.is_active !== false,
           is_raw_material:  body.is_raw_material  === 'true' || body.is_raw_material === true,
@@ -214,8 +236,12 @@ const createProduct = async (req, res, next) => {
     }
 
     await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'products', product._id.toString(), null, { sku, name: body.name });
-    return created(res, { ...product.toJSON() }, 'Product created.');
-  } catch (err) { if (!sendBarcodeError(res, err)) next(err); }
+    for (const vid of variantPlan.internalNeeded) {
+      await assignInternalBarcode(cid, { productId: product._id, variantId: vid });
+    }
+    const fresh = await Product.findById(product._id);
+    return created(res, { ...fresh.toJSON() }, 'Product created.');
+  } catch (err) { if (!variantsSvc.sendError(res, err) && !sendBarcodeError(res, err)) next(err); }
 };
 
 // ─── update ───────────────────────────────────────────────────────────────────
@@ -293,6 +319,19 @@ const updateProduct = async (req, res, next) => {
     // When the value actually changes, route it through the same record,
     // atomically with the rest of the update, clamped at 0 like every other
     // stock-adjusting path already does.
+    // Variants are saved as a whole list. Existing ones keep their stock; ones left out are removed if they have no history.
+    let variantPlan = null;
+    if (body.variants !== undefined) {
+      if (product.track_batches) return error(res, 'Variants cannot be added to a batch-tracked product.', 422);
+      variantPlan = await variantsSvc.planVariants({
+        companyId: cid,
+        productSku: product.sku,
+        input: body.variants,
+        existing: product.variants || [],
+      });
+      update.variants = variantPlan.variants;
+    }
+
     const requestedStock = body.stock_quantity !== undefined ? parseFloat(body.stock_quantity) : undefined;
     const stockChanged   = requestedStock !== undefined && !Number.isNaN(requestedStock) && requestedStock !== product.stock_quantity;
 
@@ -335,10 +374,15 @@ const updateProduct = async (req, res, next) => {
       session.endSession();
     }
 
+    if (variantPlan) {
+      for (const vid of variantPlan.internalNeeded) {
+        await assignInternalBarcode(cid, { productId: req.params.id, variantId: vid });
+      }
+    }
     const updated = await Product.findById(req.params.id).lean();
     await logAudit(cid, req.user.id, AUDIT_ACTIONS.UPDATE, 'products', req.params.id);
     return success(res, { ...updated, id: updated._id.toString() }, 'Product updated.');
-  } catch (err) { if (!sendBarcodeError(res, err)) next(err); }
+  } catch (err) { if (!variantsSvc.sendError(res, err) && !sendBarcodeError(res, err)) next(err); }
 };
 
 // ─── delete ───────────────────────────────────────────────────────────────────
