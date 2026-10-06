@@ -72,7 +72,7 @@ describe('barcodes', () => {
     it('refuses malformed codes and PBC- codes typed by hand', async () => {
       const co = await externalOn('format-co');
       await assert.rejects(() => barcodes.prepareExternalBarcode(co._id, 'ab'), e => e.status === 422);
-      await assert.rejects(() => barcodes.prepareExternalBarcode(co._id, 'AB CD-12'), e => e.status === 422);
+      await assert.rejects(() => barcodes.prepareExternalBarcode(co._id, 'AB/CD-12'), e => e.status === 422);
       await assert.rejects(
         () => barcodes.prepareExternalBarcode(co._id, 'PBC-000001'),
         e => e.status === 422 && /Use Generate/.test(e.message)
