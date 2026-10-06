@@ -17,6 +17,7 @@ const DEFAULTS = [
   { key: 'receipt_header',       value: 'Thank you for shopping with us!', type: 'string',  group_name: 'receipt', label: 'Receipt Header' },
   { key: 'receipt_footer',       value: 'Exchange within 7 days with receipt.', type: 'string', group_name: 'receipt', label: 'Receipt Footer' },
   { key: 'show_tax_on_receipt',  value: 'true',                            type: 'boolean', group_name: 'receipt', label: 'Show Tax on Receipt' },
+  { key: 'expiry_warning_days',  value: '30',                              type: 'number',  group_name: 'inventory', label: 'Expiry warning (days)' },
 ];
 
 async function ensureDefaults(companyId) {
@@ -88,7 +89,15 @@ exports.updateOne = async (req, res, next) => {
     const cid   = req.companyId;
     const { value } = req.body;
     if (value === undefined) return res.status(400).json({ success: false, message: 'value is required.' });
+    if (req.params.key === 'expiry_warning_days') {
+      const days = Number(value);
+      if (!Number.isInteger(days) || days < 0 || days > 3650) {
+        return res.status(422).json({ success: false, message: 'Expiry warning must be a whole number of days from 0 to 3650.' });
+      }
+    }
 
+    // Seed the defaults first, so a key that has never been loaded still saves.
+    await ensureDefaults(cid);
     const row = await Setting.findOne({ company_id: cid, key: req.params.key }).lean();
     if (!row) return res.status(404).json({ success: false, message: 'Setting not found.' });
 

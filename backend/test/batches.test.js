@@ -397,6 +397,52 @@ describe('batches and expiry', () => {
     });
   });
 
+  describe('settings and creating batch products', () => {
+    it('the warning window saves even when the company has never opened settings', async () => {
+      const co = await batchCompany('fresh-settings-co');
+      const r = await call('PUT', '/settings/expiry_warning_days', companyToken(co._id), { value: 60 });
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+      const alerts = await call('GET', '/products/expiry-alerts', companyToken(co._id));
+      assert.equal(alerts.body.data.warning_days, 60);
+    });
+
+    it('rejects a warning window that is not a whole number of days', async () => {
+      const co = await batchCompany('bad-window-co');
+      const r = await call('PUT', '/settings/expiry_warning_days', companyToken(co._id), { value: 'soon' });
+      assert.equal(r.status, 422);
+    });
+
+    it('creating a batch product records its opening stock as a lot with the batch and expiry', async () => {
+      const co = await batchCompany('create-batch-co');
+      const r = await call('POST', '/products', companyToken(co._id), {
+        name: 'Oat Biscuits', sale_price: 50, stock_quantity: 8, track_inventory: '1',
+        track_batches: '1', batch_no: 'OAT1', expiry_date: daysFromNow(20),
+      });
+      assert.equal(r.status, 201, JSON.stringify(r.body));
+      const id = r.body.data.id || r.body.data._id;
+      assert.equal((await Product.findById(id).lean()).track_batches, true);
+      assert.deepEqual(await lotsOf(id), { OAT1: 8 });
+      await assertInStep(id);
+    });
+
+    it('refuses batch tracking on a business without the module, and writes nothing', async () => {
+      const co = await makeCompany({ slug: 'create-no-batch-co', features: { BATCH_TRACKING: false } });
+      const r = await call('POST', '/products', companyToken(co._id), {
+        name: 'Shirt', sale_price: 900, stock_quantity: 3, track_batches: '1',
+      });
+      assert.equal(r.status, 403);
+      assert.equal(await Product.countDocuments({ company_id: co._id }), 0);
+    });
+
+    it('refuses a batch number when batch tracking is not turned on', async () => {
+      const co = await batchCompany('create-stray-batch-co');
+      const r = await call('POST', '/products', companyToken(co._id), {
+        name: 'Tea', sale_price: 20, stock_quantity: 3, track_batches: '0', batch_no: 'X1',
+      });
+      assert.equal(r.status, 422);
+    });
+  });
+
   describe('window arithmetic', () => {
     it('a lot expiring on the last day of the window is inside it, the day after is not', () => {
       const now = new Date('2030-01-10T12:00:00Z');

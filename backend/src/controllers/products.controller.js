@@ -154,29 +154,64 @@ const createProduct = async (req, res, next) => {
 
     const barcode = await prepareExternalBarcode(cid, body.barcode);
 
-    const product = await Product.create({
-      company_id:      cid,
-      category_id:     body.category_id || null,
-      brand_id:        body.brand_id    || null,
-      name:            body.name,
-      sku,
-      barcode,
-      barcode_type:    barcode ? 'external' : null,
-      description:     body.description || null,
-      image,
-      unit:            body.unit || 'pcs',
-      cost_price:      parseFloat(body.cost_price) || 0,
-      sale_price:      parseFloat(body.sale_price) || 0,
-      wholesale_price: parseFloat(body.wholesale_price) || 0,
-      tax_rate:        parseFloat(body.tax_rate) || 0,
-      stock_quantity:  parseFloat(body.stock_quantity) || 0,
-      low_stock_alert: parseInt(body.low_stock_alert, 10) || 5,
-      track_inventory: body.track_inventory !== 'false' && body.track_inventory !== false,
-      allow_negative:  body.allow_negative  === 'true'  || body.allow_negative === true,
-      is_active:       body.is_active !== 'false' && body.is_active !== false,
-      is_raw_material:  body.is_raw_material  === 'true' || body.is_raw_material === true,
-      is_finished_good: body.is_finished_good === 'true' || body.is_finished_good === true,
-    });
+    // Batch tracking on create: the opening stock becomes one lot with the batch and expiry given.
+    const trackBatches = body.track_batches === '1' || body.track_batches === 'true' || body.track_batches === true;
+    const trackInv     = body.track_inventory !== 'false' && body.track_inventory !== false;
+    const negative     = body.allow_negative === 'true' || body.allow_negative === true;
+    const stockQty     = parseFloat(body.stock_quantity) || 0;
+    let lot = {};
+    if (trackBatches) {
+      if (!(await featureSvc.isFeatureEnabled(cid, 'BATCH_TRACKING'))) {
+        return error(res, 'Batch tracking is not available for your business.', 403);
+      }
+      if (!trackInv || negative) {
+        return error(res, 'Batch tracking needs inventory tracking on and negative stock off.', 422);
+      }
+      lot = stockBatch.normalizeLot({ batch_no: body.batch_no, expiry_date: body.expiry_date });
+      const expiryOn = await featureSvc.isFeatureEnabled(cid, 'EXPIRY');
+      if (lot.expiry_date && !expiryOn) return error(res, 'Expiry dates are not enabled for your business.', 403);
+      if (expiryOn && stockQty > 0 && !lot.expiry_date) {
+        return error(res, 'Expiry date is required for batch-tracked stock.', 422);
+      }
+    } else if (body.batch_no || body.expiry_date) {
+      return error(res, 'Turn on batch tracking to record a batch or expiry date.', 422);
+    }
+
+    const session = await mongoose.startSession();
+    let product;
+    try {
+      await session.withTransaction(async () => {
+        [product] = await Product.create([{
+          company_id:      cid,
+          category_id:     body.category_id || null,
+          brand_id:        body.brand_id    || null,
+          name:            body.name,
+          sku,
+          barcode,
+          barcode_type:    barcode ? 'external' : null,
+          description:     body.description || null,
+          image,
+          unit:            body.unit || 'pcs',
+          cost_price:      parseFloat(body.cost_price) || 0,
+          sale_price:      parseFloat(body.sale_price) || 0,
+          wholesale_price: parseFloat(body.wholesale_price) || 0,
+          tax_rate:        parseFloat(body.tax_rate) || 0,
+          stock_quantity:  stockQty,
+          low_stock_alert: parseInt(body.low_stock_alert, 10) || 5,
+          track_inventory: trackInv,
+          track_batches:   trackBatches,
+          allow_negative:  negative,
+          is_active:       body.is_active !== 'false' && body.is_active !== false,
+          is_raw_material:  body.is_raw_material  === 'true' || body.is_raw_material === true,
+          is_finished_good: body.is_finished_good === 'true' || body.is_finished_good === true,
+        }], { session });
+        if (trackBatches && stockQty > 0) {
+          await stockBatch.receiveLot(session, cid, product._id, lot, stockQty);
+        }
+      });
+    } finally {
+      session.endSession();
+    }
 
     await logAudit(cid, req.user.id, AUDIT_ACTIONS.CREATE, 'products', product._id.toString(), null, { sku, name: body.name });
     return created(res, { ...product.toJSON() }, 'Product created.');

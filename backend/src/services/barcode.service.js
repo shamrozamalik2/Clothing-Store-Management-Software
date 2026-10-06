@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const Product  = require('../models/Product');
 const Company  = require('../models/Company');
 const { isFeatureEnabled } = require('./features.service');
+const { BatchError }       = require('./stockBatch.service');
 
 const INTERNAL_PREFIX  = 'PBC-';
 const INTERNAL_PATTERN = /^PBC-\d{6,}$/;
@@ -146,7 +147,7 @@ async function assignInternalBarcode(companyId, { productId, variantId = null })
 // Maps barcode errors (and duplicate-key errors from the barcode indexes) to an HTTP
 // response. Returns true when it sent one, so the caller can skip next(err).
 function sendBarcodeError(res, err) {
-  if (err instanceof BarcodeError) {
+  if (err instanceof BarcodeError || err instanceof BatchError) {
     const body = { success: false, message: err.message };
     if (err.code) { body.code = err.code; body.feature = err.feature; }
     res.status(err.status).json(body);

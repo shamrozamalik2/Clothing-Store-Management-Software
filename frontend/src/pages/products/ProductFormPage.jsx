@@ -42,7 +42,7 @@ export default function ProductFormPage() {
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
-      name: '', sku: '', barcode: scannedBarcode, description: '',
+      name: '', sku: '', barcode: scannedBarcode, description: '', batch_no: '', expiry_date: '',
       category_id: '', brand_id: '', unit: 'piece',
       cost_price: '', sale_price: '', wholesale_price: '',
       stock_quantity: 0, low_stock_alert: 10,
@@ -114,12 +114,14 @@ export default function ProductFormPage() {
     mutationFn: (data) => {
       const fd = new FormData();
       Object.entries(data).forEach(([k, v]) => {
+        // Lot details only go with batch tracking.
+        if (!isBatchTracked && (k === 'batch_no' || k === 'expiry_date')) return;
         if (v !== undefined && v !== '') fd.append(k, v);
       });
       fd.set('is_active', isActive ? '1' : '0');
       fd.set('is_raw_material', isRawMaterial ? '1' : '0');
       fd.set('is_finished_good', isFinishedGood ? '1' : '0');
-      if (isEditing) fd.set('track_batches', isBatchTracked ? '1' : '0');
+      fd.set('track_batches', isBatchTracked ? '1' : '0');
       if (variants.length > 0) fd.set('variants', JSON.stringify(variants));
       if (imageFile) fd.append('image', imageFile);
       return isEditing ? productsApi.update(id, fd) : productsApi.create(fd);
@@ -187,8 +189,10 @@ export default function ProductFormPage() {
                     <p className="text-2xs text-surface-600 mt-1">Auto-generated from name</p>
                   )}
                 </div>
-                <Input label="Barcode / ISBN" placeholder="Optional"
-                  {...register('barcode')} />
+                {isOn('BARCODE') && (
+                  <Input label="Barcode / ISBN" placeholder="Optional"
+                    {...register('barcode')} />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -275,7 +279,7 @@ export default function ProductFormPage() {
                   onChange={(v) => setValue('track_inventory', v ? '1' : '0')}
                 />
               </div>
-              {isEditing && isOn('BATCH_TRACKING') && (
+              {isOn('BATCH_TRACKING') && (
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-surface-200">
@@ -283,10 +287,20 @@ export default function ProductFormPage() {
                     </p>
                     <p className="text-xs text-surface-500">
                       Keep stock in lots with their own batch number{isOn('EXPIRY') ? ' and expiry date' : ''}. Sales use the earliest expiry first.
-                      Turning this on makes the current stock one lot.
+                      {isEditing
+                        ? 'Turning this on makes the current stock one lot.'
+                        : 'Opening stock becomes one lot, with the batch details below.'}
                     </p>
                   </div>
                   <Toggle checked={isBatchTracked} onChange={setIsBatchTracked} />
+                </div>
+              )}
+              {!isEditing && isOn('BATCH_TRACKING') && isBatchTracked && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input label="Opening batch no." placeholder="Optional" {...register('batch_no')} />
+                  {isOn('EXPIRY') && (
+                    <Input label="Expiry date" type="date" {...register('expiry_date')} />
+                  )}
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">
@@ -313,10 +327,12 @@ export default function ProductFormPage() {
               </div>
             </div>
 
-            {/* Variants */}
-            <div className="card p-5">
-              <VariantsSection variants={variants} onChange={setVariants} />
-            </div>
+            {/* Variants: sizes and colours, for businesses that use variants */}
+            {isOn('VARIANTS') && (
+              <div className="card p-5">
+                <VariantsSection variants={variants} onChange={setVariants} />
+              </div>
+            )}
           </div>
 
           {/* Right column — image + status */}
@@ -346,6 +362,7 @@ export default function ProductFormPage() {
               </div>
             </div>
 
+            {isOn('MANUFACTURING') && (
             <div className="card p-5 space-y-4">
               <h2 className="text-sm font-semibold text-surface-200 border-b border-surface-700 pb-2">
                 Manufacturing Type
@@ -372,6 +389,7 @@ export default function ProductFormPage() {
                 />
               </div>
             </div>
+            )}
 
             <div className="flex flex-col gap-2">
               <Button type="submit" loading={mutation.isPending} className="w-full">
