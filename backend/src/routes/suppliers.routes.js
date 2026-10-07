@@ -2,11 +2,13 @@
 
 const { Router } = require('express');
 const { authenticate, requirePermission } = require('../middleware/auth.middleware');
+const { requireFeature } = require('../middleware/feature.middleware');
 const ctrl       = require('../controllers/suppliers.controller');
 const csvUpload  = require('../utils/csv-uploader');
 
 const router = Router();
 router.use(authenticate);
+router.use(requireFeature('SUPPLIERS'));
 
 router.get   ('/',    requirePermission('suppliers', 'view'),   ctrl.list);
 router.get   ('/:id', requirePermission('suppliers', 'view'),   ctrl.getOne);

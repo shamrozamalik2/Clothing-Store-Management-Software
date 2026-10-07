@@ -26,6 +26,7 @@ const updateRules = [
 ];
 
 router.use(authenticate);
+router.use(requireFeature('PRODUCTS'));
 
 // Product CRUD
 router.get('/',                    requirePermission('products', 'view'),   ctrl.list);

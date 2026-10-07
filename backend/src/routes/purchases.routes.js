@@ -2,10 +2,12 @@
 
 const { Router } = require('express');
 const { authenticate, requirePermission } = require('../middleware/auth.middleware');
+const { requireFeature } = require('../middleware/feature.middleware');
 const ctrl = require('../controllers/purchases.controller');
 
 const router = Router();
 router.use(authenticate);
+router.use(requireFeature('PURCHASES'));
 
 router.get  ('/',                requirePermission('purchases', 'view'),   ctrl.list);
 router.get  ('/:id',             requirePermission('purchases', 'view'),   ctrl.getOne);

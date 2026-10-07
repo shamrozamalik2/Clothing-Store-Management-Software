@@ -3,12 +3,16 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/reports.controller');
 const { authenticate, requirePermission } = require('../middleware/auth.middleware');
+const { requireFeature } = require('../middleware/feature.middleware');
 
 const router = Router();
 
 router.use(authenticate);
 
+// The dashboard stays available regardless of the Reports module; every business keeps one.
 router.get('/dashboard',         requirePermission('reports', 'view'), ctrl.dashboard);
+
+router.use(requireFeature('REPORTS'));
 router.get('/overview',          requirePermission('reports', 'view'), ctrl.overview);
 router.get('/daily-sales',       requirePermission('reports', 'view'), ctrl.dailySales);
 router.get('/payment-methods',   requirePermission('reports', 'view'), ctrl.paymentMethods);

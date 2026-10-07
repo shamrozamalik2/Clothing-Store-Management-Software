@@ -3,8 +3,10 @@
 const router = require('express').Router();
 const { create, list, getOne } = require('../controllers/returns.controller');
 const { authenticate, requirePermission } = require('../middleware/auth.middleware');
+const { requireFeature } = require('../middleware/feature.middleware');
 
 router.use(authenticate);
+router.use(requireFeature('RETURNS'));
 
 router.get('/',    requirePermission('sales', 'view'),   list);
 router.get('/:id', requirePermission('sales', 'view'),   getOne);
