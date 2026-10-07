@@ -101,6 +101,17 @@ describe('core modules refuse the API when a category leaves them out', () => {
     assert.equal(list.body.feature, 'SALES');
   });
 
+  it('categories and brands follow the Products module, since the sidebar groups them with it', async () => {
+    const co = await makeCompany({ slug: 'no-products-co', features: { PRODUCTS: false } });
+    const token = companyToken(co._id);
+
+    const cats = await call('GET', '/categories', token);
+    assert.equal(cats.body.feature, 'PRODUCTS');
+
+    const brands = await call('GET', '/brands', token);
+    assert.equal(brands.body.feature, 'PRODUCTS');
+  });
+
   it('the dashboard stays available even when Reports is off, but the report pages are refused', async () => {
     const co = await makeCompany({ slug: 'no-reports-co', features: { REPORTS: false } });
     const token = companyToken(co._id);
@@ -115,7 +126,7 @@ describe('core modules refuse the API when a category leaves them out', () => {
   it('a default (clothing) company is refused nothing on these routes', async () => {
     const co = await makeCompany({ slug: 'clothing-ok-co' });
     const token = companyToken(co._id);
-    for (const path of ['/sales', '/returns', '/purchases', '/customers', '/suppliers', '/products', '/stock-adjustments', '/reports/overview']) {
+    for (const path of ['/sales', '/returns', '/purchases', '/customers', '/suppliers', '/products', '/categories', '/brands', '/stock-adjustments', '/reports/overview']) {
       const r = await call('GET', path, token);
       assert.notEqual(r.body.code, 'FEATURE_DISABLED', `${path} should not be feature-disabled for clothing`);
     }

@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQuery } from '@tanstack/react-query';
+import { FEATURE_BY_PATH } from '@config/featureRoutes';
 import {
   HomeIcon,
   ShoppingBagIcon,
@@ -98,14 +99,8 @@ function PBCMark({ size = 32 }) {
 }
 
 /* ─── Sidebar ────────────────────────────────────────────────────────────── */
-const FEATURE_BY_PATH = {
-  '/products': 'PRODUCTS', '/categories': 'PRODUCTS', '/brands': 'PRODUCTS',
-  '/inventory/adjust': 'INVENTORY', '/barcodes': 'BARCODE',
-  '/pos': 'POS', '/sales': 'SALES', '/returns': 'RETURNS', '/purchases': 'PURCHASES',
-  '/expenses': 'EXPENSES', '/customers': 'CUSTOMERS', '/suppliers': 'SUPPLIERS',
-  '/reports': 'REPORTS', '/manufacturing': 'MANUFACTURING', '/hr': 'HR',
-  '/ledger': 'LEDGER', '/audit': 'AUDIT',
-};
+// FEATURE_BY_PATH lives in @config/featureRoutes.js, shared with the router — one
+// path-to-module map, so a hidden nav item and a blocked page can never drift apart.
 
 export default function Sidebar() {
   const dispatch    = useDispatch();

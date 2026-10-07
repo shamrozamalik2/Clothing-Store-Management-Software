@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => ({
       '@hooks': path.resolve(__dirname, './src/hooks'),
       '@store': path.resolve(__dirname, './src/store'),
       '@api': path.resolve(__dirname, './src/api'),
+      '@config': path.resolve(__dirname, './src/config'),
       '@utils': path.resolve(__dirname, './src/utils'),
       '@assets': path.resolve(__dirname, './src/assets'),
     },

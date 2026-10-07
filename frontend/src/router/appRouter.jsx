@@ -2,6 +2,8 @@ import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectIsAuth, selectUserRole } from '@store/slices/authSlice';
 import AppLayout from '@components/layout/AppLayout';
+import FeatureGate from '@components/common/FeatureGate';
+import { FEATURE_BY_PATH } from '@config/featureRoutes';
 import { Suspense, lazy } from 'react';
 
 const PublicLoginPage       = lazy(() => import('@pages/public/PublicLoginPage'));
@@ -45,6 +47,10 @@ function PublicRoute() {
   return isAuth ? <Navigate to="/dashboard" replace /> : <Outlet />;
 }
 
+// Shows a clear "not enabled" message instead of the page when its module is off, so a
+// bookmark or direct link never looks like a broken, empty page.
+const gate = (path, el) => <FeatureGate feature={FEATURE_BY_PATH[path]}>{el}</FeatureGate>;
+
 export const appRouter = createBrowserRouter([
   // Root → login if not authenticated, dashboard if authenticated
   { path: '/', element: <Navigate to="/dashboard" replace /> },
@@ -61,30 +67,30 @@ export const appRouter = createBrowserRouter([
       { path: '/dashboard',           element: <DashboardPage /> },
       { path: '/users',               element: <UsersPage /> },
       { path: '/settings/profile',    element: <ProfilePage /> },
-      { path: '/categories',          element: <CategoriesPage /> },
-      { path: '/brands',              element: <BrandsPage /> },
-      { path: '/products',            element: <ProductsPage /> },
+      { path: '/categories',          element: gate('/categories', <CategoriesPage />) },
+      { path: '/brands',              element: gate('/brands', <BrandsPage />) },
+      { path: '/products',            element: gate('/products', <ProductsPage />) },
       { path: '/products/new',        element: <ProductFormPage /> },
       { path: '/products/:id/edit',   element: <ProductFormPage /> },
-      { path: '/suppliers',           element: <SuppliersPage /> },
-      { path: '/purchases',           element: <PurchasesPage /> },
+      { path: '/suppliers',           element: gate('/suppliers', <SuppliersPage />) },
+      { path: '/purchases',           element: gate('/purchases', <PurchasesPage />) },
       { path: '/purchases/new',       element: <PurchaseFormPage /> },
       { path: '/purchases/:id',       element: <PurchaseDetailPage /> },
-      { path: '/inventory/adjust',    element: <StockAdjustPage /> },
-      { path: '/customers',           element: <CustomersPage /> },
-      { path: '/pos',                 element: <POSPage /> },
-      { path: '/sales',               element: <SalesPage /> },
+      { path: '/inventory/adjust',    element: gate('/inventory/adjust', <StockAdjustPage />) },
+      { path: '/customers',           element: gate('/customers', <CustomersPage />) },
+      { path: '/pos',                 element: gate('/pos', <POSPage />) },
+      { path: '/sales',               element: gate('/sales', <SalesPage />) },
       { path: '/sales/:id',           element: <SaleDetailPage /> },
-      { path: '/reports',             element: <ReportsPage /> },
+      { path: '/reports',             element: gate('/reports', <ReportsPage />) },
       { path: '/settings',            element: <SettingsPage /> },
       { path: '/roles',               element: <RolesPage /> },
-      { path: '/expenses',            element: <ExpensesPage /> },
-      { path: '/returns',             element: <ReturnsPage /> },
-      { path: '/manufacturing',       element: <ManufacturingPage /> },
-      { path: '/hr',                  element: <EmployeesPage /> },
-      { path: '/ledger',              element: <LedgerPage /> },
-      { path: '/audit',               element: <AuditPage /> },
-      { path: '/barcodes',            element: <BarcodePage /> },
+      { path: '/expenses',            element: gate('/expenses', <ExpensesPage />) },
+      { path: '/returns',             element: gate('/returns', <ReturnsPage />) },
+      { path: '/manufacturing',       element: gate('/manufacturing', <ManufacturingPage />) },
+      { path: '/hr',                  element: gate('/hr', <EmployeesPage />) },
+      { path: '/ledger',              element: gate('/ledger', <LedgerPage />) },
+      { path: '/audit',               element: gate('/audit', <AuditPage />) },
+      { path: '/barcodes',            element: gate('/barcodes', <BarcodePage />) },
     ],
   }]},
 

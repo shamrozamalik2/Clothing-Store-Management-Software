@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const { body }   = require('express-validator');
 const { authenticate, requirePermission } = require('../middleware/auth.middleware');
+const { requireFeature } = require('../middleware/feature.middleware');
 const { makeUploader } = require('../utils/upload');
 const { list, getOne, create, update, remove, importCsv } = require('../controllers/brands.controller');
 const csvUpload = require('../utils/csv-uploader');
@@ -12,6 +13,7 @@ const upload = makeUploader('brands');
 const nameRule = body('name').trim().notEmpty().withMessage('Brand name is required.');
 
 router.use(authenticate);
+router.use(requireFeature('PRODUCTS'));
 
 router.get('/',     requirePermission('brands', 'view'),   list);
 router.get('/:id',  requirePermission('brands', 'view'),   getOne);
