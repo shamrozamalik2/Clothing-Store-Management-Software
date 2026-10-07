@@ -116,10 +116,13 @@ export default function SuperAdminBusinessCategories() {
     setLoading(true); setError('');
     try {
       const res = await saListBusinessCategories();
-      setCategories(res.data.data.categories);
+      const cats = res.data.data.categories;
+      setCategories(cats);
       setRegistry(res.data.data.registry);
+      return cats;
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load business categories.');
+      return null;
     } finally { setLoading(false); }
   }, []);
 
@@ -128,6 +131,15 @@ export default function SuperAdminBusinessCategories() {
   async function toggleActive(c) {
     try { await saSetBusinessCategoryStatus(c.key, !c.is_active); load(); }
     catch (err) { setError(err.response?.data?.message || 'Failed to change status.'); }
+  }
+
+  // Refetches before opening Edit, so a change made elsewhere (another admin, the per-company
+  // panel, or a direct fix) is never silently overwritten by a stale copy of this category.
+  async function openEdit(key) {
+    const fresh = await load();
+    const found = fresh?.find(c => c.key === key);
+    if (found) setEditing(found);
+    else if (fresh) setError(`"${key}" no longer exists. Reload the page.`);
   }
 
   const enabledCount = c => Object.values(c.features || {}).filter(Boolean).length;
@@ -173,7 +185,7 @@ export default function SuperAdminBusinessCategories() {
                     </button>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => setEditing(c)} className="p-2 text-slate-400 hover:text-white" title="Edit">
+                    <button onClick={() => openEdit(c.key)} className="p-2 text-slate-400 hover:text-white" title="Edit">
                       <PencilIcon className="h-4 w-4" />
                     </button>
                   </td>
