@@ -7,9 +7,11 @@ export function useFeatures() {
   const { data } = useQuery({
     queryKey: ['features'],
     queryFn: () => client.get('/features').then(r => r.data.data),
-    // Short cache, and a refresh when the tab comes back, so admin changes show up without a reload.
+    // Short cache, a refresh when the tab comes back, and a fresh check whenever a page that
+    // reads features is freshly opened — so a tab left open across an admin change still catches up.
     staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
   });
   return {
     business_category: data?.business_category,
