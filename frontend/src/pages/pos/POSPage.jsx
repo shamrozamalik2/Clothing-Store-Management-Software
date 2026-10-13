@@ -183,17 +183,9 @@ export default function POSPage() {
     setRecentProds(prev => [product, ...prev.filter(p => p.id !== product.id)].slice(0, 6));
   }
 
-  const barcodeMut = useMutation({
-    mutationFn: (code) => productsApi.getByBarcode(code),
-    onSuccess: (res) => {
-      const p = res?.data;
-      if (!p) { toast.error('No product found for this barcode.'); return; }
-      handleProductClick(p);
-      setProductSearch('');
-      setSearchDropOpen(false);
-    },
-    onError: () => toast.error('No product found for this barcode.'),
-  });
+  const pickAndClose = (p) => { handleProductClick(p); setProductSearch(''); setSearchDropOpen(false); };
+
+  const barcodeMut = useMutation({ mutationFn: (code) => productsApi.getByBarcode(code) });
 
   // One key per checkout attempt. Reused across retries/double-clicks of the
   // same cart so the backend can collapse them into a single sale; cleared
@@ -277,15 +269,19 @@ export default function POSPage() {
               onChange={e => { setProductSearch(e.target.value); setSearchDropOpen(true); }}
               onFocus={() => productSearch.length >= 2 && setSearchDropOpen(true)}
               onKeyDown={e => {
-                if (e.key === 'Enter' && productSearch.trim()) {
-                  e.preventDefault();
-                  if (searchDropOpen && products.length > 0) {
-                    handleProductClick(products[0]);
-                    setProductSearch(''); setSearchDropOpen(false);
-                  } else {
-                    barcodeMut.mutate(productSearch.trim());
-                  }
-                }
+                if (e.key !== 'Enter' || !productSearch.trim()) return;
+                e.preventDefault();
+                // A scanner sends the complete code before Enter, so an exact barcode match
+                // must win over the fuzzy name/SKU search — that search is still racing to
+                // catch up at this point, and landing on its stale, partial result was why a
+                // scan needed several tries to actually add the product.
+                barcodeMut.mutate(productSearch.trim(), {
+                  onSuccess: (res) => pickAndClose(res.data),
+                  onError: () => {
+                    if (searchDropOpen && products.length > 0) pickAndClose(products[0]);
+                    else toast.error('No product found for this barcode.');
+                  },
+                });
               }}
               placeholder="Search or scan barcode + Enter…"
               className="w-full h-10 pl-10 pr-10 rounded-xl bg-surface-800/90 border border-surface-600/60 text-sm text-surface-100 placeholder:text-surface-600 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/40 transition-all"
@@ -311,7 +307,7 @@ export default function POSPage() {
                     return (
                       <button key={p.id} type="button"
                         disabled={oos}
-                        onClick={() => { handleProductClick(p); setProductSearch(''); setSearchDropOpen(false); }}
+                        onClick={() => pickAndClose(p)}
                         className={cn(
                           'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-surface-700/20 last:border-0',
                           oos ? 'opacity-40 cursor-not-allowed' : 'hover:bg-surface-700/50 active:bg-surface-700'
@@ -326,7 +322,9 @@ export default function POSPage() {
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-surface-100 truncate">{p.name}</p>
-                          {p.sku && <p className="text-xs text-surface-500 font-mono">SKU: {p.sku}</p>}
+                          {p.barcode
+                            ? <p className="text-xs text-surface-500 font-mono">Barcode: {p.barcode}</p>
+                            : p.sku && <p className="text-xs text-surface-500 font-mono">SKU: {p.sku}</p>}
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-sm font-bold text-primary-400">{formatCurrency(p.sale_price)}</p>
