@@ -115,6 +115,8 @@ const login = async (req, res, next) => {
         role:        role.name,
         roleId:      role._id.toString(),
         companyId:   company._id.toString(),
+        companyName: company.name,
+        companySlug: company.slug,
         branchId:    user.branch_id ? user.branch_id.toString() : null,
         avatar:      user.avatar,
         permissions: role.permissions,
@@ -193,7 +195,10 @@ const me = async (req, res, next) => {
     }).lean();
     if (!user) return error(res, 'User not found.', 404);
 
-    const role = await Role.findById(user.role_id).lean();
+    const [role, company] = await Promise.all([
+      Role.findById(user.role_id).lean(),
+      Company.findById(user.company_id).select('name slug').lean(),
+    ]);
 
     return success(res, {
       id:          user._id.toString(),
@@ -201,6 +206,8 @@ const me = async (req, res, next) => {
       email:       user.email,
       role:        role?.name,
       companyId:   user.company_id.toString(),
+      companyName: company?.name,
+      companySlug: company?.slug,
       branchId:    user.branch_id ? user.branch_id.toString() : null,
       avatar:      user.avatar,
       phone:       user.phone,
