@@ -138,9 +138,23 @@ export default function POSPage() {
   const { data: catData } = useQuery({ queryKey: ['categories-flat'], queryFn: categoriesApi.flat });
   const categories = catData?.data ?? [];
 
+  // Debounced separately from `productSearch` itself: a human types a few
+  // characters and pauses, so this barely delays them, but a hardware scanner
+  // fires 12+ characters in under 20ms. Without this, every one of those
+  // keystrokes fired its own /api/products request with nothing to cancel the
+  // previous one, flooding the browser's per-origin connection limit and
+  // queuing the *real* request (the exact barcode lookup just below) behind
+  // a dozen useless fuzzy searches for partial codes — the actual reason a
+  // scan needed several tries to land, not just the state-read race above.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(productSearch), 250);
+    return () => clearTimeout(t);
+  }, [productSearch]);
+
   const { data: prodData, isFetching: loadingProducts } = useQuery({
-    queryKey: ['pos-products', { search: productSearch, category: categoryId }],
-    queryFn:  () => productsApi.list({ search: productSearch, category: categoryId, limit: 24, status: 'active' }),
+    queryKey: ['pos-products', { search: debouncedSearch, category: categoryId }],
+    queryFn:  () => productsApi.list({ search: debouncedSearch, category: categoryId, limit: 24, status: 'active' }),
     placeholderData: keepPreviousData,
   });
   const products = prodData?.data ?? [];
@@ -269,13 +283,19 @@ export default function POSPage() {
               onChange={e => { setProductSearch(e.target.value); setSearchDropOpen(true); }}
               onFocus={() => productSearch.length >= 2 && setSearchDropOpen(true)}
               onKeyDown={e => {
-                if (e.key !== 'Enter' || !productSearch.trim()) return;
+                if (e.key !== 'Enter') return;
+                // A real scanner can fire its characters and the trailing Enter within the
+                // same tick, faster than React commits the state update from the last
+                // keystroke. Reading `productSearch` here could still be one character behind;
+                // the input element's own value is never stale, so read it directly instead.
+                const code = e.currentTarget.value.trim();
+                if (!code) return;
                 e.preventDefault();
                 // A scanner sends the complete code before Enter, so an exact barcode match
                 // must win over the fuzzy name/SKU search — that search is still racing to
                 // catch up at this point, and landing on its stale, partial result was why a
                 // scan needed several tries to actually add the product.
-                barcodeMut.mutate(productSearch.trim(), {
+                barcodeMut.mutate(code, {
                   onSuccess: (res) => pickAndClose(res.data),
                   onError: () => {
                     if (searchDropOpen && products.length > 0) pickAndClose(products[0]);
