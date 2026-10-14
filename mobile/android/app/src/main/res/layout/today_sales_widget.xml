@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- RemoteViews (used by every app widget) only inflates a fixed whitelist of
+     view classes — notably NOT <Space>, which an earlier version of this
+     layout used for spacing and which failed inflation on-device with
+     "Error inflating class android.widget.Space". RelativeLayout anchoring
+     (top header, bottom secondary row) avoids needing a flexible spacer at
+     all, so there's nothing here outside the supported set. -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/today_sales_widget_bg"
+    android:padding="16dp">
+
+    <!-- Header: company name + last-updated time -->
+    <LinearLayout
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/widget_company_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="PBC"
+            android:textColor="#CCFFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/widget_updated_at"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#99FFFFFF"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <!-- Headline: today's sales -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/widget_header"
+        android:layout_marginTop="10dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_sales_amount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rs 0"
+            android:textColor="#FFFFFFFF"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:singleLine="true" />
+
+        <TextView
+            android:id="@+id/widget_sales_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Today's Sales"
+            android:textColor="#CCFFFFFF"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Secondary row: orders + profit, pinned to the bottom so it holds its
+         place regardless of how much vertical room the widget is resized to. -->
+    <LinearLayout
+        android:id="@+id/widget_secondary_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_orders_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Orders"
+                android:textColor="#99FFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="end">
+
+            <TextView
+                android:id="@+id/widget_profit_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Rs 0"
+                android:textColor="#FFFFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Profit"
+                android:textColor="#99FFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>

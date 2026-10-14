@@ -10,6 +10,7 @@ import '../../../../core/auth/auth_event_bus.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/constants/storage_keys.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/widget/home_widget_service.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _source.logout();
     await _storage.clearTokens();
     await _storage.delete(kKeyUser);
+    unawaited(HomeWidgetService.clear());
     state = AuthUnauthenticated();
   }
 
