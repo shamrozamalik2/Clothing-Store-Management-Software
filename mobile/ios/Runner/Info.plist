@@ -74,5 +74,21 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Lets the home screen widget's periodic refresh (Workmanager, which
+	     maps to BGAppRefreshTaskRequest on iOS) actually run in the
+	     background. The identifier must match main.dart's
+	     _kWidgetRefreshTaskId exactly — Workmanager registers with
+	     BGTaskScheduler using that raw string, unprefixed. Editing this
+	     file is equivalent to ticking "Background Modes → Background
+	     fetch" in Xcode's Signing & Capabilities; both just write this
+	     same plist key, so no Xcode step is needed for this part. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>pbc-widget-refresh</string>
+	</array>
 </dict>
 </plist>

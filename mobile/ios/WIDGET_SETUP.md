@@ -12,6 +12,10 @@ generate for you is already written and sitting in this repo:
 - `ios/TodaySalesWidget/Info.plist` — the extension's Info.plist.
 - `ios/TodaySalesWidget/TodaySalesWidget.entitlements` — its App Group.
 - `ios/Runner/Runner.entitlements` — the same App Group for the main app.
+- `ios/Runner/Info.plist` already has `UIBackgroundModes` (`fetch`) and
+  `BGTaskSchedulerPermittedIdentifiers` (`pbc-widget-refresh`) added, so the
+  periodic background refresh job needs no Xcode capability step — that
+  part's done.
 
 This needs a Mac with Xcode and your Apple Developer Team ID. None of it
 touches the Android build or anything already working.
