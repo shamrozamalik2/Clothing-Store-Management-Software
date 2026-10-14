@@ -1,5 +1,7 @@
 class CartItemModel {
   final String productId;
+  // Set when this line is a specific color/size variant, not the base product.
+  final String? variantId;
   final String name;
   final double price;
   final double costPrice;
@@ -10,6 +12,7 @@ class CartItemModel {
 
   const CartItemModel({
     required this.productId,
+    this.variantId,
     required this.name,
     required this.price,
     required this.costPrice,
@@ -19,6 +22,10 @@ class CartItemModel {
     this.unit = 'pcs',
   });
 
+  /// Identifies one cart line. Two variants of the same product must never
+  /// collapse into a single line just because they share a productId.
+  String get key => variantId == null ? '$productId-base' : '$productId-$variantId';
+
   /// Revenue after per-line discount: price × qty − discount
   double get lineTotal => (price * quantity) - discount;
 
@@ -27,6 +34,7 @@ class CartItemModel {
 
   CartItemModel copyWith({
     String? productId,
+    Object? variantId = _kSentinel,
     String? name,
     double? price,
     double? costPrice,
@@ -37,6 +45,7 @@ class CartItemModel {
   }) =>
       CartItemModel(
         productId: productId ?? this.productId,
+        variantId: identical(variantId, _kSentinel) ? this.variantId : variantId as String?,
         name: name ?? this.name,
         price: price ?? this.price,
         costPrice: costPrice ?? this.costPrice,
@@ -48,6 +57,7 @@ class CartItemModel {
 
   Map<String, dynamic> toJson() => {
         'productId': productId,
+        'variantId': variantId,
         'name': name,
         'price': price,
         'costPrice': costPrice,
@@ -59,6 +69,7 @@ class CartItemModel {
 
   factory CartItemModel.fromJson(Map<String, dynamic> json) => CartItemModel(
         productId: json['productId'] as String,
+        variantId: json['variantId'] as String?,
         name: json['name'] as String,
         price: (json['price'] as num).toDouble(),
         costPrice: (json['costPrice'] as num).toDouble(),
@@ -72,10 +83,12 @@ class CartItemModel {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is CartItemModel &&
-          productId == other.productId &&
+          key == other.key &&
           quantity == other.quantity &&
           discount == other.discount;
 
   @override
-  int get hashCode => productId.hashCode ^ quantity.hashCode ^ discount.hashCode;
+  int get hashCode => key.hashCode ^ quantity.hashCode ^ discount.hashCode;
 }
+
+const Object _kSentinel = Object();

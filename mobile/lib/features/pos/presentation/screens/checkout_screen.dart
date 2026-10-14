@@ -115,6 +115,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       'items': cart.items
           .map((item) => {
                 'product_id': item.productId,
+                if (item.variantId != null) 'variant_id': item.variantId,
                 'quantity': item.quantity,
                 'unit_price': item.price,
                 'discount': item.discount,

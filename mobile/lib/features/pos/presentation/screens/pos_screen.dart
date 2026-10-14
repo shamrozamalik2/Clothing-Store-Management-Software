@@ -10,6 +10,7 @@ import '../providers/cart_provider.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../data/sources/pos_remote_source.dart';
 import '../widgets/product_grid.dart';
+import '../widgets/variant_picker_sheet.dart';
 import '../../../../core/providers/scanner_controller_provider.dart';
 import '../../../products/data/models/product_model.dart';
 import '../../../products/presentation/providers/products_provider.dart';
@@ -133,26 +134,73 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     } catch (_) {}
   }
 
-  void _applyBarcode(String barcode) {
+  Future<void> _applyBarcode(String barcode) async {
     final match = _products.where((p) => p.barcode == barcode).toList();
     if (match.isNotEmpty) {
-      ref.read(cartProvider.notifier).addItem(match.first);
-      _showAddedSnack(match.first.name);
+      await _addProduct(match.first);
       return;
     }
-    ref
-        .read(cartProvider.notifier)
-        .applyBarcodeResult(barcode, ref.read(productsSourceProvider))
-        .then((_) {
-      final cart = ref.read(cartProvider);
-      if (cart.items.isNotEmpty) {
-        _showAddedSnack(cart.items.last.name);
-      } else {
+    try {
+      final product =
+          await ref.read(productsSourceProvider).findByBarcode(barcode);
+      if (!mounted) return;
+      if (product == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('No product found for barcode: $barcode')),
         );
+        return;
       }
-    });
+      // The scanned code matched one specific variant's own barcode, not
+      // just the product's — add that exact color/size straight away
+      // instead of making the cashier re-pick it from the full list.
+      final matchedId = product.matchedVariantId;
+      if (matchedId != null) {
+        final variant = product.variants.where((v) => v.id == matchedId).firstOrNull;
+        if (variant != null) {
+          await _addVariant(product, variant);
+          return;
+        }
+      }
+      await _addProduct(product);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Barcode lookup failed: $e')),
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Add to cart — routes a product with color/size variants through the
+  // picker instead of adding its (possibly non-existent) base listing.
+  // ---------------------------------------------------------------------
+
+  Future<void> _addProduct(ProductModel product) async {
+    if (product.hasVariants) {
+      final variant = await showVariantPicker(context, product);
+      if (!mounted || variant == null) return;
+      await _addVariant(product, variant);
+      return;
+    }
+    if (product.isOutOfStock) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"${product.name}" is out of stock.')),
+      );
+      return;
+    }
+    ref.read(cartProvider.notifier).addItem(product);
+    _showAddedSnack(product.name);
+  }
+
+  Future<void> _addVariant(ProductModel product, ProductVariantModel variant) async {
+    if (variant.stockQuantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This variant is out of stock.')),
+      );
+      return;
+    }
+    ref.read(cartProvider.notifier).addVariant(product, variant);
+    _showAddedSnack('${product.name}${variant.suffix}');
   }
 
   void _showAddedSnack(String name) {
@@ -349,10 +397,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           child: ProductGrid(
             products: _filteredProducts,
             loading: _loadingProducts,
-            onTap: (product) {
-              ref.read(cartProvider.notifier).addItem(product);
-              _showAddedSnack(product.name);
-            },
+            onTap: (product) => _addProduct(product),
           ),
         ),
       ],
@@ -563,15 +608,15 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       item: cart.items[index],
                       onIncrement: () => ref
                           .read(cartProvider.notifier)
-                          .updateQty(cart.items[index].productId,
+                          .updateQty(cart.items[index].key,
                               cart.items[index].quantity + 1),
                       onDecrement: () => ref
                           .read(cartProvider.notifier)
-                          .updateQty(cart.items[index].productId,
+                          .updateQty(cart.items[index].key,
                               cart.items[index].quantity - 1),
                       onRemove: () => ref
                           .read(cartProvider.notifier)
-                          .removeItem(cart.items[index].productId),
+                          .removeItem(cart.items[index].key),
                     ),
                   ),
           ),

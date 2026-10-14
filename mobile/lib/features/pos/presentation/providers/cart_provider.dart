@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/cart_item_model.dart';
 import '../../../products/data/models/product_model.dart';
-import '../../../products/data/sources/products_remote_source.dart';
 
 // ---------------------------------------------------------------------------
 // CartState
@@ -107,9 +106,13 @@ class CartNotifier extends StateNotifier<CartState> {
 
   // --- Cart mutations ---------------------------------------------------
 
+  /// Adds the product's own (base) listing — never call this for a product
+  /// that has variants; route those through [addVariant] instead so the
+  /// right color/size, price and stock get recorded on the cart line.
   void addItem(ProductModel product) {
     final pid = product.id.toString();
-    final idx = state.items.indexWhere((i) => i.productId == pid);
+    final key = '$pid-base';
+    final idx = state.items.indexWhere((i) => i.key == key);
     if (idx >= 0) {
       final items = List<CartItemModel>.from(state.items);
       items[idx] = items[idx].copyWith(quantity: items[idx].quantity + 1);
@@ -131,31 +134,56 @@ class CartNotifier extends StateNotifier<CartState> {
     }
   }
 
-  void removeItem(String productId) {
+  /// Adds one specific color/size variant of [product].
+  void addVariant(ProductModel product, ProductVariantModel variant) {
+    final pid = product.id.toString();
+    final key = '$pid-${variant.id}';
+    final idx = state.items.indexWhere((i) => i.key == key);
+    if (idx >= 0) {
+      final items = List<CartItemModel>.from(state.items);
+      items[idx] = items[idx].copyWith(quantity: items[idx].quantity + 1);
+      state = state.copyWith(items: items);
+    } else {
+      state = state.copyWith(
+        items: [
+          ...state.items,
+          CartItemModel(
+            productId: pid,
+            variantId: variant.id,
+            name: '${product.name}${variant.suffix}',
+            price: variant.salePrice > 0 ? variant.salePrice : product.sellingPrice,
+            costPrice: variant.costPrice > 0 ? variant.costPrice : product.costPrice,
+            quantity: 1,
+            barcode: variant.barcode ?? product.barcode,
+          ),
+        ],
+      );
+    }
+  }
+
+  void removeItem(String key) {
     state = state.copyWith(
-      items: state.items
-          .where((i) => i.productId != productId)
-          .toList(),
+      items: state.items.where((i) => i.key != key).toList(),
     );
   }
 
-  void updateQty(String productId, int qty) {
+  void updateQty(String key, int qty) {
     if (qty <= 0) {
-      removeItem(productId);
+      removeItem(key);
       return;
     }
     state = state.copyWith(
       items: state.items
-          .map((i) => i.productId == productId ? i.copyWith(quantity: qty) : i)
+          .map((i) => i.key == key ? i.copyWith(quantity: qty) : i)
           .toList(),
     );
   }
 
-  void updateItemDiscount(String productId, double discount) {
+  void updateItemDiscount(String key, double discount) {
     state = state.copyWith(
       items: state.items
           .map((i) =>
-              i.productId == productId ? i.copyWith(discount: discount.clamp(0, double.infinity)) : i)
+              i.key == key ? i.copyWith(discount: discount.clamp(0, double.infinity)) : i)
           .toList(),
     );
   }
@@ -196,22 +224,6 @@ class CartNotifier extends StateNotifier<CartState> {
   /// Restore a previously held cart (e.g. loaded from SharedPreferences).
   void restoreCart(CartState restored) {
     state = restored;
-  }
-
-  // --- Barcode lookup ---------------------------------------------------
-
-  /// Looks up [barcode] via [productsSource] and adds the matching product.
-  ///
-  /// [ProductsRemoteSource] is expected to expose:
-  ///   Future<List<ProductModel>> getProducts({String? barcode, ...})
-  Future<void> applyBarcodeResult(
-    String barcode,
-    ProductsRemoteSource productsSource,
-  ) async {
-    final results = await productsSource.getProducts(barcode: barcode);
-    if (results.items.isNotEmpty) {
-      addItem(results.items.first);
-    }
   }
 }
 

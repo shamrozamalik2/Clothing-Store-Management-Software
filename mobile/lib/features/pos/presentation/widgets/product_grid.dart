@@ -129,6 +129,33 @@ class _ProductCard extends StatelessWidget {
                         right: 6,
                         child: _StockBadge(qty: product.stockQuantity),
                       ),
+                      // Variant indicator (bottom-left) — tapping this card
+                      // opens the color/size picker instead of adding directly.
+                      if (product.hasVariants)
+                        Positioned(
+                          bottom: 6,
+                          left: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.style_rounded, size: 10, color: Colors.white),
+                                const SizedBox(width: 3),
+                                Text('${product.variants.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    )),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
