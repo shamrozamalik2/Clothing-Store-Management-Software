@@ -48,11 +48,13 @@ class TodaySalesWidgetProvider : HomeWidgetProvider() {
                     setTextViewText(R.id.widget_sales_label, "Today's Sales")
                     setTextViewText(R.id.widget_orders_value, orders.toString())
                     setTextViewText(R.id.widget_profit_value, formatMoney(profit))
+                    setViewVisibility(R.id.widget_divider, android.view.View.VISIBLE)
                     setViewVisibility(R.id.widget_secondary_row, android.view.View.VISIBLE)
                 } else {
                     setTextViewText(R.id.widget_updated_at, "")
                     setTextViewText(R.id.widget_sales_amount, "—")
                     setTextViewText(R.id.widget_sales_label, "Open the app to sign in")
+                    setViewVisibility(R.id.widget_divider, android.view.View.GONE)
                     setViewVisibility(R.id.widget_secondary_row, android.view.View.GONE)
                 }
             }

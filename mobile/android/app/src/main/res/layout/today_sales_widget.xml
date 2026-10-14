@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- RemoteViews (used by every app widget) only inflates a fixed whitelist of
-     view classes — notably NOT <Space>, which an earlier version of this
-     layout used for spacing and which failed inflation on-device with
-     "Error inflating class android.widget.Space". RelativeLayout anchoring
-     (top header, bottom secondary row) avoids needing a flexible spacer at
-     all, so there's nothing here outside the supported set. -->
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Plain top-anchored LinearLayout, deliberately not stretched to fill the
+     widget's full height: a previous version pinned the header to the top
+     and the orders/profit row to the bottom, which left a large dead gap in
+     the middle on anything bigger than the minimum widget size. Content
+     here stays naturally compact; if the widget is resized taller, the
+     extra space falls below everything as one quiet trailing gap instead
+     of splitting the card in two. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="@drawable/today_sales_widget_bg"
-    android:padding="16dp">
+    android:padding="14dp">
 
-    <!-- Header: company name + last-updated time -->
+    <!-- Header: small brand mark + company name + last-updated time -->
     <LinearLayout
-        android:id="@+id/widget_header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
@@ -27,7 +27,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="PBC"
-            android:textColor="#CCFFFFFF"
+            android:textColor="#D9FFFFFF"
             android:textSize="12sp"
             android:textStyle="bold"
             android:singleLine="true"
@@ -43,39 +43,43 @@
     </LinearLayout>
 
     <!-- Headline: today's sales -->
-    <LinearLayout
+    <TextView
+        android:id="@+id/widget_sales_amount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/widget_header"
-        android:layout_marginTop="10dp"
-        android:orientation="vertical">
+        android:layout_marginTop="8dp"
+        android:text="Rs 0"
+        android:textColor="#FFFFFFFF"
+        android:textSize="25sp"
+        android:textStyle="bold"
+        android:singleLine="true" />
 
-        <TextView
-            android:id="@+id/widget_sales_amount"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Rs 0"
-            android:textColor="#FFFFFFFF"
-            android:textSize="26sp"
-            android:textStyle="bold"
-            android:singleLine="true" />
+    <TextView
+        android:id="@+id/widget_sales_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Today's Sales"
+        android:textColor="#CCFFFFFF"
+        android:textSize="11sp" />
 
-        <TextView
-            android:id="@+id/widget_sales_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Today's Sales"
-            android:textColor="#CCFFFFFF"
-            android:textSize="11sp" />
-    </LinearLayout>
+    <!-- Divider — a 1dp TextView rather than <Space>/<View>: only TextView,
+         ImageView, (Linear/Relative/Frame/Grid)Layout and a short list of
+         other framework views are in RemoteViews' inflation whitelist, and
+         this is the plainest supported way to draw a hairline. -->
+    <TextView
+        android:id="@+id/widget_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:background="#26FFFFFF" />
 
-    <!-- Secondary row: orders + profit, pinned to the bottom so it holds its
-         place regardless of how much vertical room the widget is resized to. -->
+    <!-- Secondary row: orders + profit -->
     <LinearLayout
         android:id="@+id/widget_secondary_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
         android:orientation="horizontal">
 
         <LinearLayout
@@ -125,4 +129,4 @@
                 android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
-</RelativeLayout>
+</LinearLayout>
