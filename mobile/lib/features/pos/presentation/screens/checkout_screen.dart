@@ -12,6 +12,7 @@ import '../../data/sources/pos_remote_source.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../printer/presentation/providers/printer_provider.dart';
+import '../../../dashboard/presentation/providers/dashboard_provider.dart';
 
 final _shopNameProvider = Provider<String>((ref) {
   final user = ref.watch(currentUserProvider);
@@ -133,6 +134,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
       // Sale confirmed — this attempt is done, so the next one gets a fresh key.
       _idempotency.clear();
+
+      // Dashboard is loaded once and kept alive across tab switches, so without
+      // this it keeps showing whatever it had before this sale (today's totals,
+      // top products, etc. all stuck stale) until the user manually pulls to
+      // refresh — easy to miss since a card just quietly not updating looks a
+      // lot like it was never fetching in the first place.
+      ref.invalidate(dashboardProvider);
 
       // Clear cart and navigate back to POS.
       ref.read(cartProvider.notifier).clearCart();
