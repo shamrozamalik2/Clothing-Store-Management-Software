@@ -29,7 +29,7 @@ class HomeWidgetService {
   /// Must match the App Group configured in both Xcode targets (Runner and
   /// the Widget Extension) under Signing & Capabilities. See
   /// ios/WIDGET_SETUP.md for the one-time Xcode steps this needs.
-  static const iosAppGroupId = 'group.com.sasgarments.sasGarmentsMobile';
+  static const iosAppGroupId = 'group.com.probusinesscloud.app';
 
   static const _kCompanyName = 'company_name';
   static const _kTodaySales  = 'today_sales';

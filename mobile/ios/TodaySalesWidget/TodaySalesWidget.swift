@@ -5,7 +5,7 @@ import SwiftUI
 // storage contract (an App Group on this side instead of SharedPreferences),
 // written by lib/core/widget/home_widget_service.dart. This file only ever
 // renders the numbers it finds there; it never fetches anything itself.
-private let appGroupId = "group.com.sasgarments.sasGarmentsMobile"
+private let appGroupId = "group.com.probusinesscloud.app"
 
 struct TodaySalesEntry: TimelineEntry {
     let date: Date

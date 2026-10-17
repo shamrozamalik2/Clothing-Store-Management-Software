@@ -43,7 +43,7 @@ needed" is unchecked (they should stay at their existing repo paths) and
 
 1. Select the **Runner** target → **Signing & Capabilities** → **+
    Capability** → **App Groups** → **+** → add
-   `group.com.sasgarments.sasGarmentsMobile` (the identifier already baked
+   `group.com.probusinesscloud.app` (the identifier already baked
    into `Runner.entitlements` and the widget's Swift code).
 2. Select the **TodaySalesWidget** target → same steps → tick the *same*
    group (don't create a second one — it must be the identical string on
