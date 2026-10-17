@@ -48,7 +48,11 @@ const list = async (req, res, next) => {
   try {
     const cid = req.companyId;
     const { page, limit, offset } = parsePagination(req.query);
-    const { search = '', category = '', brand = '', stock_status = '', status = '', sort = 'name', order = 'asc' } = req.query;
+    // Defaults to newest-first: a product list that isn't explicitly sorted by
+    // the user falls back to alphabetical-by-name otherwise, which buries a
+    // product someone just added wherever its name happens to land rather
+    // than showing it where they'd expect — at the top.
+    const { search = '', category = '', brand = '', stock_status = '', status = '', sort = 'created', order = 'desc' } = req.query;
 
     const filter = { company_id: cid };
     if (search)   filter.$or = [{ name: { $regex: search, $options: 'i' } }, { sku: { $regex: search, $options: 'i' } }, { barcode: { $regex: search, $options: 'i' } }];

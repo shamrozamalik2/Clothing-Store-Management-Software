@@ -297,9 +297,23 @@ export default function POSPage() {
                 // scan needed several tries to actually add the product.
                 barcodeMut.mutate(code, {
                   onSuccess: (res) => pickAndClose(res.data),
-                  onError: () => {
-                    if (searchDropOpen && products.length > 0) pickAndClose(products[0]);
-                    else toast.error('No product found for this barcode.');
+                  onError: async () => {
+                    // Not a barcode — e.g. someone typed a partial name/SKU and
+                    // hit Enter. The on-screen dropdown's `products` can't be
+                    // trusted here: it's debounced ~250ms behind `code`, so for
+                    // a fast scan it's still showing whatever the PREVIOUS
+                    // input matched — including nothing at all, or another
+                    // product entirely. A fresh, undebounced lookup for this
+                    // exact `code` is the only way to know what actually
+                    // matches it right now.
+                    try {
+                      const res = await productsApi.list({ search: code, limit: 1, status: 'active' });
+                      const match = res?.data?.[0];
+                      if (match) pickAndClose(match);
+                      else toast.error('No product found for this barcode.');
+                    } catch {
+                      toast.error('No product found for this barcode.');
+                    }
                   },
                 });
               }}

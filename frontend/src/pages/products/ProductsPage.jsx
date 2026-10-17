@@ -89,8 +89,11 @@ export default function ProductsPage() {
     try { return new Set(JSON.parse(localStorage.getItem('products-hidden-cols') ?? '[]')); } catch { return new Set(); }
   });
   const [view,    setView]    = useState('list');
-  const [sortBy,  setSortBy]  = useState('name');
-  const [sortDir, setSortDir] = useState('asc');
+  // Newest-first by default — a product sorted alphabetically shows up
+  // wherever its name lands rather than where you'd actually look for
+  // something you just added. Clicking "Product" still re-sorts by name.
+  const [sortBy,  setSortBy]  = useState('created');
+  const [sortDir, setSortDir] = useState('desc');
 
   function handleSort(col) {
     if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
