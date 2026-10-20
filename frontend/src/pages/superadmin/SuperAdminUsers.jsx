@@ -71,7 +71,7 @@ function ResetPasswordModal({ user, onClose }) {
           <div className="text-center py-4">
             <CheckCircleIcon className="h-10 w-10 text-green-400 mx-auto mb-3" />
             <p className="text-green-400 font-medium">Password reset successfully.</p>
-            <SecondaryButton onClick={onClose} className="mt-4 bg-slate-800/80">Close</SecondaryButton>
+            <SecondaryButton onClick={onClose} className="mt-4 bg-surface-800/80">Close</SecondaryButton>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
@@ -149,7 +149,7 @@ export default function SuperAdminUsers() {
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-500" />
               <input type="search" value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search users…"
                 className={`${INPUT} pl-9 w-56`} />
@@ -160,7 +160,7 @@ export default function SuperAdminUsers() {
               <option value="true">Active</option>
               <option value="false">Inactive</option>
             </select>
-            <SecondaryButton onClick={load} className="bg-slate-800/80 border border-slate-700/60 text-xs px-3 py-2">
+            <SecondaryButton onClick={load} className="bg-surface-800/80 border border-surface-700/60 text-xs px-3 py-2">
               Refresh
             </SecondaryButton>
           </div>
@@ -171,7 +171,7 @@ export default function SuperAdminUsers() {
           <Panel className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700/40 bg-slate-900/40 text-slate-400 text-xs uppercase tracking-wider">
+                <tr className="border-b border-surface-700/40 bg-surface-900/40 text-surface-400 text-xs uppercase tracking-wider">
                   <th className="px-4 py-3 text-left">User</th>
                   <th className="px-4 py-3 text-left">Company</th>
                   <th className="px-4 py-3 text-left">Role</th>
@@ -180,17 +180,17 @@ export default function SuperAdminUsers() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/30">
+              <tbody className="divide-y divide-surface-700/30">
                 {loading ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i}><td colSpan={6} className="px-4 py-3">
-                      <div className="h-8 rounded-lg bg-slate-800/50 animate-pulse" />
+                      <div className="h-8 rounded-lg bg-surface-800/50 animate-pulse" />
                     </td></tr>
                   ))
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">No users found.</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-10 text-center text-surface-500">No users found.</td></tr>
                 ) : rows.map(u => (
-                  <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={u.id} className="hover:bg-surface-800/30 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-600/50 to-indigo-600/40 border border-purple-500/20 flex items-center justify-center text-xs font-bold text-purple-200 shrink-0">
@@ -198,25 +198,25 @@ export default function SuperAdminUsers() {
                         </div>
                         <div>
                           <p className="text-white font-medium">{u.name}</p>
-                          <p className="text-slate-500 text-xs">{u.email}</p>
+                          <p className="text-surface-500 text-xs">{u.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-slate-300 text-xs">{u.company_name || '—'}</p>
-                      {u.branch_name && <p className="text-slate-500 text-xs">{u.branch_name}</p>}
+                      <p className="text-surface-300 text-xs">{u.company_name || '—'}</p>
+                      {u.branch_name && <p className="text-surface-500 text-xs">{u.branch_name}</p>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 bg-slate-800 text-slate-400 text-xs rounded-full capitalize">
+                      <span className="px-2 py-0.5 bg-surface-800 text-surface-400 text-xs rounded-full capitalize">
                         {u.role_name || '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {u.is_active
                         ? <span className="px-2 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 text-xs rounded-full">Active</span>
-                        : <span className="px-2 py-0.5 bg-slate-700 text-slate-400 border border-slate-600 text-xs rounded-full">Inactive</span>}
+                        : <span className="px-2 py-0.5 bg-surface-700 text-surface-400 border border-surface-600 text-xs rounded-full">Inactive</span>}
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">
+                    <td className="px-4 py-3 text-surface-500 text-xs">
                       {u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}
                     </td>
                     <td className="px-4 py-3">
@@ -237,14 +237,14 @@ export default function SuperAdminUsers() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between text-sm text-slate-400">
+            <div className="flex items-center justify-between text-sm text-surface-400">
               <span>{total} users</span>
               <div className="flex items-center gap-2">
                 <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">← Prev</button>
+                  className="px-3 py-1.5 bg-surface-800/80 hover:bg-surface-700 disabled:opacity-40 rounded-lg text-xs">← Prev</button>
                 <span className="px-3 py-1.5 text-xs">Page {page} / {totalPages}</span>
                 <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
-                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">Next →</button>
+                  className="px-3 py-1.5 bg-surface-800/80 hover:bg-surface-700 disabled:opacity-40 rounded-lg text-xs">Next →</button>
               </div>
             </div>
           )}

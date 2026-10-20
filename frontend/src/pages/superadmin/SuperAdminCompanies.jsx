@@ -22,7 +22,7 @@ const STATUS = {
   active:    'bg-green-500/10 text-green-400 border-green-500/20',
   trial:     'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
   suspended: 'bg-red-500/10 text-red-400 border-red-500/20',
-  expired:   'bg-slate-700 text-slate-400 border-slate-600',
+  expired:   'bg-surface-700 text-surface-400 border-surface-600',
 };
 
 function Badge({ status }) {
@@ -58,20 +58,20 @@ function CopyRow({ label, value, secret }) {
   };
   const display = secret && !show ? '••••••••' : value;
   return (
-    <div className="flex items-center justify-between bg-slate-800/80 rounded-xl px-4 py-2.5 gap-3">
+    <div className="flex items-center justify-between bg-surface-800/80 rounded-xl px-4 py-2.5 gap-3">
       <div className="min-w-0">
-        <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+        <p className="text-xs text-surface-500 mb-0.5">{label}</p>
         <p className="text-sm font-mono text-white break-all">{display}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0">
         {secret && (
           <button onClick={() => setShow(s => !s)}
-            className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors">
+            className="text-xs text-surface-400 hover:text-white px-2 py-1 rounded-lg bg-surface-700 hover:bg-surface-600 transition-colors">
             {show ? 'Hide' : 'Show'}
           </button>
         )}
         <button onClick={copy} title="Copy"
-          className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+          className="h-7 w-7 flex items-center justify-center rounded-lg text-surface-400 hover:text-white hover:bg-surface-700 transition-colors">
           {copied
             ? <ClipboardDocumentCheckIcon className="h-4 w-4 text-green-400" />
             : <ClipboardDocumentIcon className="h-4 w-4" />}
@@ -105,7 +105,7 @@ function CredentialsCard({ creds, onClose }) {
         </div>
         <div>
           <p className="text-white font-semibold">Company created!</p>
-          <p className="text-sm text-slate-400">Share these login details with your client.</p>
+          <p className="text-sm text-surface-400">Share these login details with your client.</p>
         </div>
       </div>
 
@@ -121,7 +121,7 @@ function CredentialsCard({ creds, onClose }) {
       </div>
 
       <div className="flex justify-end gap-3">
-        <SecondaryButton type="button" onClick={copyAll} className="bg-slate-800 hover:bg-slate-700">
+        <SecondaryButton type="button" onClick={copyAll} className="bg-surface-800 hover:bg-surface-700">
           {allCopied
             ? <><ClipboardDocumentCheckIcon className="h-4 w-4 text-green-400" /> Copied!</>
             : <><ClipboardDocumentIcon className="h-4 w-4" /> Copy All</>}
@@ -404,7 +404,7 @@ function PlanModal({ company, onClose, onSaved }) {
       maxWidth="max-w-xl"
     >
       <form onSubmit={save} className="p-6 space-y-5 overflow-y-auto">
-        <p className="text-xs text-slate-500 -mt-3">{company.name}</p>
+        <p className="text-xs text-surface-500 -mt-3">{company.name}</p>
         {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-2 text-sm">{error}</div>}
 
         <div className="grid grid-cols-2 gap-3">
@@ -433,23 +433,23 @@ function PlanModal({ company, onClose, onSaved }) {
               className="text-xs text-purple-400 hover:text-purple-300">Use category defaults for all</button>
           </div>
           {!rows ? (
-            <p className="text-sm text-slate-500">Loading…</p>
+            <p className="text-sm text-surface-500">Loading…</p>
           ) : (
             <div className="space-y-1 max-h-[55vh] overflow-y-auto pr-1">
-              <p className="text-xs text-slate-500 mb-2">
+              <p className="text-xs text-surface-500 mb-2">
                 Business category: {category}. Each feature follows the category unless you set it here.
               </p>
               {rows.map(r => {
                 const override = overrides[r.key];
                 const on = typeof override === 'boolean' ? override : r.category;
                 return (
-                  <div key={r.key} className="flex items-center justify-between gap-3 py-1.5 px-3 rounded-xl hover:bg-slate-800/60">
+                  <div key={r.key} className="flex items-center justify-between gap-3 py-1.5 px-3 rounded-xl hover:bg-surface-800/60">
                     <div className="min-w-0">
-                      <p className="text-sm text-slate-300 truncate">{r.label}</p>
-                      <p className="text-xs text-slate-500">Category: {r.category ? 'on' : 'off'}</p>
+                      <p className="text-sm text-surface-300 truncate">{r.label}</p>
+                      <p className="text-xs text-surface-500">Category: {r.category ? 'on' : 'off'}</p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className={`text-xs font-semibold ${on ? 'text-green-400' : 'text-slate-500'}`}>{on ? 'On' : 'Off'}</span>
+                      <span className={`text-xs font-semibold ${on ? 'text-green-400' : 'text-surface-500'}`}>{on ? 'On' : 'Off'}</span>
                       <select value={typeof override === 'boolean' ? String(override) : 'default'}
                         onChange={e => setOverride(r.key, e.target.value)} className={INPUT}>
                         <option value="default">Category default</option>
@@ -485,11 +485,11 @@ function SuspendModal({ company, onClose, onDone }) {
     finally { setBusy(false); }
   }
   return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-surface-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="rounded-2xl shadow-xl backdrop-blur-md w-full max-w-md p-6"
         style={{ background: 'rgba(15,23,42,0.72)', border: '1px solid rgba(248,113,113,0.25)' }}>
         <h3 className="text-white font-semibold mb-1">Suspend Company</h3>
-        <p className="text-sm text-slate-400 mb-4">Suspending <span className="text-red-400 font-medium">{company.name}</span> will block all logins.</p>
+        <p className="text-sm text-surface-400 mb-4">Suspending <span className="text-red-400 font-medium">{company.name}</span> will block all logins.</p>
         <form onSubmit={submit} className="space-y-4">
           <textarea required rows={3} value={reason} onChange={e => setReason(e.target.value)}
             placeholder="Reason for suspension…"
@@ -579,7 +579,7 @@ export default function SuperAdminCompanies() {
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-500" />
               <input type="search" value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search companies…"
                 className={`${INPUT} pl-9 w-56`} />
@@ -600,7 +600,7 @@ export default function SuperAdminCompanies() {
           <Panel className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700/40 bg-slate-900/40 text-slate-400 text-xs uppercase tracking-wider">
+                <tr className="border-b border-surface-700/40 bg-surface-900/40 text-surface-400 text-xs uppercase tracking-wider">
                   <th className="px-4 py-3 text-left">Company</th>
                   <th className="px-4 py-3 text-left">Plan</th>
                   <th className="px-4 py-3 text-center">Status</th>
@@ -610,26 +610,26 @@ export default function SuperAdminCompanies() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/30">
+              <tbody className="divide-y divide-surface-700/30">
                 {loading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i}><td colSpan={7} className="px-4 py-3">
-                      <div className="h-8 rounded-lg bg-slate-800/50 animate-pulse" />
+                      <div className="h-8 rounded-lg bg-surface-800/50 animate-pulse" />
                     </td></tr>
                   ))
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">No companies found.</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-surface-500">No companies found.</td></tr>
                 ) : rows.map(c => (
-                  <tr key={c.id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={c.id} className="hover:bg-surface-800/30 transition-colors">
                     <td className="px-4 py-3">
                       <p className="text-white font-medium">{c.name}</p>
-                      <p className="text-slate-500 text-xs">{c.slug} {c.email ? `· ${c.email}` : ''}</p>
+                      <p className="text-surface-500 text-xs">{c.slug} {c.email ? `· ${c.email}` : ''}</p>
                     </td>
-                    <td className="px-4 py-3 text-slate-400 capitalize text-xs">{c.plan || '—'}</td>
+                    <td className="px-4 py-3 text-surface-400 capitalize text-xs">{c.plan || '—'}</td>
                     <td className="px-4 py-3 text-center"><Badge status={c.subscription_status} /></td>
-                    <td className="px-4 py-3 text-right text-slate-400">{c.active_users ?? '—'} / {c.max_users ?? '—'}</td>
-                    <td className="px-4 py-3 text-right text-slate-400">{c.total_sales ?? '—'}</td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">
+                    <td className="px-4 py-3 text-right text-surface-400">{c.active_users ?? '—'} / {c.max_users ?? '—'}</td>
+                    <td className="px-4 py-3 text-right text-surface-400">{c.total_sales ?? '—'}</td>
+                    <td className="px-4 py-3 text-surface-500 text-xs">
                       {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-4 py-3">
@@ -651,14 +651,14 @@ export default function SuperAdminCompanies() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between text-sm text-slate-400">
+            <div className="flex items-center justify-between text-sm text-surface-400">
               <span>{total} companies</span>
               <div className="flex items-center gap-2">
                 <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">← Prev</button>
+                  className="px-3 py-1.5 bg-surface-800/80 hover:bg-surface-700 disabled:opacity-40 rounded-lg text-xs">← Prev</button>
                 <span className="px-3 py-1.5 text-xs">Page {page} / {totalPages}</span>
                 <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
-                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">Next →</button>
+                  className="px-3 py-1.5 bg-surface-800/80 hover:bg-surface-700 disabled:opacity-40 rounded-lg text-xs">Next →</button>
               </div>
             </div>
           )}
@@ -671,11 +671,11 @@ export default function SuperAdminCompanies() {
 
         {/* Delete Company — typed confirmation to prevent accidental wipe */}
         {deleting && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-950/80 backdrop-blur-sm">
             <div className="rounded-2xl shadow-xl backdrop-blur-md p-6 w-full max-w-md"
               style={{ background: 'rgba(15,23,42,0.72)', border: '1px solid rgba(248,113,113,0.22)' }}>
               <h3 className="text-lg font-bold text-white mb-1">Delete Company</h3>
-              <p className="text-sm text-slate-400 mb-4">
+              <p className="text-sm text-surface-400 mb-4">
                 This permanently deletes <span className="text-white font-semibold">{deleting.name}</span> and{' '}
                 <span className="text-red-400 font-semibold">all its data</span> — products, sales, customers, everything.
                 This cannot be undone.

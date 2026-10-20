@@ -19,7 +19,7 @@ const GROUP_LABELS = {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{label}</span>
+      <span className="block text-xs font-semibold uppercase tracking-wider text-surface-400 mb-1.5">{label}</span>
       {children}
     </label>
   );
@@ -76,7 +76,7 @@ function CategoryModal({ category, registry, onClose, onSaved }) {
               <p className="text-xs font-semibold uppercase tracking-wider text-purple-300 mb-2">{GROUP_LABELS[group] || group}</p>
               <div className="grid grid-cols-2 gap-2">
                 {items.map(f => (
-                  <label key={f.key} className="flex items-center gap-2 text-sm text-slate-200 bg-slate-800/60 rounded-xl px-3 py-2 cursor-pointer hover:bg-slate-800 transition-colors">
+                  <label key={f.key} className="flex items-center gap-2 text-sm text-surface-200 bg-surface-800/60 rounded-xl px-3 py-2 cursor-pointer hover:bg-surface-800 transition-colors">
                     <input type="checkbox" checked={!!form.features[f.key]} onChange={() => toggle(f.key)} className="accent-purple-500" />
                     {f.label}
                   </label>
@@ -153,7 +153,7 @@ export default function SuperAdminBusinessCategories() {
 
         <Panel className="overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-900/40 text-slate-400 text-xs uppercase tracking-wider">
+            <thead className="bg-surface-900/40 text-surface-400 text-xs uppercase tracking-wider">
               <tr>
                 <th className="text-left px-4 py-3">Name</th>
                 <th className="text-left px-4 py-3">Key</th>
@@ -162,21 +162,21 @@ export default function SuperAdminBusinessCategories() {
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/30">
-              {loading && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">Loading…</td></tr>}
+            <tbody className="divide-y divide-surface-700/30">
+              {loading && <tr><td colSpan={5} className="px-4 py-6 text-center text-surface-500">Loading…</td></tr>}
               {!loading && categories.map(c => (
-                <tr key={c.key} className="hover:bg-slate-800/30 transition-colors">
+                <tr key={c.key} className="hover:bg-surface-800/30 transition-colors">
                   <td className="px-4 py-3 text-white font-medium">{c.name}</td>
-                  <td className="px-4 py-3 font-mono text-slate-300">{c.key}</td>
-                  <td className="px-4 py-3 text-slate-300">{enabledCount(c)} / {registry.length}</td>
+                  <td className="px-4 py-3 font-mono text-surface-300">{c.key}</td>
+                  <td className="px-4 py-3 text-surface-300">{enabledCount(c)} / {registry.length}</td>
                   <td className="px-4 py-3">
                     <button onClick={() => toggleActive(c)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${c.is_active ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-slate-700/40 text-slate-400 border-slate-600'}`}>
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${c.is_active ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-surface-700/40 text-surface-400 border-surface-600'}`}>
                       {c.is_active ? 'Active' : 'Inactive'}
                     </button>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => openEdit(c.key)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors" title="Edit">
+                    <button onClick={() => openEdit(c.key)} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800/60 transition-colors" title="Edit">
                       <PencilIcon className="h-4 w-4" />
                     </button>
                   </td>
