@@ -24,6 +24,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications' AAR declares this as a hard requirement
+        // at build time (checkDebugAarMetadata fails without it) — it's what
+        // lets its Java code use newer java.time/stream APIs back to minSdk.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -68,6 +72,10 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 // NOTE: CameraX 1.2.3 forcing was REMOVED.

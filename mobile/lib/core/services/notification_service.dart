@@ -1,4 +1,5 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Background message handler — must be a top-level function.
@@ -29,10 +30,19 @@ void debugPrintFirebaseMessage(String context, RemoteMessage message) {
 // NotificationService
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Must match AndroidManifest.xml's com.google.firebase.messaging.default_notification_channel_id
+// meta-data, and the channel created below — FCM notification payloads that
+// arrive while the app is backgrounded/killed are auto-shown by the OS
+// through this channel, so its id has to agree in both places.
+const _kAndroidChannelId   = 'default_channel';
+const _kAndroidChannelName = 'General';
+
 class NotificationService {
   NotificationService._();
 
   static final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  static final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
 
   // ── Initialise ─────────────────────────────────────────────────────────────
 
@@ -40,6 +50,25 @@ class NotificationService {
   static Future<void> init() async {
     // Register the background handler.
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+    // Android only auto-shows an FCM notification's banner for you when the
+    // app is backgrounded or not running at all — while it's open, nothing
+    // appears unless the app explicitly draws one itself. This sets up the
+    // plugin and channel that onMessage() below uses to do that.
+    await _localNotifications.initialize(
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(),
+      ),
+    );
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(const AndroidNotificationChannel(
+          _kAndroidChannelId,
+          _kAndroidChannelName,
+          importance: Importance.high,
+        ));
 
     // Request permission (iOS + Android 13+).
     final settings = await _fcm.requestPermission(
@@ -97,9 +126,38 @@ class NotificationService {
 
   // ── Message listeners ──────────────────────────────────────────────────────
 
-  /// Listen to messages received while the app is in the foreground.
+  /// Listen to messages received while the app is in the foreground. Always
+  /// draws the system notification banner first — iOS does this itself via
+  /// setForegroundNotificationPresentationOptions, Android does not — then
+  /// calls [handler] for any additional in-app handling (badges, lists, etc).
   static void onMessage(void Function(RemoteMessage message) handler) {
-    FirebaseMessaging.onMessage.listen(handler);
+    FirebaseMessaging.onMessage.listen((message) {
+      _showForegroundNotification(message);
+      handler(message);
+    });
+  }
+
+  static Future<void> _showForegroundNotification(RemoteMessage message) async {
+    final notification = message.notification;
+    if (notification == null) return;
+    try {
+      await _localNotifications.show(
+        id: message.hashCode,
+        title: notification.title,
+        body: notification.body,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _kAndroidChannelId,
+            _kAndroidChannelName,
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        ),
+      );
+    } catch (_) {
+      // A missing/misconfigured plugin must never crash message handling —
+      // the in-app handler (badge, notifications list) still runs either way.
+    }
   }
 
   /// Listen for when the user taps a notification that opens the app from
