@@ -14,6 +14,9 @@ import {
   saUpdatePlan, saUpdateFeatures, saGetCompanyFeatures,
   saListBusinessCategories, saAssignBusinessCategory,
 } from '@api/superAdminClient';
+import {
+  INPUT, Field, Modal, Panel, PageHeader, PrimaryButton, SecondaryButton, SECTION_LABEL,
+} from './components/adminUI';
 
 const STATUS = {
   active:    'bg-green-500/10 text-green-400 border-green-500/20',
@@ -38,22 +41,10 @@ function clientLoginUrl() {
   return `${window.location.protocol}//${host}/login`;
 }
 
-function Field({ label, children, required }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-slate-400 mb-1">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-const INPUT = 'w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500';
-
 const EMPTY = {
   name: '', slug: '', email: '', phone: '', address: '',
   plan: 'standard', subscription_status: 'trial', max_users: 5,
+  business_category: 'CLOTHING',
   admin_name: '', admin_email: '', admin_password: '',
 };
 
@@ -67,7 +58,7 @@ function CopyRow({ label, value, secret }) {
   };
   const display = secret && !show ? '••••••••' : value;
   return (
-    <div className="flex items-center justify-between bg-slate-800 rounded-lg px-4 py-2.5 gap-3">
+    <div className="flex items-center justify-between bg-slate-800/80 rounded-xl px-4 py-2.5 gap-3">
       <div className="min-w-0">
         <p className="text-xs text-slate-500 mb-0.5">{label}</p>
         <p className="text-sm font-mono text-white break-all">{display}</p>
@@ -75,12 +66,12 @@ function CopyRow({ label, value, secret }) {
       <div className="flex items-center gap-1 shrink-0">
         {secret && (
           <button onClick={() => setShow(s => !s)}
-            className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 transition-colors">
+            className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors">
             {show ? 'Hide' : 'Show'}
           </button>
         )}
         <button onClick={copy} title="Copy"
-          className="h-7 w-7 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+          className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
           {copied
             ? <ClipboardDocumentCheckIcon className="h-4 w-4 text-green-400" />
             : <ClipboardDocumentIcon className="h-4 w-4" />}
@@ -109,7 +100,7 @@ function CredentialsCard({ creds, onClose }) {
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+        <div className="h-10 w-10 rounded-full bg-green-500/15 border border-green-500/25 flex items-center justify-center shrink-0">
           <CheckCircleIcon className="h-5 w-5 text-green-400" />
         </div>
         <div>
@@ -125,21 +116,17 @@ function CredentialsCard({ creds, onClose }) {
         <CopyRow label="Password"      value={creds.password} secret />
       </div>
 
-      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-4 py-3 text-xs text-yellow-400">
+      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3 text-xs text-yellow-400">
         Save this password now — it cannot be recovered after you close this window.
       </div>
 
       <div className="flex justify-end gap-3">
-        <button onClick={copyAll}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors">
+        <SecondaryButton type="button" onClick={copyAll} className="bg-slate-800 hover:bg-slate-700">
           {allCopied
             ? <><ClipboardDocumentCheckIcon className="h-4 w-4 text-green-400" /> Copied!</>
             : <><ClipboardDocumentIcon className="h-4 w-4" /> Copy All</>}
-        </button>
-        <button onClick={onClose}
-          className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors">
-          Done
-        </button>
+        </SecondaryButton>
+        <PrimaryButton onClick={onClose}>Done</PrimaryButton>
       </div>
     </div>
   );
@@ -147,10 +134,17 @@ function CredentialsCard({ creds, onClose }) {
 
 function CreateModal({ onClose, onCreated }) {
   const [form,  setForm]  = useState(EMPTY);
+  const [categories, setCategories] = useState([]);
   const [error, setError] = useState('');
   const [busy,  setBusy]  = useState(false);
   const [creds, setCreds] = useState(null); // set after success
   const set = f => e => setForm(v => ({ ...v, [f]: e.target.value }));
+
+  useEffect(() => {
+    saListBusinessCategories()
+      .then(res => setCategories(res.data.data.categories.filter(c => c.is_active)))
+      .catch(() => setCategories([]));
+  }, []);
 
   const autoSlug = (name) =>
     name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -164,7 +158,17 @@ function CreateModal({ onClose, onCreated }) {
     e.preventDefault();
     setBusy(true); setError('');
     try {
-      await saCreateCompany(form);
+      const { business_category, ...companyFields } = form;
+      const res = await saCreateCompany(companyFields);
+      // Business category isn't part of company creation itself (a separate,
+      // existing endpoint assigns it) — what used to be missing here entirely
+      // was ever calling that endpoint, so every new company silently sat on
+      // whatever the backend defaults to until someone remembered to go edit
+      // it afterward. Same two-call pattern EditModal already uses below.
+      const companyId = res.data.data.id;
+      if (business_category && business_category !== 'CLOTHING') {
+        await saAssignBusinessCategory(companyId, business_category);
+      }
       const loginUrl = clientLoginUrl();
       setCreds({
         company_name: form.name,
@@ -180,82 +184,82 @@ function CreateModal({ onClose, onCreated }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 shrink-0">
-          <h3 className="text-white font-semibold">{creds ? 'Client Login Info' : 'New Company'}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
-        </div>
+    <Modal title={creds ? 'Client Login Info' : 'New Company'} onClose={onClose}>
+      {creds ? (
+        <CredentialsCard creds={creds} onClose={onClose} />
+      ) : (
+        <form onSubmit={submit} className="p-6 space-y-4 overflow-y-auto flex-1">
+          {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-2 text-sm">{error}</div>}
 
-        {creds ? (
-          <CredentialsCard creds={creds} onClose={onClose} />
-        ) : (
-          <form onSubmit={submit} className="p-6 space-y-4 overflow-y-auto flex-1">
-            {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-2 text-sm">{error}</div>}
-
-            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Company Details</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Company Name" required>
-                <input required value={form.name} onChange={handleNameChange} placeholder="Acme Store" className={INPUT} />
-              </Field>
-              <Field label="Company Slug">
-                <input value={form.slug} onChange={set('slug')} placeholder="acme-store" className={INPUT} />
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Email">
-                <input type="email" value={form.email} onChange={set('email')} placeholder="info@acme.com" className={INPUT} />
-              </Field>
-              <Field label="Phone">
-                <input value={form.phone} onChange={set('phone')} placeholder="+92 300 0000000" className={INPUT} />
-              </Field>
-            </div>
-            <Field label="Address">
-              <input value={form.address} onChange={set('address')} placeholder="City, Country" className={INPUT} />
+          <p className={`${SECTION_LABEL} pt-1`}>Company Details</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Company Name" required>
+              <input required value={form.name} onChange={handleNameChange} placeholder="Acme Store" className={INPUT} />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Plan">
-                <select value={form.plan} onChange={set('plan')} className={INPUT}>
-                  <option value="standard">Standard</option>
-                  <option value="pro">Pro</option>
-                  <option value="enterprise">Enterprise</option>
-                </select>
-              </Field>
-              <Field label="Status">
-                <select value={form.subscription_status} onChange={set('subscription_status')} className={INPUT}>
-                  <option value="trial">Trial</option>
-                  <option value="active">Active</option>
-                </select>
-              </Field>
-            </div>
+            <Field label="Company Slug">
+              <input value={form.slug} onChange={set('slug')} placeholder="acme-store" className={INPUT} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Email">
+              <input type="email" value={form.email} onChange={set('email')} placeholder="info@acme.com" className={INPUT} />
+            </Field>
+            <Field label="Phone">
+              <input value={form.phone} onChange={set('phone')} placeholder="+92 300 0000000" className={INPUT} />
+            </Field>
+          </div>
+          <Field label="Address">
+            <input value={form.address} onChange={set('address')} placeholder="City, Country" className={INPUT} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Plan">
+              <select value={form.plan} onChange={set('plan')} className={INPUT}>
+                <option value="standard">Standard</option>
+                <option value="pro">Pro</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+            </Field>
+            <Field label="Status">
+              <select value={form.subscription_status} onChange={set('subscription_status')} className={INPUT}>
+                <option value="trial">Trial</option>
+                <option value="active">Active</option>
+              </select>
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Max Users">
               <input type="number" min={1} max={500} value={form.max_users} onChange={set('max_users')} className={INPUT} />
             </Field>
-
-            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold pt-2">User's Crediential of Account</p>
-            <Field label="Admin Name" required>
-              <input required value={form.admin_name} onChange={set('admin_name')} placeholder="Admin User" className={INPUT} />
+            <Field label="Business Category" hint="Sets which modules are on by default.">
+              <select value={form.business_category} onChange={set('business_category')} className={INPUT}>
+                {categories.length === 0 && <option value="CLOTHING">Clothing</option>}
+                {categories.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
+              </select>
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Admin Email" required>
-                <input required type="email" value={form.admin_email} onChange={set('admin_email')} placeholder="admin@acme.com" className={INPUT} />
-              </Field>
-              <Field label="Password" required>
-                <input required type="password" minLength={8} value={form.admin_password} onChange={set('admin_password')} placeholder="Min 8 chars" className={INPUT} />
-              </Field>
-            </div>
+          </div>
 
-            <div className="flex justify-end gap-3 pt-2 shrink-0">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-              <button type="submit" disabled={busy}
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
-                {busy ? 'Creating…' : 'Create Company'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+          <p className={`${SECTION_LABEL} pt-2`}>User's Credential of Account</p>
+          <Field label="Admin Name" required>
+            <input required value={form.admin_name} onChange={set('admin_name')} placeholder="Admin User" className={INPUT} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Admin Email" required>
+              <input required type="email" value={form.admin_email} onChange={set('admin_email')} placeholder="admin@acme.com" className={INPUT} />
+            </Field>
+            <Field label="Password" required>
+              <input required type="password" minLength={8} value={form.admin_password} onChange={set('admin_password')} placeholder="Min 8 chars" className={INPUT} />
+            </Field>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 shrink-0">
+            <SecondaryButton type="button" onClick={onClose}>Cancel</SecondaryButton>
+            <PrimaryButton type="submit" disabled={busy}>
+              {busy ? 'Creating…' : 'Create Company'}
+            </PrimaryButton>
+          </div>
+        </form>
+      )}
+    </Modal>
   );
 }
 
@@ -296,63 +300,56 @@ function EditModal({ company, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <h3 className="text-white font-semibold">Edit — {company.name}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
-        </div>
-        <form onSubmit={submit} className="p-6 space-y-4">
-          {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-2 text-sm">{error}</div>}
-          <Field label="Company Name" required>
-            <input required value={form.name} onChange={set('name')} className={INPUT} />
+    <Modal title={`Edit — ${company.name}`} onClose={onClose} maxWidth="max-w-md">
+      <form onSubmit={submit} className="p-6 space-y-4">
+        {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-2 text-sm">{error}</div>}
+        <Field label="Company Name" required>
+          <input required value={form.name} onChange={set('name')} className={INPUT} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Email">
+            <input type="email" value={form.email} onChange={set('email')} className={INPUT} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Email">
-              <input type="email" value={form.email} onChange={set('email')} className={INPUT} />
-            </Field>
-            <Field label="Phone">
-              <input value={form.phone} onChange={set('phone')} className={INPUT} />
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Plan">
-              <select value={form.plan} onChange={set('plan')} className={INPUT}>
-                <option value="standard">Standard</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-            </Field>
-            <Field label="Status">
-              <select value={form.subscription_status} onChange={set('subscription_status')} className={INPUT}>
-                <option value="trial">Trial</option>
-                <option value="active">Active</option>
-                <option value="suspended">Suspended</option>
-                <option value="expired">Expired</option>
-              </select>
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Max Users">
-              <input type="number" min={1} max={500} value={form.max_users} onChange={set('max_users')} className={INPUT} />
-            </Field>
-            <Field label="Business Category">
-              <select value={form.business_category} onChange={set('business_category')} className={INPUT}>
-                {!categories.some(c => c.key === form.business_category) && <option value={form.business_category}>{form.business_category}</option>}
-                {categories.map(c => <option key={c.key} value={c.key}>{c.name}{c.is_active ? '' : ' (inactive)'}</option>)}
-              </select>
-            </Field>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-            <button type="submit" disabled={busy}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
-              {busy ? 'Saving…' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          <Field label="Phone">
+            <input value={form.phone} onChange={set('phone')} className={INPUT} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Plan">
+            <select value={form.plan} onChange={set('plan')} className={INPUT}>
+              <option value="standard">Standard</option>
+              <option value="pro">Pro</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </Field>
+          <Field label="Status">
+            <select value={form.subscription_status} onChange={set('subscription_status')} className={INPUT}>
+              <option value="trial">Trial</option>
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+              <option value="expired">Expired</option>
+            </select>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Max Users">
+            <input type="number" min={1} max={500} value={form.max_users} onChange={set('max_users')} className={INPUT} />
+          </Field>
+          <Field label="Business Category">
+            <select value={form.business_category} onChange={set('business_category')} className={INPUT}>
+              {!categories.some(c => c.key === form.business_category) && <option value={form.business_category}>{form.business_category}</option>}
+              {categories.map(c => <option key={c.key} value={c.key}>{c.name}{c.is_active ? '' : ' (inactive)'}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="flex justify-end gap-3 pt-2">
+          <SecondaryButton type="button" onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={busy}>
+            {busy ? 'Saving…' : 'Save Changes'}
+          </PrimaryButton>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -401,85 +398,80 @@ function PlanModal({ company, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <div>
-            <h3 className="text-white font-semibold">Plan & Features</h3>
-            <p className="text-xs text-slate-500 mt-0.5">{company.name}</p>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
-        </div>
-        <form onSubmit={save} className="p-6 space-y-5">
-          {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-2 text-sm">{error}</div>}
+    <Modal
+      title="Plan & Features"
+      onClose={onClose}
+      maxWidth="max-w-xl"
+    >
+      <form onSubmit={save} className="p-6 space-y-5 overflow-y-auto">
+        <p className="text-xs text-slate-500 -mt-3">{company.name}</p>
+        {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-2 text-sm">{error}</div>}
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Plan">
-              <select value={plan} onChange={e => setPlan(e.target.value)} className={INPUT}>
-                <option value="standard">Standard</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-            </Field>
-            <Field label="Max Users">
-              <input type="number" min={1} max={500} value={maxUsers}
-                onChange={e => setMaxUsers(e.target.value)} className={INPUT} />
-            </Field>
-          </div>
-
-          <Field label="Trial Ends At">
-            <input type="date" value={trialEnds}
-              onChange={e => setTrialEnds(e.target.value)} className={INPUT} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Plan">
+            <select value={plan} onChange={e => setPlan(e.target.value)} className={INPUT}>
+              <option value="standard">Standard</option>
+              <option value="pro">Pro</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
           </Field>
+          <Field label="Max Users">
+            <input type="number" min={1} max={500} value={maxUsers}
+              onChange={e => setMaxUsers(e.target.value)} className={INPUT} />
+          </Field>
+        </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Features</p>
-              <button type="button" onClick={() => setOverrides({})}
-                className="text-xs text-purple-400 hover:text-purple-300">Use category defaults for all</button>
-            </div>
-            {!rows ? (
-              <p className="text-sm text-slate-500">Loading…</p>
-            ) : (
-              <div className="space-y-1 max-h-[55vh] overflow-y-auto pr-1">
-                <p className="text-xs text-slate-500 mb-2">
-                  Business category: {category}. Each feature follows the category unless you set it here.
-                </p>
-                {rows.map(r => {
-                  const override = overrides[r.key];
-                  const on = typeof override === 'boolean' ? override : r.category;
-                  return (
-                    <div key={r.key} className="flex items-center justify-between gap-3 py-1.5 px-3 rounded-lg hover:bg-slate-800">
-                      <div className="min-w-0">
-                        <p className="text-sm text-slate-300 truncate">{r.label}</p>
-                        <p className="text-xs text-slate-500">Category: {r.category ? 'on' : 'off'}</p>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className={`text-xs font-semibold ${on ? 'text-green-400' : 'text-slate-500'}`}>{on ? 'On' : 'Off'}</span>
-                        <select value={typeof override === 'boolean' ? String(override) : 'default'}
-                          onChange={e => setOverride(r.key, e.target.value)} className={INPUT}>
-                          <option value="default">Category default</option>
-                          <option value="true">On</option>
-                          <option value="false">Off</option>
-                        </select>
-                      </div>
+        <Field label="Trial Ends At">
+          <input type="date" value={trialEnds}
+            onChange={e => setTrialEnds(e.target.value)} className={INPUT} />
+        </Field>
+
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className={SECTION_LABEL}>Features</p>
+            <button type="button" onClick={() => setOverrides({})}
+              className="text-xs text-purple-400 hover:text-purple-300">Use category defaults for all</button>
+          </div>
+          {!rows ? (
+            <p className="text-sm text-slate-500">Loading…</p>
+          ) : (
+            <div className="space-y-1 max-h-[55vh] overflow-y-auto pr-1">
+              <p className="text-xs text-slate-500 mb-2">
+                Business category: {category}. Each feature follows the category unless you set it here.
+              </p>
+              {rows.map(r => {
+                const override = overrides[r.key];
+                const on = typeof override === 'boolean' ? override : r.category;
+                return (
+                  <div key={r.key} className="flex items-center justify-between gap-3 py-1.5 px-3 rounded-xl hover:bg-slate-800/60">
+                    <div className="min-w-0">
+                      <p className="text-sm text-slate-300 truncate">{r.label}</p>
+                      <p className="text-xs text-slate-500">Category: {r.category ? 'on' : 'off'}</p>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className={`text-xs font-semibold ${on ? 'text-green-400' : 'text-slate-500'}`}>{on ? 'On' : 'Off'}</span>
+                      <select value={typeof override === 'boolean' ? String(override) : 'default'}
+                        onChange={e => setOverride(r.key, e.target.value)} className={INPUT}>
+                        <option value="default">Category default</option>
+                        <option value="true">On</option>
+                        <option value="false">Off</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-          <div className="flex justify-end gap-3 pt-1">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-            <button type="submit" disabled={busy}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
-              {busy ? 'Saving…' : 'Save Plan'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex justify-end gap-3 pt-1">
+          <SecondaryButton type="button" onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={busy}>
+            {busy ? 'Saving…' : 'Save Plan'}
+          </PrimaryButton>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -493,8 +485,9 @@ function SuspendModal({ company, onClose, onDone }) {
     finally { setBusy(false); }
   }
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-red-800/50 rounded-2xl w-full max-w-md shadow-2xl p-6">
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="rounded-2xl shadow-xl backdrop-blur-md w-full max-w-md p-6"
+        style={{ background: 'rgba(15,23,42,0.72)', border: '1px solid rgba(248,113,113,0.25)' }}>
         <h3 className="text-white font-semibold mb-1">Suspend Company</h3>
         <p className="text-sm text-slate-400 mb-4">Suspending <span className="text-red-400 font-medium">{company.name}</span> will block all logins.</p>
         <form onSubmit={submit} className="space-y-4">
@@ -502,9 +495,9 @@ function SuspendModal({ company, onClose, onDone }) {
             placeholder="Reason for suspension…"
             className={`${INPUT} resize-none`} />
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
+            <SecondaryButton type="button" onClick={onClose}>Cancel</SecondaryButton>
             <button type="submit" disabled={busy}
-              className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
+              className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-lg shadow-red-950/40 transition-all">
               {busy ? 'Suspending…' : 'Suspend'}
             </button>
           </div>
@@ -573,17 +566,15 @@ export default function SuperAdminCompanies() {
     <SuperAdminGuard>
       <SuperAdminLayout page="companies">
         <div className="space-y-5 max-w-7xl">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-white">Companies</h2>
-              <p className="text-sm text-slate-500 mt-0.5">{total} total companies</p>
-            </div>
-            <button onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors">
-              <PlusIcon className="h-4 w-4" /> New Company
-            </button>
-          </div>
+          <PageHeader
+            title="Companies"
+            subtitle={`${total} total companies`}
+            action={
+              <PrimaryButton onClick={() => setShowCreate(true)}>
+                <PlusIcon className="h-4 w-4" /> New Company
+              </PrimaryButton>
+            }
+          />
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-3">
@@ -591,10 +582,10 @@ export default function SuperAdminCompanies() {
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
               <input type="search" value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search companies…"
-                className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg pl-9 pr-3 py-2 w-56 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                className={`${INPUT} pl-9 w-56`} />
             </div>
             <select value={status} onChange={e => setStatus(e.target.value)}
-              className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+              className={`${INPUT} w-auto`}>
               <option value="">All Statuses</option>
               <option value="active">Active</option>
               <option value="trial">Trial</option>
@@ -606,10 +597,10 @@ export default function SuperAdminCompanies() {
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
           {/* Table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
+          <Panel className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 text-xs uppercase tracking-wider">
+                <tr className="border-b border-slate-700/40 bg-slate-900/40 text-slate-400 text-xs uppercase tracking-wider">
                   <th className="px-4 py-3 text-left">Company</th>
                   <th className="px-4 py-3 text-left">Plan</th>
                   <th className="px-4 py-3 text-center">Status</th>
@@ -619,17 +610,17 @@ export default function SuperAdminCompanies() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-slate-700/30">
                 {loading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i}><td colSpan={7} className="px-4 py-3">
-                      <div className="h-8 rounded bg-slate-800/50 animate-pulse" />
+                      <div className="h-8 rounded-lg bg-slate-800/50 animate-pulse" />
                     </td></tr>
                   ))
                 ) : rows.length === 0 ? (
                   <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">No companies found.</td></tr>
                 ) : rows.map(c => (
-                  <tr key={c.id} className="bg-slate-950 hover:bg-slate-900/50 transition-colors">
+                  <tr key={c.id} className="hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3">
                       <p className="text-white font-medium">{c.name}</p>
                       <p className="text-slate-500 text-xs">{c.slug} {c.email ? `· ${c.email}` : ''}</p>
@@ -656,7 +647,7 @@ export default function SuperAdminCompanies() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Panel>
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -664,10 +655,10 @@ export default function SuperAdminCompanies() {
               <span>{total} companies</span>
               <div className="flex items-center gap-2">
                 <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">← Prev</button>
+                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">← Prev</button>
                 <span className="px-3 py-1.5 text-xs">Page {page} / {totalPages}</span>
                 <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">Next →</button>
+                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">Next →</button>
               </div>
             </div>
           )}
@@ -680,15 +671,16 @@ export default function SuperAdminCompanies() {
 
         {/* Delete Company — typed confirmation to prevent accidental wipe */}
         {deleting && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-red-900/40 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+            <div className="rounded-2xl shadow-xl backdrop-blur-md p-6 w-full max-w-md"
+              style={{ background: 'rgba(15,23,42,0.72)', border: '1px solid rgba(248,113,113,0.22)' }}>
               <h3 className="text-lg font-bold text-white mb-1">Delete Company</h3>
               <p className="text-sm text-slate-400 mb-4">
                 This permanently deletes <span className="text-white font-semibold">{deleting.name}</span> and{' '}
                 <span className="text-red-400 font-semibold">all its data</span> — products, sales, customers, everything.
                 This cannot be undone.
               </p>
-              <div className="rounded-lg border border-red-900/30 bg-red-500/5 px-3 py-2 text-xs text-red-300 mb-3">
+              <div className="rounded-xl border border-red-900/30 bg-red-500/5 px-3 py-2 text-xs text-red-300 mb-3">
                 Type <span className="font-mono font-bold text-white">{deleting.name}</span> to confirm
               </div>
               <input
@@ -697,16 +689,15 @@ export default function SuperAdminCompanies() {
                 onChange={e => setDeleteInput(e.target.value)}
                 placeholder={`Type "${deleting.name}" to confirm`}
                 autoFocus
-                className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
+                className={`${INPUT} mb-4 font-mono focus:ring-red-500/60 focus:border-red-500/60`}
               />
               <div className="flex gap-3 justify-end">
-                <button onClick={() => { setDeleting(null); setDeleteInput(''); }}
-                  className="px-4 py-2 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors">
+                <SecondaryButton onClick={() => { setDeleting(null); setDeleteInput(''); }}>
                   Cancel
-                </button>
+                </SecondaryButton>
                 <button onClick={deleteCompany}
                   disabled={deleteInput.trim() !== deleting.name}
-                  className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                  className="px-5 py-2.5 text-sm bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-semibold rounded-xl shadow-lg shadow-red-950/40 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none">
                   Permanently Delete
                 </button>
               </div>
@@ -728,7 +719,7 @@ function ActionBtn({ Icon, title, color, onClick }) {
   };
   return (
     <button onClick={onClick} title={title}
-      className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${colors[color] || ''}`}>
+      className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${colors[color] || ''}`}>
       <Icon className="h-3.5 w-3.5" />
     </button>
   );

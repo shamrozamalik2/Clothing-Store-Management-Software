@@ -8,19 +8,7 @@ import {
   saListUsers, saUpdateUser, saToggleUser,
   saResetUserPassword, saDeleteUser,
 } from '@api/superAdminClient';
-
-const INPUT = 'w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500';
-
-function Field({ label, children, required }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-slate-400 mb-1">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
+import { INPUT, Field, Modal, Panel, PageHeader, PrimaryButton, SecondaryButton } from './components/adminUI';
 
 function EditModal({ user, onClose, onSaved }) {
   const [form, setForm] = useState({ name: user.name, email: user.email });
@@ -37,30 +25,23 @@ function EditModal({ user, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <h3 className="text-white font-semibold">Edit User — {user.name}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+    <Modal title={`Edit User — ${user.name}`} onClose={onClose} maxWidth="max-w-md">
+      <form onSubmit={submit} className="p-6 space-y-4">
+        {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-2 text-sm">{error}</div>}
+        <Field label="Full Name" required>
+          <input required value={form.name} onChange={set('name')} className={INPUT} />
+        </Field>
+        <Field label="Email" required>
+          <input required type="email" value={form.email} onChange={set('email')} className={INPUT} />
+        </Field>
+        <div className="flex justify-end gap-3 pt-2">
+          <SecondaryButton type="button" onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={busy}>
+            {busy ? 'Saving…' : 'Save Changes'}
+          </PrimaryButton>
         </div>
-        <form onSubmit={submit} className="p-6 space-y-4">
-          {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-2 text-sm">{error}</div>}
-          <Field label="Full Name" required>
-            <input required value={form.name} onChange={set('name')} className={INPUT} />
-          </Field>
-          <Field label="Email" required>
-            <input required type="email" value={form.email} onChange={set('email')} className={INPUT} />
-          </Field>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-            <button type="submit" disabled={busy}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
-              {busy ? 'Saving…' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -84,21 +65,17 @@ function ResetPasswordModal({ user, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-white font-semibold">Reset Password — {user.name}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
-        </div>
+    <Modal title={`Reset Password — ${user.name}`} onClose={onClose} maxWidth="max-w-md">
+      <div className="p-6">
         {success ? (
           <div className="text-center py-4">
             <CheckCircleIcon className="h-10 w-10 text-green-400 mx-auto mb-3" />
             <p className="text-green-400 font-medium">Password reset successfully.</p>
-            <button onClick={onClose} className="mt-4 px-5 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg">Close</button>
+            <SecondaryButton onClick={onClose} className="mt-4 bg-slate-800/80">Close</SecondaryButton>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
-            {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-2 text-sm">{error}</div>}
+            {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-2 text-sm">{error}</div>}
             <Field label="New Password" required>
               <input required type="password" minLength={8} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" className={INPUT} />
             </Field>
@@ -106,16 +83,15 @@ function ResetPasswordModal({ user, onClose }) {
               <input required type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat password" className={INPUT} />
             </Field>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-              <button type="submit" disabled={busy}
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg">
+              <SecondaryButton type="button" onClick={onClose}>Cancel</SecondaryButton>
+              <PrimaryButton type="submit" disabled={busy}>
                 {busy ? 'Resetting…' : 'Reset Password'}
-              </button>
+              </PrimaryButton>
             </div>
           </form>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -168,11 +144,7 @@ export default function SuperAdminUsers() {
     <SuperAdminGuard>
       <SuperAdminLayout page="users">
         <div className="space-y-5 max-w-7xl">
-          {/* Header */}
-          <div>
-            <h2 className="text-xl font-bold text-white">Users</h2>
-            <p className="text-sm text-slate-500 mt-0.5">{total} users across all companies</p>
-          </div>
+          <PageHeader title="Users" subtitle={`${total} users across all companies`} />
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-3">
@@ -180,27 +152,26 @@ export default function SuperAdminUsers() {
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
               <input type="search" value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search users…"
-                className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg pl-9 pr-3 py-2 w-56 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                className={`${INPUT} pl-9 w-56`} />
             </div>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+              className={`${INPUT} w-auto`}>
               <option value="">All Statuses</option>
               <option value="true">Active</option>
               <option value="false">Inactive</option>
             </select>
-            <button onClick={load}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs rounded-lg border border-slate-700 transition-colors">
+            <SecondaryButton onClick={load} className="bg-slate-800/80 border border-slate-700/60 text-xs px-3 py-2">
               Refresh
-            </button>
+            </SecondaryButton>
           </div>
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
           {/* Table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
+          <Panel className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 text-xs uppercase tracking-wider">
+                <tr className="border-b border-slate-700/40 bg-slate-900/40 text-slate-400 text-xs uppercase tracking-wider">
                   <th className="px-4 py-3 text-left">User</th>
                   <th className="px-4 py-3 text-left">Company</th>
                   <th className="px-4 py-3 text-left">Role</th>
@@ -209,20 +180,20 @@ export default function SuperAdminUsers() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-slate-700/30">
                 {loading ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i}><td colSpan={6} className="px-4 py-3">
-                      <div className="h-8 rounded bg-slate-800/50 animate-pulse" />
+                      <div className="h-8 rounded-lg bg-slate-800/50 animate-pulse" />
                     </td></tr>
                   ))
                 ) : rows.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">No users found.</td></tr>
                 ) : rows.map(u => (
-                  <tr key={u.id} className="bg-slate-950 hover:bg-slate-900/50 transition-colors">
+                  <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-purple-700/40 flex items-center justify-center text-xs font-bold text-purple-300 shrink-0">
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-600/50 to-indigo-600/40 border border-purple-500/20 flex items-center justify-center text-xs font-bold text-purple-200 shrink-0">
                           {(u.name || 'U').slice(0, 2).toUpperCase()}
                         </div>
                         <div>
@@ -262,7 +233,7 @@ export default function SuperAdminUsers() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Panel>
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -270,10 +241,10 @@ export default function SuperAdminUsers() {
               <span>{total} users</span>
               <div className="flex items-center gap-2">
                 <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">← Prev</button>
+                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">← Prev</button>
                 <span className="px-3 py-1.5 text-xs">Page {page} / {totalPages}</span>
                 <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">Next →</button>
+                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 disabled:opacity-40 rounded-lg text-xs">Next →</button>
               </div>
             </div>
           )}
@@ -296,7 +267,7 @@ function ActionBtn({ Icon, title, color, onClick }) {
   };
   return (
     <button onClick={onClick} title={title}
-      className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${colors[color] || ''}`}>
+      className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${colors[color] || ''}`}>
       <Icon className="h-3.5 w-3.5" />
     </button>
   );
