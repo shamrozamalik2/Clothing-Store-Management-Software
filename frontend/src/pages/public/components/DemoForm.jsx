@@ -5,15 +5,21 @@ import { motion, useReducedMotion } from 'framer-motion';
 
 import { EASE } from './motion';
 import { BUSINESS_TYPES, LOCATION_COUNTS } from '../content';
+import { API_ORIGIN } from '@api/client';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Demo request submission
    Posts to the public, rate-limited POST /api/leads endpoint, which validates
    the payload and stores it in the demo_leads table. Field-level errors from
    the server are surfaced back onto the matching inputs.
+
+   This marketing page is served from app.probusinesscloud.com / probusinesscloud.com,
+   which has no /api/ proxy — only api.probusinesscloud.com does. So this must hit
+   the absolute API_ORIGIN, the same resolution the rest of the app uses, not a
+   same-origin relative path.
    ═══════════════════════════════════════════════════════════════════════════ */
 async function submitDemoRequest(values) {
-  const res = await fetch('/api/leads', {
+  const res = await fetch(`${API_ORIGIN}/api/leads`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
