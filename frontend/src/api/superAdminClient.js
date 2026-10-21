@@ -66,6 +66,11 @@ export const saUpdateBusinessCategory     = (key, d)   => sa.put(`/business-cate
 export const saSetBusinessCategoryStatus  = (key, on)  => sa.patch(`/business-categories/${key}/status`, { is_active: on });
 export const saAssignBusinessCategory     = (id, key)  => sa.put(`/companies/${id}/business-category`, { business_category: key });
 
+// ── Demo leads ────────────────────────────────────────────────────────────────
+export const saListLeads  = (params) => sa.get('/leads', { params });
+export const saUpdateLead = (id, d)  => sa.patch(`/leads/${id}`, d);
+export const saDeleteLead = (id)     => sa.delete(`/leads/${id}`);
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const saListUsers          = (params) => sa.get('/users', { params });
 export const saUpdateUser         = (id, d)  => sa.patch(`/users/${id}`, d);

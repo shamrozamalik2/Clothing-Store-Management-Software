@@ -4,6 +4,7 @@ import SuperAdminDashboard  from '@pages/superadmin/SuperAdminDashboard';
 import SuperAdminCompanies  from '@pages/superadmin/SuperAdminCompanies';
 import SuperAdminUsers      from '@pages/superadmin/SuperAdminUsers';
 import SuperAdminBusinessCategories from '@pages/superadmin/SuperAdminBusinessCategories';
+import SuperAdminLeads     from '@pages/superadmin/SuperAdminLeads';
 import { SuperAdminGuard }  from '@pages/superadmin/SuperAdminLayout';
 
 function GuardedRoute({ children }) {
@@ -16,5 +17,6 @@ export const superAdminRouter = createHashRouter([
   { path: '/admin/companies', element: <GuardedRoute><SuperAdminCompanies /></GuardedRoute> },
   { path: '/admin/users',     element: <GuardedRoute><SuperAdminUsers /></GuardedRoute> },
   { path: '/admin/business-categories', element: <GuardedRoute><SuperAdminBusinessCategories /></GuardedRoute> },
+  { path: '/admin/leads',     element: <GuardedRoute><SuperAdminLeads /></GuardedRoute> },
   { path: '*',                element: <Navigate to="/admin/login" replace /> },
 ]);

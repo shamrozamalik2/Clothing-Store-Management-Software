@@ -45,6 +45,11 @@ const env = {
 
   // ── Cookie ────────────────────────────────────────────────
   COOKIE_SECRET: opt('COOKIE_SECRET', req('JWT_SECRET')),
+
+  // ── Transactional email (Resend) ───────────────────────────
+  RESEND_API_KEY:     opt('RESEND_API_KEY', ''),
+  MAIL_FROM:          opt('MAIL_FROM', 'ProBusinessCloud <onboarding@resend.dev>'),
+  LEADS_NOTIFY_EMAIL: opt('LEADS_NOTIFY_EMAIL', ''),
 };
 
 module.exports = { env };

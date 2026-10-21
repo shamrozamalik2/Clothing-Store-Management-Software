@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import {
   HomeIcon, BuildingOffice2Icon, UsersIcon,
   ArrowRightOnRectangleIcon,
-  Bars3Icon, ChevronLeftIcon, TagIcon,
+  Bars3Icon, ChevronLeftIcon, TagIcon, EnvelopeIcon,
 } from '@heroicons/react/24/outline';
 import Logo from '@components/ui/Logo';
 
@@ -23,6 +23,7 @@ const NAV = [
   { id: 'dashboard', label: 'Dashboard',  href: '#/admin/dashboard', Icon: HomeIcon },
   { id: 'companies', label: 'Companies',  href: '#/admin/companies', Icon: BuildingOffice2Icon },
   { id: 'business-categories', label: 'Business Categories', href: '#/admin/business-categories', Icon: TagIcon },
+  { id: 'leads',     label: 'Demo Leads', href: '#/admin/leads',     Icon: EnvelopeIcon },
   { id: 'users',     label: 'Users',      href: '#/admin/users',     Icon: UsersIcon },
 ];
 

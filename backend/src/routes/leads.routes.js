@@ -6,7 +6,7 @@ const { body, validationResult } = require('express-validator');
 
 const DemoLead = require('../models/DemoLead');
 const logger   = require('../config/logger');
-const { requireSuperAdmin } = require('../middleware/superadmin.middleware');
+const mailer   = require('../utils/mailer');
 
 const router = Router();
 
@@ -51,44 +51,14 @@ router.post('/', submitLimiter, validators, async (req, res, next) => {
       user_agent:    (req.get('user-agent') || '').slice(0, 400) || null,
     });
     logger.info(`[leads] demo request ${lead._id} from ${business} <${email}>`);
+    // Best-effort — must never block or fail the submission itself.
+    mailer.notifyNewLead(lead).catch(err => logger.warn(`[leads] notify email failed: ${err.message}`));
     return res.status(201).json({ success: true, message: 'Thank you — your request has been received.' });
   } catch (err) { return next(err); }
 });
 
-// GET /api/leads — super-admin only
-router.get('/', requireSuperAdmin, async (req, res, next) => {
-  try {
-    const limit  = Math.min(Number(req.query.limit)  || 50, 200);
-    const offset = Math.max(Number(req.query.offset) || 0,  0);
-    const filter = req.query.status ? { status: req.query.status } : {};
-
-    const [total, leads] = await Promise.all([
-      DemoLead.countDocuments(filter),
-      DemoLead.find(filter).sort({ created_at: -1 }).skip(offset).limit(limit).lean(),
-    ]);
-    return res.json({ success: true, data: { leads: leads.map(l => ({ ...l, id: l._id.toString() })), total } });
-  } catch (err) { return next(err); }
-});
-
-// PATCH /api/leads/:id — super-admin only
-router.patch('/:id', requireSuperAdmin,
-  [
-    body('status').optional().isIn(['new', 'contacted', 'qualified', 'converted', 'rejected']),
-    body('notes').optional({ values: 'falsy' }).trim().isLength({ max: 4000 }),
-  ],
-  async (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(422).json({ success: false, message: 'Invalid update.', errors: errors.array() });
-    try {
-      const { status, notes } = req.body;
-      const upd = {};
-      if (status !== undefined) { upd.status = status; upd.handled_at = new Date(); }
-      if (notes  !== undefined) upd.notes = notes;
-      const lead = await DemoLead.findByIdAndUpdate(req.params.id, upd, { new: true }).lean();
-      if (!lead) return res.status(404).json({ success: false, message: 'Lead not found.' });
-      return res.json({ success: true, data: { ...lead, id: lead._id.toString() } });
-    } catch (err) { return next(err); }
-  }
-);
+// Admin management of leads (list / update / delete) lives under
+// /api/admin/leads, alongside the rest of the super admin API surface —
+// see routes/admin.routes.js and controllers/leads.controller.js.
 
 module.exports = router;

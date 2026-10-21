@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   BuildingOffice2Icon, UsersIcon, ShoppingCartIcon,
   ExclamationTriangleIcon, ServerIcon, ClockIcon,
-  CheckCircleIcon, XCircleIcon,
+  CheckCircleIcon, XCircleIcon, EnvelopeIcon,
 } from '@heroicons/react/24/outline';
 import SuperAdminLayout, { SuperAdminGuard } from './SuperAdminLayout';
 import { saGetStats } from '@api/superAdminClient';
@@ -64,12 +64,15 @@ export default function SuperAdminDashboard() {
           <div>
             <p className="text-xs font-semibold text-surface-500 uppercase tracking-widest mb-3">Activity</p>
             <motion.div
-              className="grid grid-cols-2 md:grid-cols-4 gap-4"
+              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4"
               variants={STAGGER_PARENT} initial="hidden" animate="show"
             >
               <KpiTile label="Active Users"    value={stats?.active_users}       icon={UsersIcon}               theme="blue"   loading={loading} />
               <KpiTile label="Sales Today"     value={stats?.sales_today}        icon={ShoppingCartIcon}        theme="green"  loading={loading} />
               <KpiTile label="Low Stock Items" value={stats?.low_stock_products} icon={ExclamationTriangleIcon} theme="amber"  loading={loading} />
+              <a href="#/admin/leads" className="block">
+                <KpiTile label="New Leads" value={stats?.new_leads} icon={EnvelopeIcon} theme="violet" loading={loading} />
+              </a>
               <KpiTile
                 label="Server Uptime"
                 value={stats ? `${uptimeHours}h` : undefined}
@@ -104,6 +107,7 @@ export default function SuperAdminDashboard() {
                     { label: 'Manage Companies',       href: '#/admin/companies' },
                     { label: 'Trial Accounts',         href: '#/admin/companies?status=trial' },
                     { label: 'Suspended Accounts',     href: '#/admin/companies?status=suspended' },
+                    { label: 'Demo Leads',             href: '#/admin/leads' },
                     { label: 'Manage Users',           href: '#/admin/users' },
                   ].map(({ label, href }) => (
                     <a key={label} href={href}

@@ -9,6 +9,7 @@ const Branch     = require('../models/Branch');
 const Sale       = require('../models/Sale');
 const Product    = require('../models/Product');
 const SuperAdmin = require('../models/SuperAdmin');
+const DemoLead   = require('../models/DemoLead');
 const logger     = require('../config/logger');
 const BusinessCategory = require('../models/BusinessCategory');
 const featureSvc = require('../services/features.service');
@@ -352,7 +353,7 @@ exports.stats = async (req, res, next) => {
     const todayStart = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
     const todayEnd   = new Date(new Date().toISOString().slice(0, 10) + 'T23:59:59.999Z');
 
-    const [companiesAgg, activeUsers, salesToday, lowStock] = await Promise.all([
+    const [companiesAgg, activeUsers, salesToday, lowStock, newLeads] = await Promise.all([
       Company.aggregate([
         { $group: {
           _id:       null,
@@ -365,6 +366,7 @@ exports.stats = async (req, res, next) => {
       User.countDocuments({ is_active: true }),
       Sale.countDocuments({ sale_date: { $gte: todayStart, $lte: todayEnd }, status: { $ne: 'cancelled' } }),
       Product.countDocuments({ is_active: true, track_inventory: true, $expr: { $lte: ['$stock_quantity', '$low_stock_alert'] } }),
+      DemoLead.countDocuments({ status: 'new' }),
     ]);
 
     return res.json({
@@ -374,6 +376,7 @@ exports.stats = async (req, res, next) => {
         active_users:       activeUsers,
         sales_today:        salesToday,
         low_stock_products: lowStock,
+        new_leads:          newLeads,
         server_time:        new Date().toISOString(),
         uptime_seconds:     Math.floor(process.uptime()),
         memory_mb:          Math.round(process.memoryUsage().rss / 1024 / 1024),

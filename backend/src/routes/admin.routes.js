@@ -4,6 +4,7 @@ const { Router } = require('express');
 const { body }   = require('express-validator');
 const ctrl       = require('../controllers/admin.controller');
 const categoryCtrl = require('../controllers/business-categories.controller');
+const leadsCtrl  = require('../controllers/leads.controller');
 const { requireSuperAdmin } = require('../middleware/superadmin.middleware');
 
 const router = Router();
@@ -48,6 +49,11 @@ router.post('/business-categories',                categoryCtrl.createBusinessCa
 router.put('/business-categories/:key',            categoryCtrl.updateBusinessCategory);
 router.patch('/business-categories/:key/status',   categoryCtrl.setBusinessCategoryStatus);
 router.put('/companies/:id/business-category',     categoryCtrl.assignCompanyBusinessCategory);
+
+// ── Demo leads ─────────────────────────────────────────────────────────────────
+router.get('/leads',        leadsCtrl.listLeads);
+router.patch('/leads/:id',  leadsCtrl.updateLead);
+router.delete('/leads/:id', leadsCtrl.deleteLead);
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 router.get('/users',                   ctrl.listUsers);
