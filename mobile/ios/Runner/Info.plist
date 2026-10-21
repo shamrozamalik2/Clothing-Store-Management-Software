@@ -81,10 +81,16 @@
 	     BGTaskScheduler using that raw string, unprefixed. Editing this
 	     file is equivalent to ticking "Background Modes → Background
 	     fetch" in Xcode's Signing & Capabilities; both just write this
-	     same plist key, so no Xcode step is needed for this part. -->
+	     same plist key, so no Xcode step is needed for this part.
+	     `remote-notification` is the same story — it's what lets a silent/
+	     background FCM push wake the app; it does NOT grant the
+	     `aps-environment` signing entitlement, which still has to come from
+	     Xcode's Push Notifications capability (that one touches code
+	     signing, not just this plist). -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
+		<string>remote-notification</string>
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
